@@ -1,0 +1,88 @@
+# Node.js and npm directories
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Typescript compiled output (build artifacts)
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# IDE and editor specific files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.vscode/
+
+# OS-specific files
+.DS_Store       # macOS
+Thumbs.db       # Windows
+
+# Environment variables file
+.env
+.env.local
+.env.*.local
+
+# Log files
+*.log
+*.log.*
+
+# Temporary files
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Dependency directories for specific package managers
+.pnp/
+.pnp.js
+coverage/    # Jest code coverage
+*.tgz        # Package tarballs
+
+# Dependency manager lock files (if you’re using Yarn, uncomment these)
+# yarn.lock
+# package-lock.json
+
+# Docker files
+Dockerfile
+docker-compose.yml
+
+# Coverage reports
+coverage/
+
+# TypeScript typings
+typings/
+
+# Testing output
+test-coverage/
+jest-report/
+
+# Next.js specific (if you're using Next.js)
+.next/
+out/
+
+# JetBrains IDE files
+.idea/
+
+# SASS/SCSS/LESS compilation artifacts
+*.css
+*.scss
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# JetBrains & IntelliJ
+.idea/
+*.iml
+
+# SASS maps (generated in dev mode)
+*.map
+
+# dotenv files
+.env.*

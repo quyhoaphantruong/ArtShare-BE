@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "target": "ES2020",                            // Target a modern version of ECMAScript (adjust as necessary)
+    "module": "commonjs",                          // Use CommonJS module system for Node.js compatibility
+    "lib": ["ES2020"],                             // Include standard ES2020 library for better async support and modern APIs
+    "moduleResolution": "node",                    // Resolve modules using Node.js resolution logic
+    "strict": true,                                // Enable all strict type-checking options
+    "esModuleInterop": true,                       // Allows using `import` syntax with CommonJS modules
+    "skipLibCheck": true,                          // Skip type checking of declaration files for faster compilation
+    "forceConsistentCasingInFileNames": true,      // Ensure consistent casing of file names
+    "resolveJsonModule": true,                     // Allow importing JSON modules
+    "noEmit": false,                               // Don't emit any output (can be useful for type-checking only)
+    "isolatedModules": true,                       // Ensure each file can be safely transpiled independently
+    "noUnusedLocals": true,                        // Report errors on unused locals
+    "noUnusedParameters": true,                    // Report errors on unused parameters
+    "noImplicitReturns": true,                     // Report error if not all code paths return a value
+    "noImplicitAny": true,                         // Enforce explicit typing where the type is `any`
+    "strictNullChecks": true,                      // Enforce strict null checks
+    "allowSyntheticDefaultImports": true,          // Allow default imports from modules with no default export
+    "skipDefaultLibCheck": true,                   // Skip checking of default libraries (speeds up the build)
+    "outDir": "./dist",                            // Output directory for compiled files
+    "baseUrl": ".",                                // Base directory to resolve non-relative module names
+    "paths": {
+      "@src/*": ["src/*"],                         // Aliases to simplify imports
+      "@modules/*": ["src/modules/*"]
+    },
+    "incremental": true,                           // Enable incremental compilation for faster rebuilds
+    "composite": true                              // Enable project references for efficient builds
+  },
+  "include": [
+    "src/**/*.ts"                                  // Include all TypeScript files in the `src` folder
+  ],
+  "exclude": [
+    "node_modules",                                // Exclude node_modules from being compiled
+    "dist"                                         // Exclude dist folder (compiled output)
+  ]
+}
