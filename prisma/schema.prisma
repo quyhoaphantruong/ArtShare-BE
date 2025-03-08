@@ -18,9 +18,12 @@ model User {
   username           String   @unique
   email              String   @unique
   password_hash      String
+  full_name          String?
   profile_picture_url String?
   bio                String?
   created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
+  updated_at         DateTime? @updatedAt
   refresh_token      String?
+
+  @@map("user")
 }
