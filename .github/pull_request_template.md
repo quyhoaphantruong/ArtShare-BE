@@ -1,5 +1,5 @@
 **Jira ticket** \
-[Link](https://clc-team-ml4jir1c.atlassian.net/browse/SCRUM-4)
+Ex. [Link](https://clc-team-ml4jir1c.atlassian.net/browse/SCRUM-4)
 
 **Priority**
 - [ ] High
