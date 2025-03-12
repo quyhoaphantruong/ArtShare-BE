@@ -8,11 +8,13 @@ import {
   Delete,
   Req,
   ValidationPipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from '@prisma/client';
-import { UserProfileDTO } from './dto/UserProfileDTO';
-import { UpdateUserDTO } from './dto/UpdateUserDTO';
+import { UserProfileDTO } from './dto/user-profile.dto';
+import { UpdateUserDTO } from './dto/update-user.dto';
+import { FollowRequestDTO } from './dto/follow-request.dto';
 
 @Controller('user')
 export class UserController {
@@ -72,5 +74,29 @@ export class UserController {
   @Delete('delete')
   async remove(): Promise<any> {
     return this.userService.deleteUser();
+  }
+
+  // Theo dõi người dùng khác
+  @Post(':userId/follow')
+  async followUser(
+    @Param('userId', ParseIntPipe) userIdToFollow: number,
+    @Req() req: any,
+  ): Promise<string> {
+    // const currentUserId = req.user.id; Lấy thông tin user từ token
+    // hiện tại fix cứng, chưa có implement token
+    const currentUserId = 10;
+
+    return this.userService.followUser(currentUserId, userIdToFollow);
+  }
+
+  // Theo dõi người dùng khác
+  @Post(':userId/unfollow')
+  async unfollowUser(
+    @Param('userId', ParseIntPipe) userIdToUnfollow: number,
+    @Req() req: any,
+  ): Promise<string> {
+    const currentUserId = 10;
+
+    return this.userService.unfollowUser(currentUserId, userIdToUnfollow);
   }
 }
