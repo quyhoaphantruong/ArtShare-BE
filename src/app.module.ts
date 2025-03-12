@@ -7,6 +7,6 @@ import { ExampleModule } from './example/example.module';
 @Module({
   imports: [ExampleModule],
   controllers: [AppController],
-  providers: [AppService, PrismaService]
+  providers: [AppService, PrismaService],
 })
 export class AppModule {}
