@@ -9,18 +9,18 @@ import {
   Req,
   ValidationPipe,
   ParseIntPipe,
+  Patch,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from '@prisma/client';
 import { UserProfileDTO } from './dto/user-profile.dto';
 import { UpdateUserDTO } from './dto/update-user.dto';
-import { FollowRequestDTO } from './dto/follow-request.dto';
+import { DeleteUsersDTO } from './dto/delete-users.dto';
 
-@Controller('user')
+@Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  // Lấy tất cả người dùng (hoặc người dùng đầu tiên trong cơ sở dữ liệu)
   @Get()
   async findAll(): Promise<User[] | null> {
     return this.userService.findAll();
@@ -34,7 +34,7 @@ export class UserController {
     return this.userService.getUserProfile(userId);
   }
 
-  @Put('profile')
+  @Patch('profile')
   async updateProfile(
     @Req() req: any,
     @Body(new ValidationPipe()) updateUserDto: UpdateUserDTO,
@@ -43,7 +43,6 @@ export class UserController {
     return this.userService.updateUserProfile(userId, updateUserDto);
   }
 
-  // Tạo mới người dùng
   @Post('create')
   async create(
     @Body()
@@ -57,7 +56,7 @@ export class UserController {
   }
 
   // Cập nhật thông tin người dùng
-  @Put(':id')
+  @Patch(':id')
   async update(
     @Param('id') id: number,
     @Body()
@@ -70,13 +69,18 @@ export class UserController {
     return this.userService.updateUser(id, updateUserDto);
   }
 
-  // Xoá người dùng
-  @Delete('delete')
-  async remove(): Promise<any> {
-    return this.userService.deleteUser();
+  // Xoá nhiều người dùng
+  @Delete()
+  async deleteUsers(@Body() deleteUsersDTO: DeleteUsersDTO): Promise<any> {
+    return this.userService.deleteUsers(deleteUsersDTO);
   }
 
-  // Theo dõi người dùng khác
+  // Xoá người dùng bằng userId
+  @Delete(':userId')
+  async deleteUserById(@Param('userId') userId: number): Promise<any> {
+    return this.userService.deleteUserById(userId);
+  }
+
   @Post(':userId/follow')
   async followUser(
     @Param('userId', ParseIntPipe) userIdToFollow: number,
@@ -89,7 +93,6 @@ export class UserController {
     return this.userService.followUser(currentUserId, userIdToFollow);
   }
 
-  // Theo dõi người dùng khác
   @Post(':userId/unfollow')
   async unfollowUser(
     @Param('userId', ParseIntPipe) userIdToUnfollow: number,

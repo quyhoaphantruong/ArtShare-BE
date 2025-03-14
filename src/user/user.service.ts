@@ -3,7 +3,7 @@ import { PrismaService } from 'src/prisma.service'; // Import PrismaService
 import { User } from '@prisma/client'; // Import User type
 import { UserProfileDTO } from './dto/user-profile.dto';
 import { UpdateUserDTO } from './dto/update-user.dto';
-import { FollowRequestDTO } from './dto/follow-request.dto';
+import { DeleteUsersDTO } from './dto/delete-users.dto';
 
 @Injectable()
 export class UserService {
@@ -85,9 +85,23 @@ export class UserService {
     });
   }
 
-  // Xoá người dùng
-  async deleteUser(): Promise<any> {
-    return this.prisma.user.deleteMany();
+  // Xoá nhiều người dùng
+  async deleteUsers(deleteUserDTO: DeleteUsersDTO): Promise<any> {
+    return this.prisma.user.deleteMany({
+      where: {
+        id: {
+          in: deleteUserDTO.userIds,
+        },
+      },
+    });
+  }
+
+  async deleteUserById(userId: number): Promise<any> {
+    return this.prisma.user.delete({
+      where: {
+        id: userId,
+      },
+    });
   }
 
   async followUser(followerId: number, followingId: number): Promise<string> {
