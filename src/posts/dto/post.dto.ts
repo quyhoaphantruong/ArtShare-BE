@@ -1,8 +1,6 @@
 import { IsString, IsOptional, IsBoolean, IsInt } from 'class-validator';
 
 export class CreatePostDto {
-  @IsInt()
-  user_id: number;
 
   @IsOptional()
   @IsString()

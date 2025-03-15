@@ -71,7 +71,7 @@ model Media {
   media_type  MediaType
   description String?
   url         String    @unique
-  creator     String
+  creator_id  Int
   downloads   Int       @default(0)
   created_at  DateTime  @default(now())
 
