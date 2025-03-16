@@ -1,7 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { PostsService } from './posts.service';
-import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
+import { CreatePostDto, UpdatePostDto } from './dto/post-request.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { CreatePostResponseDto, PostDetailsResponseDto } from './dto/post-response.dto';
 
 @Controller('posts')
 export class PostsController {
@@ -11,11 +12,11 @@ export class PostsController {
   @UseInterceptors(FilesInterceptor('images'))
   async createPost(
     @Body() createPostDto: CreatePostDto,
-    @UploadedFiles() files: Express.Multer.File[],
-  ) {
+    @UploadedFiles() medias: Express.Multer.File[],
+  ) : Promise<CreatePostResponseDto> {
     // will extract from accesstoken
     var userId = 1;
-    return this.postsService.createPostWithImages(createPostDto, files, userId);
+    return this.postsService.createPost(createPostDto, medias, userId);
   }
 
   @Patch(':post_id')
@@ -23,12 +24,12 @@ export class PostsController {
   async updatePost(
     @Param('post_id') postId: number,
     @Body() updatePostDto: UpdatePostDto,
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFiles() medias: Express.Multer.File[],
   ) {
 
     // will extract from accesstoken
     var userId = 1;
-    return this.postsService.updatePost(Number(postId), updatePostDto, files, userId);
+    return this.postsService.updatePost(Number(postId), updatePostDto, medias, userId);
   }
 
   @Delete(':post_id')
@@ -37,17 +38,21 @@ export class PostsController {
   }
 
   @Get(':post_id')
-  async getPostDetails(@Param('post_id') postId: number) {
+  async getPostDetails(@Param('post_id') postId: number): Promise<PostDetailsResponseDto> {
     return this.postsService.getPostDetails(Number(postId));
   }
 
   @Get('trending')
-  async getTrendingPosts() {
-    return this.postsService.getTrendingPosts();
+  async getForYouPosts() {
+    // TODO: get user_id from access token
+    var userId = 1;
+    return this.postsService.getForYouPosts(userId);
   }
 
   @Get('following')
   async getFollowingPosts(@Query('user_id') userId: number, @Query('filter') filter?: string) {
+    // TODO: get user_id from access token
+    var userId = 1;
     return this.postsService.getFollowingPosts(Number(userId), filter);
   }
 }

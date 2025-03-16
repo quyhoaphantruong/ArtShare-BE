@@ -57,11 +57,12 @@ model Post {
   share_count   Int      @default(0)
   comment_count Int      @default(0)
 
-  user     User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  medias   Media[] // One-to-many relationship with Media
-  likes    Like[]
-  comments Comment[]
-  shares   Share[]
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  medias     Media[] // One-to-many relationship with Media
+  likes      Like[]
+  comments   Comment[]
+  shares     Share[]
+  categories Category[] // Many-to-many relation with Category
 
   @@map("post")
 }
@@ -76,8 +77,7 @@ model Media {
   downloads   Int       @default(0)
   created_at  DateTime  @default(now())
 
-  post       Post       @relation(fields: [post_id], references: [id], onDelete: Cascade)
-  categories Category[] // Many-to-many relation with Category
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
 
   @@map("media")
 }
@@ -85,9 +85,10 @@ model Media {
 model Category {
   cate_id    Int      @id @default(autoincrement())
   cate_name  String   @unique
+  url        String   @unique
   created_at DateTime @default(now())
 
-  medias Media[] // Many-to-many relation with Media
+  posts Post[] // Many-to-many relation with Post
 
   @@map("category")
 }

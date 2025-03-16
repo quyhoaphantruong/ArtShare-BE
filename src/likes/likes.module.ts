@@ -4,7 +4,7 @@ import { LikesController } from './likes.controller';
 import { PrismaService } from 'src/prisma.service';
 
 @Module({
-  providers: [LikesService],
-  controllers: [LikesController, PrismaService]
+  providers: [LikesService, PrismaService],
+  controllers: [LikesController]
 })
 export class LikesModule {}

@@ -12,6 +12,8 @@ export class CreatePostDto {
 
   @IsBoolean()
   is_published: boolean;
+
+  cate_ids: number[];
 }
 
 export class UpdatePostDto {
@@ -26,4 +28,6 @@ export class UpdatePostDto {
   @IsOptional()
   @IsBoolean()
   is_published?: boolean;
+
+  cate_ids: number[];
 }
