@@ -10,14 +10,14 @@ export class SharesController {
   @Post()
   async createShare(@Body() createShareDto: CreateShareDto) {
     // will extract userId from access token
-    var userId = 1;
+    const userId = 1;
     return this.sharesService.createShare(createShareDto, userId);
   }
 
   @Delete()
   async removeShare(@Body() removeShareDto: RemoveShareDto) {
     // will extract userId from access token
-    var userId = 1;
+    const userId = 1;
     return this.sharesService.removeShare(removeShareDto, userId);
   }
 }

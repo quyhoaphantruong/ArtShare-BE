@@ -1,20 +1,34 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post-request.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { CreatePostResponseDto, PostDetailsResponseDto } from './dto/post-response.dto';
+import {
+  CreatePostResponseDto,
+  PostDetailsResponseDto,
+} from './dto/post-response.dto';
 
 @Controller('posts')
 export class PostsController {
-  constructor(private readonly postsService: PostsService) { }
+  constructor(private readonly postsService: PostsService) {}
 
   @Post()
   @UseInterceptors(FilesInterceptor('images'))
   async createPost(
     @Body() createPostDto: CreatePostDto,
-  ) : Promise<CreatePostResponseDto> {
+  ): Promise<CreatePostResponseDto> {
     // TODO: will extract from accesstoken
-    var userId = 1;
+    const userId = 1;
     return this.postsService.createPost(createPostDto, userId);
   }
 
@@ -25,7 +39,7 @@ export class PostsController {
     @Body() updatePostDto: UpdatePostDto,
   ) {
     // TODO: will extract from accesstoken
-    var userId = 1;
+    const userId = 1;
     return this.postsService.updatePost(Number(postId), updatePostDto, userId);
   }
 
@@ -35,19 +49,24 @@ export class PostsController {
   }
 
   @Get(':post_id')
-  async getPostDetails(@Param('post_id') postId: number): Promise<PostDetailsResponseDto> {
+  async getPostDetails(
+    @Param('post_id') postId: number,
+  ): Promise<PostDetailsResponseDto> {
     return this.postsService.getPostDetails(Number(postId));
   }
 
   @Get('trending')
   async getForYouPosts() {
     // TODO: get user_id from access token
-    var userId = 1;
+    const userId = 1;
     return this.postsService.getForYouPosts(userId);
   }
 
   @Get('following')
-  async getFollowingPosts(@Query('user_id') userId: number, @Query('filter') filter?: string) {
+  async getFollowingPosts(
+    @Query('user_id') userId: number,
+    @Query('filter') filter?: string,
+  ) {
     // TODO: get user_id from access token
     var userId = 1;
     return this.postsService.getFollowingPosts(Number(userId), filter);

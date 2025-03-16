@@ -9,13 +9,13 @@ export class LikesController {
 
   @Post()
   async createLike(@Body() createLikeDto: CreateLikeDto) {
-    var userId = 1;
+    const userId = 1;
     return this.likesService.createLike(createLikeDto, userId);
   }
 
   @Delete()
   async removeLike(@Body() removeLikeDto: RemoveLikeDto) {
-    var userId = 1;
+    const userId = 1;
     return this.likesService.removeLike(removeLikeDto, userId);
   }
 }

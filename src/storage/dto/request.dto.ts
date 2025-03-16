@@ -1,10 +1,15 @@
-import { MediaType } from "@prisma/client";
-import { IsEnum, IsOptional, IsString, Matches, MinLength } from "class-validator";
+import { MediaType } from '@prisma/client';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  Matches,
+} from 'class-validator';
 
 export class GetPresignedUrlRequestDto {
   @IsString()
   @IsOptional()
-  fileName: string = "";
+  fileName: string = '';
 
   @IsString()
   @Matches(/^(png|jpg|jpeg|gif|webp|mp4|mov|avi)$/i, {

@@ -8,7 +8,9 @@ export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
   @Post('presigned-url')
-  async getPresignedUrl(@Body() request: GetPresignedUrlRequestDto): Promise<GetPresignedUrlResponseDto> {
+  async getPresignedUrl(
+    @Body() request: GetPresignedUrlRequestDto,
+  ): Promise<GetPresignedUrlResponseDto> {
     return this.storageService.generatePresignedUrl(request);
   }
 }

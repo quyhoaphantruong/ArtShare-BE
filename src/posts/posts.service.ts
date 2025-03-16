@@ -1,7 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post-request.dto';
-import { CreatePostResponseDto, PostDetailsResponseDto, UpdatePostResponseDto } from './dto/post-response.dto';
+import {
+  CreatePostResponseDto,
+  PostDetailsResponseDto,
+  UpdatePostResponseDto,
+} from './dto/post-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
 
@@ -10,16 +14,16 @@ export class PostsService {
   constructor(
     private prisma: PrismaService,
     private storageService: StorageService,
-  ) { }
-  
+  ) {}
+
   async createPost(
     createPostDto: CreatePostDto,
-    userId: number
+    userId: number,
   ): Promise<CreatePostResponseDto> {
     console.log('createPostDto', createPostDto);
-  
+
     const { cate_ids, medias_data, ...postData } = createPostDto;
-  
+
     // Create post with provided metadata
     const post = await this.prisma.post.create({
       data: {
@@ -38,35 +42,35 @@ export class PostsService {
       },
       include: { medias: true, user: true, categories: true },
     });
-  
+
     return plainToInstance(CreatePostResponseDto, post);
   }
 
   async updatePost(
     postId: number,
     updatePostDto: UpdatePostDto,
-    userId: number
+    userId: number,
   ) {
     // Check if the post exists
     const existingPost = await this.prisma.post.findUnique({
       where: { id: postId },
       include: { medias: true }, // Fetch existing media
     });
-  
+
     if (!existingPost) {
       throw new NotFoundException('Post not found');
     }
-  
+
     const { cate_ids, medias_data, ...postData } = updatePostDto;
-  
+
     // Determine if media needs to be updated
     const newMediaProvided = medias_data && medias_data.length > 0;
-    
+
     // If new media is provided, delete existing media
     if (newMediaProvided) {
       await this.prisma.media.deleteMany({ where: { post_id: postId } });
     }
-  
+
     // Update the post.
     const updatedPost = await this.prisma.post.update({
       where: { id: postId },
@@ -87,11 +91,9 @@ export class PostsService {
       },
       include: { medias: true, user: true, categories: true },
     });
-  
+
     return plainToInstance(UpdatePostResponseDto, updatedPost);
   }
-  
-  
 
   async deletePost(postId: number) {
     // Retrieve the post along with its associated media records
@@ -99,22 +101,21 @@ export class PostsService {
       where: { id: postId },
       include: { medias: true },
     });
-    
+
     if (!post) {
       throw new NotFoundException('Post not found');
     }
-  
+
     // Delete each file from S3
     if (post.medias && post.medias.length > 0) {
       await Promise.all(
-        post.medias.map((media) => this.storageService.deleteFile(media.url))
+        post.medias.map((media) => this.storageService.deleteFile(media.url)),
       );
     }
-  
+
     // Delete the post from the database
     return this.prisma.post.delete({ where: { id: postId } });
   }
-  
 
   async getForYouPosts(userId: number) {
     return this.prisma.post.findMany({
@@ -132,11 +133,11 @@ export class PostsService {
       where: { id: postId },
       include: { medias: true, user: true, categories: true },
     });
-  
+
     if (!post) {
       throw new NotFoundException('Post not found');
     }
-  
+
     return plainToInstance(PostDetailsResponseDto, post);
   }
 

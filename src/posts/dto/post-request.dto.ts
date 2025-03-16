@@ -1,9 +1,17 @@
 import { MediaType } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsString, IsOptional, IsBoolean, IsArray, IsEnum, ValidateNested, IsNotEmpty, IsInt } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  IsEnum,
+  ValidateNested,
+  IsNotEmpty,
+  IsInt,
+} from 'class-validator';
 
 export class CreatePostDto {
-
   @IsString()
   @IsNotEmpty()
   title: string;

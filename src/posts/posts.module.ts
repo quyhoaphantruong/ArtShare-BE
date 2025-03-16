@@ -7,6 +7,6 @@ import { S3StorageProvider } from 'src/storage/providers/s3-storage.provider';
 
 @Module({
   providers: [PostsService, PrismaService, StorageService, S3StorageProvider],
-  controllers: [PostsController]
+  controllers: [PostsController],
 })
 export class PostsModule {}

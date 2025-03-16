@@ -1,5 +1,5 @@
-import { MediaType } from "@prisma/client";
-import { Exclude, Type } from "class-transformer";
+import { MediaType } from '@prisma/client';
+import { Exclude, Type } from 'class-transformer';
 
 export class MediaResponseDto {
   @Exclude() id: number;
@@ -54,8 +54,6 @@ export class PostDetailsResponseDto {
   categories: CategoryResponseDto[];
 }
 
-export class CreatePostResponseDto extends PostDetailsResponseDto {
-}
+export class CreatePostResponseDto extends PostDetailsResponseDto {}
 
-export class UpdatePostResponseDto extends PostDetailsResponseDto {
-}
+export class UpdatePostResponseDto extends PostDetailsResponseDto {}

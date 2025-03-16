@@ -9,8 +9,14 @@ import { SharesModule } from './shares/shares.module';
 import { StorageModule } from './storage/storage.module';
 
 @Module({
-  imports: [ExampleModule, PostsModule, LikesModule, SharesModule, StorageModule],
+  imports: [
+    ExampleModule,
+    PostsModule,
+    LikesModule,
+    SharesModule,
+    StorageModule,
+  ],
   controllers: [AppController],
-  providers: [AppService, PrismaService,]
+  providers: [AppService, PrismaService],
 })
 export class AppModule {}

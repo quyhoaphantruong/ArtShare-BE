@@ -26,7 +26,12 @@ export class S3StorageProvider implements IStorageProvider {
     });
   }
 
-  async generatePresignedUrl({fileName, extension, mediaType, directory}: GetPresignedUrlRequestDto): Promise<{ url: string; key: string }> {
+  async generatePresignedUrl({
+    fileName,
+    extension,
+    mediaType,
+    directory,
+  }: GetPresignedUrlRequestDto): Promise<{ url: string; key: string }> {
     const key = `${directory}/${nanoid()}_${fileName}.${extension}`;
 
     try {
@@ -56,7 +61,9 @@ export class S3StorageProvider implements IStorageProvider {
     }
 
     try {
-      await this.s3.deleteObject({ Bucket: this.bucketName, Key: key }).promise();
+      await this.s3
+        .deleteObject({ Bucket: this.bucketName, Key: key })
+        .promise();
     } catch (error) {
       console.error(`Error deleting file from S3 (Key: ${key}):`, error);
       throw new Error(`Failed to delete file from S3: ${key}`);
