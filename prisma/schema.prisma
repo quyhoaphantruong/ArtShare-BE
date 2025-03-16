@@ -8,8 +8,8 @@ datasource db {
 }
 
 enum MediaType {
-  IMAGE
-  VIDEO
+  image
+  video
 }
 
 enum TargetType {

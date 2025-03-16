@@ -4,13 +4,13 @@ import { AppService } from './app.service';
 import { PrismaService } from './prisma.service';
 import { ExampleModule } from './example/example.module';
 import { PostsModule } from './posts/posts.module';
-import { S3Service } from './s3/s3.service';
 import { LikesModule } from './likes/likes.module';
 import { SharesModule } from './shares/shares.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
-  imports: [ExampleModule, PostsModule, LikesModule, SharesModule],
+  imports: [ExampleModule, PostsModule, LikesModule, SharesModule, StorageModule],
   controllers: [AppController],
-  providers: [AppService, PrismaService, S3Service]
+  providers: [AppService, PrismaService,]
 })
 export class AppModule {}
