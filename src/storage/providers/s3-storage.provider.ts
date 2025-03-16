@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { S3 } from 'aws-sdk';
 import { nanoid } from 'nanoid';
 import { IStorageProvider } from '../storage.interface';
-import { MediaType } from '@prisma/client';
 import { GetPresignedUrlRequestDto } from '../dto/request.dto';
 
 @Injectable()

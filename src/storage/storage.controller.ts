@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Delete, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { StorageService } from './storage.service';
 import { GetPresignedUrlRequestDto } from './dto/request.dto';
 import { GetPresignedUrlResponseDto } from './dto/response.dto';

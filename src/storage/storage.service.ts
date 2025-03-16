@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { IStorageProvider } from './storage.interface';
 import { S3StorageProvider } from './providers/s3-storage.provider';
-import { MediaType } from '@prisma/client';
 import { GetPresignedUrlRequestDto } from './dto/request.dto';
 import { GetPresignedUrlResponseDto } from './dto/response.dto';
 

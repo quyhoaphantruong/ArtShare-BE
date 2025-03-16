@@ -1,5 +1,5 @@
 import { IsEnum, IsInt } from 'class-validator';
-import { TargetType, SharePlatform } from '@prisma/client';
+import { TargetType } from '@prisma/client';
 
 export class RemoveShareDto {
   @IsInt()
