@@ -29,7 +29,7 @@ export class CategoryResponseDto {
   name: string;
   cate_name: string;
   url: string;
-  @Exclude() created_at: Date;
+  created_at: Date;
 }
 
 export class PostDetailsResponseDto {
@@ -50,7 +50,8 @@ export class PostDetailsResponseDto {
   @Type(() => UserResponseDto)
   user: UserResponseDto[];
 
-  categories: string[];
+  @Type(() => CategoryResponseDto)
+  categories: CategoryResponseDto[];
 }
 
 export class CreatePostResponseDto extends PostDetailsResponseDto {

@@ -1,5 +1,5 @@
 import { MediaType } from "@prisma/client";
-import { IsIn, IsOptional, IsString, Matches, MinLength } from "class-validator";
+import { IsEnum, IsOptional, IsString, Matches, MinLength } from "class-validator";
 
 export class GetPresignedUrlRequestDto {
   @IsString()
@@ -12,7 +12,7 @@ export class GetPresignedUrlRequestDto {
   })
   extension: string;
 
-  @IsIn(Object.values(MediaType), {
+  @IsEnum(MediaType, {
     message: 'Invalid media type. Allowed values: image, video',
   })
   mediaType: MediaType;

@@ -35,7 +35,6 @@ export class S3StorageProvider implements IStorageProvider {
         Key: key,
         Expires: 300, // URL valid for 5 minutes
         ContentType: `${mediaType}/${extension}`,
-        ACL: 'public-read', // Optional: Allow public access
       });
 
       return { url, key };

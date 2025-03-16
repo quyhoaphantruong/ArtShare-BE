@@ -85,7 +85,7 @@ model Media {
 model Category {
   cate_id    Int      @id @default(autoincrement())
   cate_name  String   @unique
-  url        String   @unique
+  url        String?  @unique
   created_at DateTime @default(now())
 
   posts Post[] // Many-to-many relation with Post
@@ -116,7 +116,7 @@ model Comment {
   target_type       TargetType
   content           String
   created_at        DateTime   @default(now())
-  updated_at        DateTime   @updatedAt
+  updated_at        DateTime?  @updatedAt
 
   user           User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   post           Post?     @relation(fields: [target_id], references: [id], onDelete: Cascade)

@@ -1,18 +1,24 @@
-import { IsString, IsOptional, IsBoolean, IsInt } from 'class-validator';
+import { MediaType } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsBoolean, IsArray, IsEnum, ValidateNested, IsNotEmpty, IsInt } from 'class-validator';
 
 export class CreatePostDto {
 
-  @IsOptional()
   @IsString()
-  title?: string;
+  @IsNotEmpty()
+  title: string;
 
   @IsOptional()
   @IsString()
   description?: string;
 
-  @IsBoolean()
-  is_published: boolean;
+  @IsArray()
+  @ValidateNested({ each: true }) // Ensures each item in the array is validated
+  @Type(() => MediaDto) // Tells class-validator to use `MediaDto` for validation
+  medias_data: MediaDto[];
 
+  @IsArray()
+  @IsInt({ each: true })
   cate_ids: number[];
 }
 
@@ -25,9 +31,23 @@ export class UpdatePostDto {
   @IsString()
   description?: string;
 
-  @IsOptional()
-  @IsBoolean()
-  is_published?: boolean;
+  @IsOptional() // Now optional to allow updates without changing categories
+  @IsArray()
+  @IsInt({ each: true })
+  cate_ids?: number[];
 
-  cate_ids: number[];
+  @IsOptional() // Ensures media is updated only if provided
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MediaDto)
+  medias_data?: MediaDto[];
+}
+
+export class MediaDto {
+  @IsString()
+  @IsNotEmpty()
+  url: string;
+
+  @IsEnum(MediaType)
+  media_type: MediaType;
 }

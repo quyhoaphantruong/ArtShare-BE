@@ -12,11 +12,10 @@ export class PostsController {
   @UseInterceptors(FilesInterceptor('images'))
   async createPost(
     @Body() createPostDto: CreatePostDto,
-    @UploadedFiles() medias: Express.Multer.File[],
   ) : Promise<CreatePostResponseDto> {
-    // will extract from accesstoken
+    // TODO: will extract from accesstoken
     var userId = 1;
-    return this.postsService.createPost(createPostDto, medias, userId);
+    return this.postsService.createPost(createPostDto, userId);
   }
 
   @Patch(':post_id')
@@ -24,12 +23,10 @@ export class PostsController {
   async updatePost(
     @Param('post_id') postId: number,
     @Body() updatePostDto: UpdatePostDto,
-    @UploadedFiles() medias: Express.Multer.File[],
   ) {
-
-    // will extract from accesstoken
+    // TODO: will extract from accesstoken
     var userId = 1;
-    return this.postsService.updatePost(Number(postId), updatePostDto, medias, userId);
+    return this.postsService.updatePost(Number(postId), updatePostDto, userId);
   }
 
   @Delete(':post_id')

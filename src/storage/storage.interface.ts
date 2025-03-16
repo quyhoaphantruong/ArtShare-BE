@@ -5,5 +5,5 @@ import { GetPresignedUrlResponseDto } from "./dto/response.dto";
 export interface IStorageProvider {
   generatePresignedUrl(request: GetPresignedUrlRequestDto): Promise<GetPresignedUrlResponseDto>;
 
-  deleteFile(fileKey: string): Promise<void>;
+  deleteFile(url: string): Promise<void>;
 }

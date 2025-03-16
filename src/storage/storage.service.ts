@@ -22,7 +22,7 @@ export class StorageService {
     return this.storageProvider.generatePresignedUrl(request);
   }
 
-  async deleteFile(fileKey: string) {
-    return this.storageProvider.deleteFile(fileKey);
+  async deleteFile(fileUrl: string) {
+    return this.storageProvider.deleteFile(fileUrl);
   }
 }

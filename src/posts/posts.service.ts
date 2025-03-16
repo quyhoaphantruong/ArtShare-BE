@@ -1,102 +1,96 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post-request.dto';
-import { S3 } from 'aws-sdk';
-import { v4 as uuidv4 } from 'uuid';
-import { nanoid } from 'nanoid';
-import { MediaType } from '@prisma/client';
-import { S3Service } from 'src/s3/s3.service';
 import { CreatePostResponseDto, PostDetailsResponseDto, UpdatePostResponseDto } from './dto/post-response.dto';
 import { plainToInstance } from 'class-transformer';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class PostsService {
   constructor(
     private prisma: PrismaService,
-    private s3Service: S3Service, // Inject S3Service
+    private storageService: StorageService,
   ) { }
   
   async createPost(
     createPostDto: CreatePostDto,
-    medias: Express.Multer.File[],
     userId: number
   ): Promise<CreatePostResponseDto> {
     console.log('createPostDto', createPostDto);
-    const mediaData = await this.s3Service.uploadFiles(medias);
-
-    const { cate_ids, ...postData } = createPostDto;
   
+    const { cate_ids, medias_data, ...postData } = createPostDto;
+  
+    // Create post with provided metadata
     const post = await this.prisma.post.create({
       data: {
         user_id: userId,
         ...postData,
         medias: {
-          create: mediaData.map(({ url, media_type }) => ({
+          create: medias_data.map(({ url, media_type }) => ({
             media_type,
             url,
             creator_id: userId,
           })),
         },
         categories: {
-          connect: cate_ids.map((cate_id) => ({ cate_id })),
+          connect: (cate_ids || []).map((cate_id) => ({ cate_id })),
         },
       },
       include: { medias: true, user: true, categories: true },
     });
   
-    return plainToInstance(CreatePostResponseDto, post, { excludeExtraneousValues: true });
+    return plainToInstance(CreatePostResponseDto, post);
   }
 
   async updatePost(
     postId: number,
     updatePostDto: UpdatePostDto,
-    medias: Express.Multer.File[],
-    userId: number,
+    userId: number
   ) {
     // Check if the post exists
-    const existingPost = await this.prisma.post.findUnique({ where: { id: postId } });
+    const existingPost = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: { medias: true }, // Fetch existing media
+    });
+  
     if (!existingPost) {
       throw new NotFoundException('Post not found');
     }
   
-    // if files are provided, upload them and prepare new media records
-    const newFilesProvided = medias && medias.length > 0;
-    let additionalMediaData = undefined;
-    if (newFilesProvided) {
-      const mediaData = await this.s3Service.uploadFiles(medias);
-      additionalMediaData = mediaData.map(({ url, media_type }) => ({
-        media_type,
-        url,
-        creator_id: userId,
-      }));
-    }
+    const { cate_ids, medias_data, ...postData } = updatePostDto;
   
-    // delete existing media
-    if (newFilesProvided) {
+    // Determine if media needs to be updated
+    const newMediaProvided = medias_data && medias_data.length > 0;
+    
+    // If new media is provided, delete existing media
+    if (newMediaProvided) {
       await this.prisma.media.deleteMany({ where: { post_id: postId } });
     }
-
-    const { cate_ids, ...postData } = updatePostDto;
   
-    // update the post.
+    // Update the post.
     const updatedPost = await this.prisma.post.update({
       where: { id: postId },
       data: {
         ...postData,
         categories: {
-          set: cate_ids.map((cate_id) => ({ cate_id })),
+          set: (cate_ids || []).map((cate_id) => ({ cate_id })),
         },
-        ...(newFilesProvided && {
+        ...(newMediaProvided && {
           medias: {
-            create: additionalMediaData,
+            create: medias_data.map(({ url, media_type }) => ({
+              media_type,
+              url,
+              creator_id: userId,
+            })),
           },
         }),
       },
       include: { medias: true, user: true, categories: true },
     });
   
-    return plainToInstance(UpdatePostResponseDto, updatedPost, { excludeExtraneousValues: true });
+    return plainToInstance(UpdatePostResponseDto, updatedPost);
   }
+  
   
 
   async deletePost(postId: number) {
@@ -113,7 +107,7 @@ export class PostsService {
     // Delete each file from S3
     if (post.medias && post.medias.length > 0) {
       await Promise.all(
-        post.medias.map((media) => this.s3Service.deleteFileByUrl(media.url))
+        post.medias.map((media) => this.storageService.deleteFile(media.url))
       );
     }
   
