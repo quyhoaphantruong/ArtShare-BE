@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';  // Firebase Admin SDK
 import { PrismaService } from 'src/prisma.service';  // PrismaService để quản lý người dùng
-import { User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {

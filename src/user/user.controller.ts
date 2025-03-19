@@ -4,7 +4,6 @@ import {
   Post,
   Body,
   Param,
-  Put,
   Delete,
   Req,
   ValidationPipe,
@@ -27,7 +26,7 @@ export class UserController {
   }
 
   @Get('profile')
-  async getProfile(@Req() req: any): Promise<UserProfileDTO> {
+  async getProfile(): Promise<UserProfileDTO> {
     // const userId = req.user.id;
     // hiện tại fix cứng, chưa có implement token
     const userId = 10;
@@ -84,7 +83,6 @@ export class UserController {
   @Post(':userId/follow')
   async followUser(
     @Param('userId', ParseIntPipe) userIdToFollow: number,
-    @Req() req: any,
   ): Promise<string> {
     // const currentUserId = req.user.id; Lấy thông tin user từ token
     // hiện tại fix cứng, chưa có implement token
@@ -95,9 +93,7 @@ export class UserController {
 
   @Post(':userId/unfollow')
   async unfollowUser(
-    @Param('userId', ParseIntPipe) userIdToUnfollow: number,
-    @Req() req: any,
-  ): Promise<string> {
+    @Param('userId', ParseIntPipe) userIdToUnfollow: number): Promise<string> {
     const currentUserId = 10;
 
     return this.userService.unfollowUser(currentUserId, userIdToUnfollow);
