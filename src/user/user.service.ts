@@ -9,7 +9,6 @@ import { DeleteUsersDTO } from './dto/delete-users.dto';
 export class UserService {
   constructor(private prisma: PrismaService) {}
 
-  // Tạo người dùng mới
   async createUser(data: {
     email: string;
     password_hash: string;
@@ -124,8 +123,8 @@ export class UserService {
     const existingFollow = await this.prisma.follow.findUnique({
       where: {
         follower_id_following_id: {
-          followerId: followerId,
-          followingId: followingId,
+          follower_id: followerId,
+          following_id: followingId,
         },
       },
     });
@@ -147,8 +146,8 @@ export class UserService {
     const existingFollow = await this.prisma.follow.findUnique({
       where: {
         follower_id_following_id: {
-          followerId: followerId,
-          followingId: followingId,
+          follower_id: followerId,
+          following_id: followingId,
         },
       },
     });
@@ -160,8 +159,8 @@ export class UserService {
     await this.prisma.follow.delete({
       where: {
         follower_id_following_id: {
-          followerId: followerId,
-          followingId: followingId,
+          follower_id: followerId,
+          following_id: followingId,
         },
       },
     });
