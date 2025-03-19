@@ -6,11 +6,6 @@ import { ExampleModule } from './example/example.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 
-
-
-
-
-
 @Module({
   imports: [ExampleModule, UserModule, AuthModule],
   controllers: [AppController],

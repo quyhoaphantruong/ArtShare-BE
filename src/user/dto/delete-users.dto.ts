@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNotEmpty } from "class-validator";
+import { IsArray, IsInt, IsNotEmpty } from 'class-validator';
 
 export class DeleteUsersDTO {
   @IsArray()

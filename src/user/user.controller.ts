@@ -93,7 +93,8 @@ export class UserController {
 
   @Post(':userId/unfollow')
   async unfollowUser(
-    @Param('userId', ParseIntPipe) userIdToUnfollow: number): Promise<string> {
+    @Param('userId', ParseIntPipe) userIdToUnfollow: number,
+  ): Promise<string> {
     const currentUserId = 10;
 
     return this.userService.unfollowUser(currentUserId, userIdToUnfollow);

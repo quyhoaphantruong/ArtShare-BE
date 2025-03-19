@@ -1,6 +1,6 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { AuthGuard } from './auth.guard';  // Guard bảo vệ các route
+import { AuthGuard } from './auth.guard'; // Guard bảo vệ các route
 
 @Controller('auth')
 export class AuthController {
@@ -8,7 +8,9 @@ export class AuthController {
 
   // Route đăng ký người dùng mới
   @Post('register')
-  async signup(@Body() body: { email: string; password: string; username: string }) {
+  async signup(
+    @Body() body: { email: string; password: string; username: string },
+  ) {
     return this.authService.signup(body.email, body.password, body.username);
   }
 

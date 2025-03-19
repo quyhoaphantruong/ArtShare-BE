@@ -1,5 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
-import { AuthService } from './auth.service';  // Sử dụng AuthService để xác minh token
+import { AuthService } from './auth.service'; // Sử dụng AuthService để xác minh token
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -7,17 +7,17 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const token = request.headers.authorization?.split(' ')[1];  // Lấy token từ header Authorization
+    const token = request.headers.authorization?.split(' ')[1]; // Lấy token từ header Authorization
 
     if (!token) {
       throw new Error('Authorization token is required');
     }
 
     try {
-      await this.authService.verifyToken(token);  // Xác minh token
+      await this.authService.verifyToken(token); // Xác minh token
       return true;
     } catch (error) {
-      throw new Error('Unauthorized');
+      throw new Error('Unauthorized' + error.message);
     }
   }
 }
