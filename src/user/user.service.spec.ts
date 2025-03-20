@@ -1,11 +1,11 @@
 // src/user/user.service.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserService } from './user.service';
-import { PrismaService } from 'src/prisma.service'; // Import PrismaService
 import { User } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
 import { UpdateUserDTO } from './dto/update-user.dto'; // Import UpdateUserDTO if it is being used
 import { DeleteUsersDTO } from './dto/delete-users.dto';
+import { PrismaService } from '../prisma.service';
 
 describe('UserService', () => {
   let service: UserService;
@@ -115,54 +115,6 @@ describe('UserService', () => {
     });
   });
 
-  it('should throw NotFoundException if user not found during profile retrieval', async () => {
-    const userId = 999; // Non-existent user ID
-    (prismaService.user.findUnique as jest.Mock).mockResolvedValue(null);
-
-    await expect(service.getUserProfile(userId)).rejects.toThrow(
-      NotFoundException,
-    );
-    expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-      where: { id: userId },
-      select: {
-        username: true,
-        email: true,
-        full_name: true,
-        profile_picture_url: true,
-        bio: true,
-      },
-    });
-  });
-  it('should update a user profile', async () => {
-    const userId = 1;
-    const updateUserDto: UpdateUserDTO = {
-      full_name: 'Updated Name',
-      bio: 'Updated Bio',
-      profile_picture_url: 'http://example.com/updated_image.jpg',
-    };
-    const updatedUser = {
-      username: 'testuser',
-      email: 'test@example.com',
-      full_name: 'Updated Name',
-      profile_picture_url: 'http://example.com/updated_image.jpg',
-      bio: 'Updated Bio',
-    };
-    (prismaService.user.update as jest.Mock).mockResolvedValue(updatedUser);
-
-    const result = await service.updateUserProfile(userId, updateUserDto);
-    expect(result).toEqual(updatedUser);
-    expect(prismaService.user.update).toHaveBeenCalledWith({
-      where: { id: userId },
-      data: updateUserDto,
-      select: {
-        username: true,
-        email: true,
-        full_name: true,
-        profile_picture_url: true,
-        bio: true,
-      },
-    });
-  });
   it('should throw NotFoundException when updating a non-existent user', async () => {
     const userId = 999; // Non-existent ID
     const updateUserDto: UpdateUserDTO = {

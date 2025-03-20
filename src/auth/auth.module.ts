@@ -11,6 +11,7 @@ import * as path from 'path'; // For path resolution
   imports: [ConfigModule], // If you're using environment variables
   providers: [AuthService, PrismaService],
   controllers: [AuthController],
+  exports: [AuthService],
 })
 export class AuthModule implements OnModuleInit {
   // Called when the module is initialized
