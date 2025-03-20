@@ -6,7 +6,6 @@ import {
   Param,
   Delete,
   Req,
-  ValidationPipe,
   ParseIntPipe,
   Patch,
 } from '@nestjs/common';
@@ -34,10 +33,7 @@ export class UserController {
   }
 
   @Patch('profile')
-  async updateProfile(
-    @Req() req: any,
-    @Body(new ValidationPipe()) updateUserDto: UpdateUserDTO,
-  ) {
+  async updateProfile(@Req() req: any, @Body() updateUserDto: UpdateUserDTO) {
     const userId = req.user?.id | 10;
     return this.userService.updateUserProfile(userId, updateUserDto);
   }
