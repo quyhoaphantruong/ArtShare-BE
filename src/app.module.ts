@@ -7,6 +7,7 @@ import { PostsModule } from './posts/posts.module';
 import { LikesModule } from './likes/likes.module';
 import { SharesModule } from './shares/shares.module';
 import { StorageModule } from './storage/storage.module';
+import { EmbeddingModule } from './embedding/embedding.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { StorageModule } from './storage/storage.module';
     LikesModule,
     SharesModule,
     StorageModule,
+    EmbeddingModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

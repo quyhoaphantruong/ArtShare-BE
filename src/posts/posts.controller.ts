@@ -47,6 +47,11 @@ export class PostsController {
     return this.postsService.deletePost(Number(postId));
   }
 
+  @Get('search')
+  async searchPosts(@Query('q') query: string) {
+    return this.postsService.searchPosts(query);
+  }
+
   @Get(':post_id')
   async getPostDetails(
     @Param('post_id') postId: number,
@@ -62,12 +67,11 @@ export class PostsController {
   }
 
   @Get('following')
-  async getFollowingPosts(
-    @Query('user_id') userId: number,
-    @Query('filter') filter?: string,
-  ) {
+  async getFollowingPosts(@Query('filter') filter?: string) {
     // TODO: get user_id from access token
-    var userId = 1;
+    const userId = 1;
     return this.postsService.getFollowingPosts(Number(userId), filter);
   }
+
+
 }
