@@ -23,35 +23,26 @@ export class AuthService {
     try {
       // Check if the username already exists
       let existingUser = await this.prisma.user.findUnique({
-        where: { username },
+        where: { email },
       });
 
       if (existingUser) {
-        // If username exists, append a number to make it unique
-        let count = 1;
-        let newUsername = username;
-
-        while (existingUser) {
-          newUsername = `user${count}`;
-          existingUser = await this.prisma.user.findUnique({
-            where: { username: newUsername },
-          });
-          count++;
+        // return to let frontend know that user already signup
+        return {
+          message_type: "USER_ALREADY_EXIST",
+          user: existingUser
         }
-
-        username = newUsername; // Update username to the unique one
       }
 
-      // Save user information into Prisma (your database)
       const user = await this.prisma.user.create({
         data: {
           email,
           password_hash: password ? password : '', // If password is null, we can store it as null or handle accordingly
-          username,
+          username: this.createRandomUsername(),
         },
       });
 
-      return { user };
+      return { message_type: 'SIGNUP_SUCCESS', user };
     } catch (error) {
       throw new Error(`Error creating user: ${error.message}`);
     }
@@ -60,18 +51,26 @@ export class AuthService {
   // Method to verify the Firebase ID token and extract user data
   async login(token: string) {
     try {
-      this.logger.log('Received token for verification'); // Log a message for debugging
+      this.logger.log('Received token for verification', token); // Log a message for debugging
 
       // Verify the Firebase ID Token
       const decodedToken = await admin.auth().verifyIdToken(token);
       this.logger.log(
         'Decoded token successfully: ' + JSON.stringify(decodedToken),
       ); // Log decoded token
-      const tokens = await this.getTokens(decodedToken.uid, decodedToken.email);
+            const userFromDb = await this.prisma.user.findUnique({
+                where: { email: decodedToken.email },
+              });
+              if (!userFromDb) {
+                throw new Error(`User with email ${decodedToken.email} not found in database`);
+              }
+      this.logger.log(`User info: ${userFromDb.id}`)
+      const tokens = await this.getTokens(userFromDb.id, decodedToken.email);
       console.log('tokens: ', tokens);
       // Create access_token, refresh_token
+      let user = null;
       try {
-                await this.prisma.user.update({
+               user = await this.prisma.user.update({
                   where: { email: decodedToken.email }, // Tìm user theo email từ Firebase token
                   data: { refresh_token: tokens.refresh_token }, // Cập nhật refresh_token
                 });
@@ -87,10 +86,7 @@ export class AuthService {
       // Store access_token, refresh_token
       // Return user information (can be customized to return more details or save to DB)
       return {
-        uid: decodedToken.uid,
-        email: decodedToken.email,
-        displayName: decodedToken.name,
-        access_token: tokens.access_token,
+        access_token:  tokens.access_token,
         refresh_token: tokens.refresh_token,
       };
     } catch (error) {
@@ -128,16 +124,16 @@ export class AuthService {
     }
   }
 
-  async getTokens(userId: string, email: string): Promise<Tokens> {
+  async getTokens(userId: number, email: string): Promise<Tokens> {
     const jwtPayload: JwtPayload = {
-      sub: userId,
+      userId: userId,
       email: email,
     };
 
     const [at, rt] = await Promise.all([
       this.jwtService.signAsync(jwtPayload, {
         secret: this.config.get<string>('AT_SECRET'),
-        expiresIn: '15m',
+        expiresIn: '10000m',
       }),
       this.jwtService.signAsync(jwtPayload, {
         secret: this.config.get<string>('RT_SECRET'),
@@ -149,5 +145,9 @@ export class AuthService {
       access_token: at,
       refresh_token: rt,
     };
+  }
+  
+  createRandomUsername(): string {
+    return `user_${crypto.randomUUID()}`
   }
 }
