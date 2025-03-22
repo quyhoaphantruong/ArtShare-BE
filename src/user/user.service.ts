@@ -7,7 +7,11 @@ export class UserService {
   constructor(private prisma: PrismaService) {}
 
   // Tạo người dùng mới
-  async createUser(data: { email: string; password_hash: string; username: string }): Promise<User> {
+  async createUser(data: {
+    email: string;
+    password_hash: string;
+    username: string;
+  }): Promise<User> {
     return this.prisma.user.create({
       data,
     });
@@ -24,7 +28,7 @@ export class UserService {
 
   // Lấy thông tin người dùng đầu tiên (findFirst)
   async findAll(): Promise<User[] | null> {
-    return this.prisma.user.findMany();  // Hoặc có thể tùy chỉnh để tìm kiếm theo điều kiện khác
+    return this.prisma.user.findMany(); // Hoặc có thể tùy chỉnh để tìm kiếm theo điều kiện khác
   }
 
   // Cập nhật thông tin người dùng
