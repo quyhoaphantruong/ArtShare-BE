@@ -1,25 +1,31 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { CreateLikeDto } from './dto/create-like.dto';
+import { CreateLikeDto } from './dto/request/create-like.dto';
 import { TargetType } from '@prisma/client';
+import { plainToClass } from 'class-transformer';
+import { LikeDetailsDto } from './dto/response/like-details.dto';
+import { RemoveLikeDto } from './dto/request/remove-like.dto';
+import e from 'express';
 
 @Injectable()
 export class LikesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createLike(createLikeDto: CreateLikeDto, userId: number) {
-    // You can wrap this in a transaction to ensure both operations succeed or fail together.
+  async createLike(createLikeDto: CreateLikeDto, userId: number): Promise<LikeDetailsDto> {
+
+    await this.verifyTargetExists(createLikeDto.target_id, createLikeDto.target_type);
+
+    await this.verifyLikeAlreadyExists(createLikeDto, userId);
+
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create the like
       const like = await tx.like.create({
         data: {
           user_id: userId,
           target_id: createLikeDto.target_id,
-          target_type: createLikeDto.target_type, // Either TargetType.POST or TargetType.BLOG
+          target_type: createLikeDto.target_type,
         },
       });
 
-      // Update the like count if the target is a post
       if (createLikeDto.target_type === TargetType.POST) {
         await tx.post.update({
           where: { id: createLikeDto.target_id },
@@ -36,13 +42,56 @@ export class LikesService {
       return like;
     });
 
-    return result;
+    return plainToClass(LikeDetailsDto, result);
   }
 
-  async removeLike(createLikeDto: CreateLikeDto, userId: number) {
-    // Remove a like and decrement the like count
+  private async verifyTargetExists(targetId: number, targetType: TargetType) {
+    if (targetType === TargetType.POST) {
+      const post = await this.prisma.post.findUnique({ where: { id: targetId } });
+      if (!post) {
+        throw new BadRequestException('Post not found');
+      }
+    } else if (targetType === TargetType.BLOG) {
+      // TODO: will un comment this when blog model is created
+      // const blog = await this.prisma.blog.findUnique({ where: { id: targetId } });
+      // if (!blog) {
+      //   throw new BadRequestException('Blog not found');
+      // }
+    }
+  }
+
+  private async verifyLikeAlreadyExists(createLikeDto: CreateLikeDto, userId: number) {
+    const existingLike = await this.findLike(createLikeDto.target_id, createLikeDto.target_type, userId);
+    if (existingLike) {
+      throw new BadRequestException('You have already liked this target');
+    }
+  }
+
+  private async verifyLikeNotExists(removeLikeDto: RemoveLikeDto, userId: number) {
+    const existingLike = await this.findLike(removeLikeDto.target_id, removeLikeDto.target_type, userId);
+
+    if (!existingLike) {
+      throw new BadRequestException('Can\'t remove because you have not liked this target');
+    }
+  }
+
+  private async findLike(target_id: number, target_type: TargetType, userId: number) {
+    return this.prisma.like.findFirst({
+      where: {
+        user_id: userId,
+        target_id,
+        target_type,
+      },
+    });
+  }
+
+  async removeLike(createLikeDto: RemoveLikeDto, userId: number) {
+
+    await this.verifyTargetExists(createLikeDto.target_id, createLikeDto.target_type);
+
+    await this.verifyLikeNotExists(createLikeDto, userId);
+
     const result = await this.prisma.$transaction(async (tx) => {
-      // Delete the like record
       await tx.like.deleteMany({
         where: {
           user_id: userId,
@@ -51,7 +100,6 @@ export class LikesService {
         },
       });
 
-      // Decrement the like count if the target is a post
       if (createLikeDto.target_type === TargetType.POST) {
         await tx.post.update({
           where: { id: createLikeDto.target_id },
