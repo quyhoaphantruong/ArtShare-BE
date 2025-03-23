@@ -1,17 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { CreatePostDto, UpdatePostDto } from './dto/post-request.dto';
-import {
-  CreatePostResponseDto,
-  PostDetailsResponseDto,
-  UpdatePostResponseDto,
-} from './dto/post-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { Media, Post } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { TryCatch } from 'src/common/try-catch.decorator.';
+import { CreatePostDto } from './dto/request/create-post.dto';
+import { PostDetailsResponseDto } from './dto/response/post-details.dto';
+import { UpdatePostDto } from './dto/request/update-post.dto';
 
 class VectorParams {
   title?: number[];
@@ -38,7 +35,7 @@ export class PostsService {
   async createPost(
     createPostDto: CreatePostDto,
     userId: number,
-  ): Promise<CreatePostResponseDto> {
+  ): Promise<PostDetailsResponseDto> {
     const { cate_ids, medias_data, ...postData } = createPostDto;
 
     const post = await this.prisma.post.create({
@@ -60,14 +57,14 @@ export class PostsService {
     });
 
     await this.savePostEmbedding(post);
-    return plainToInstance(CreatePostResponseDto, post);
+    return plainToInstance(PostDetailsResponseDto, post);
   }
 
   async updatePost(
     postId: number,
     updatePostDto: UpdatePostDto,
     userId: number,
-  ): Promise<UpdatePostResponseDto> {
+  ): Promise<PostDetailsResponseDto> {
     const existingPost = await this.prisma.post.findUnique({
       where: { id: postId },
       include: { medias: true },
@@ -107,7 +104,7 @@ export class PostsService {
       include: { medias: true, user: true, categories: true },
     });
 
-    return plainToInstance(UpdatePostResponseDto, updatedPost);
+    return plainToInstance(PostDetailsResponseDto, updatedPost);
   }
 
   async deletePost(postId: number): Promise<Post> {

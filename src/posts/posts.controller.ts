@@ -10,33 +10,30 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { PostsService } from './posts.service';
-import { CreatePostDto, UpdatePostDto } from './dto/post-request.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import {
-  CreatePostResponseDto,
-  PostDetailsResponseDto,
-} from './dto/post-response.dto';
+import { CreatePostDto } from './dto/request/create-post.dto';
+import { PostDetailsResponseDto } from './dto/response/post-details.dto';
+import { UpdatePostDto } from './dto/request/update-post.dto';
+import { ApiBody } from '@nestjs/swagger';
 
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
   @Post()
-  @UseInterceptors(FilesInterceptor('images'))
   async createPost(
     @Body() createPostDto: CreatePostDto,
-  ): Promise<CreatePostResponseDto> {
+  ): Promise<PostDetailsResponseDto> {
     // TODO: will extract from accesstoken
     const userId = 1;
     return this.postsService.createPost(createPostDto, userId);
   }
 
   @Patch(':post_id')
-  @UseInterceptors(FilesInterceptor('images'))
   async updatePost(
     @Param('post_id') postId: number,
     @Body() updatePostDto: UpdatePostDto,
-  ) {
+  ): Promise<PostDetailsResponseDto> {
     // TODO: will extract from accesstoken
     const userId = 1;
     return this.postsService.updatePost(Number(postId), updatePostDto, userId);
@@ -71,9 +68,9 @@ export class PostsController {
   }
 
   @Get('following')
-  async getFollowingPosts(@Query('filter') filter?: string) {
+  async getFollowingPosts() {
     // TODO: get user_id from access token
     const userId = 1;
-    return this.postsService.getFollowingPosts(Number(userId), filter);
+    return this.postsService.getFollowingPosts(Number(userId));
   }
 }

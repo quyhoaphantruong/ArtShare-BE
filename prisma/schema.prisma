@@ -41,21 +41,26 @@ model User {
   comments Comment[]
   shares   Share[]
 
+  followers  Follow[] @relation("Follower")
+  followings Follow[] @relation("Following")
+
   @@map("user")
 }
 
 model Post {
-  id            Int      @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   user_id       Int // Foreign key to User
-  title         String?
+  title         String
   description   String?
-  created_at    DateTime @default(now())
-  is_published  Boolean  @default(false)
-  is_private    Boolean  @default(false)
+  thumbnail_url String
+  is_published  Boolean   @default(false)
+  is_private    Boolean   @default(false)
   group_id      Int?
-  like_count    Int      @default(0)
-  share_count   Int      @default(0)
-  comment_count Int      @default(0)
+  like_count    Int       @default(0)
+  share_count   Int       @default(0)
+  comment_count Int       @default(0)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime? @updatedAt
 
   user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
   medias     Media[] // One-to-many relationship with Media
@@ -139,4 +144,17 @@ model Share {
   post Post? @relation(fields: [target_id], references: [id], onDelete: Cascade)
 
   @@map("share")
+}
+
+model Follow {
+  follower_id   Int
+  following_id  Int
+  created_at    DateTime @default(now())
+  is_subscribed Boolean  @default(false)
+
+  follower  User @relation("Follower", fields: [follower_id], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [following_id], references: [id], onDelete: Cascade)
+
+  @@id([follower_id, following_id])
+  @@map("follow")
 }
