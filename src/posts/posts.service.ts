@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
 import { EmbeddingService } from 'src/embedding/embedding.service';
-import { Media, Post } from '@prisma/client';
+import { Media, MediaType, Post } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { TryCatch } from 'src/common/try-catch.decorator.';
 import { CreatePostDto } from './dto/request/create-post.dto';
@@ -39,11 +39,17 @@ export class PostsService {
   ): Promise<PostDetailsResponseDto> {
     const { cate_ids, medias_data, ...postData } = createPostDto;
 
+    const firstImage = medias_data.find((media) => media.media_type === MediaType.image);
+
+    if (!firstImage) {
+      throw new BadRequestException('At least one image is required to create a post');
+    }
+    
     const post = await this.prisma.post.create({
       data: {
         user_id: userId,
         ...postData,
-        thumbnail_url: medias_data[0].url,
+        thumbnail_url: firstImage.url,
         medias: {
           create: medias_data.map(({ url, media_type }) => ({
             media_type,
