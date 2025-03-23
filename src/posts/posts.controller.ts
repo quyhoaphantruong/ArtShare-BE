@@ -48,8 +48,12 @@ export class PostsController {
   }
 
   @Get('search')
-  async searchPosts(@Query('q') query: string) {
-    return this.postsService.searchPosts(query);
+  async searchPosts(
+    @Query('q') query: string,
+    @Query('page') page: number = 1,
+    @Query('page_size') page_size: number = 25,
+  ) {
+    return this.postsService.searchPosts(query, page, page_size);
   }
 
   @Get(':post_id')
@@ -59,7 +63,7 @@ export class PostsController {
     return this.postsService.getPostDetails(Number(postId));
   }
 
-  @Get('trending')
+  @Get('for-you')
   async getForYouPosts() {
     // TODO: get user_id from access token
     const userId = 1;
@@ -72,6 +76,4 @@ export class PostsController {
     const userId = 1;
     return this.postsService.getFollowingPosts(Number(userId), filter);
   }
-
-
 }

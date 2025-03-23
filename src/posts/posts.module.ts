@@ -12,7 +12,7 @@ import { EmbeddingService } from 'src/embedding/embedding.service';
     PrismaService,
     StorageService,
     S3StorageProvider,
-    EmbeddingService
+    EmbeddingService,
   ],
   controllers: [PostsController],
 })

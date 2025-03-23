@@ -8,29 +8,33 @@ import {
 } from './dto/post-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
-import { EmbeddingService, EmbeddingType } from 'src/embedding/embedding.service';
+import { EmbeddingService } from 'src/embedding/embedding.service';
 import { Media, Post } from '@prisma/client';
-import { QdrantClient } from "@qdrant/js-client-rest";
+import { QdrantClient } from '@qdrant/js-client-rest';
+import { TryCatch } from 'src/common/try-catch.decorator.';
 
-const client = new QdrantClient({ host: "localhost", port: 6333 });
-
-export class VectorParams {
-  title?: number[]
+class VectorParams {
+  title?: number[];
   description?: number[];
-  images: number[][];
+  images?: number[][];
 }
 
 @Injectable()
 export class PostsService {
   private readonly qdrantCollectionName = 'posts';
-  private qdrantClient = new QdrantClient({ url: process.env.QDRANT_URL, port: 6333, apiKey: process.env.QDRANT_API_KEY });
+  private readonly qdrantClient = new QdrantClient({
+    url: process.env.QDRANT_URL,
+    port: 6333,
+    apiKey: process.env.QDRANT_API_KEY,
+  });
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
-    private readonly embeddingService: EmbeddingService
-  ) { }
+    private readonly embeddingService: EmbeddingService,
+  ) {}
 
+  @TryCatch()
   async createPost(
     createPostDto: CreatePostDto,
     userId: number,
@@ -59,72 +63,6 @@ export class PostsService {
     return plainToInstance(CreatePostResponseDto, post);
   }
 
-  private async getVectorParams(post: Post & { medias: Media[] }): Promise<VectorParams> {
-    if (!post.medias || post.medias.length === 0) {
-      throw new Error('Post must have at least one media');
-    }
-
-    const [titleEmbedding, descriptionEmbedding, imageEmbeddings] = await Promise.all([
-      post.title ? this.embeddingService.generateEmbeddingFromText(post.title) : undefined,
-      post.description ? this.embeddingService.generateEmbeddingFromText(post.description) : undefined,
-      Promise.all(post.medias.map((media) => this.embeddingService.generateEmbeddingFromImage(media.url))),
-    ]);
-
-    return {
-      title: titleEmbedding,
-      description: descriptionEmbedding,
-      images: imageEmbeddings,
-    };
-  }
-
-  private async savePostEmbedding(post: Post & { medias: Media[] }): Promise<void> {
-    const { title, description, images } = await this.getVectorParams(post);
-
-    try {
-      const operationInfo = await this.qdrantClient.upsert(this.qdrantCollectionName, {
-        wait: true,
-        points: [
-          {
-            id: post.id,
-            vector: {
-              title: title,
-              description: description,
-              images: images,
-            },
-            payload: { postId: post.id },
-          },
-        ],
-      });
-
-      console.log('Upsert operation info:', operationInfo);
-    } catch (error) {
-      console.error('Failed to save embedding to Qdrant:', error);
-      throw new Error('Failed to save embedding to Qdrant');
-    }
-  }
-
-  async updatePostEmbedding(post: Post & { medias: Media[] }): Promise<void> {
-    const { title, description, images } = await this.getVectorParams(post);
-
-    try {
-      const operationInfo = await this.qdrantClient.updateVectors(this.qdrantCollectionName, {
-        points: [
-          {
-            id: post.id,
-            vector: {
-              title: title,
-              description: description,
-              images: images,
-            },
-          },
-        ],
-      });
-    } catch (error) {
-      console.error('Failed to update embedding in Qdrant:', error);
-      throw new Error('Failed to update embedding in Qdrant');
-    }
-  }
-
   async updatePost(
     postId: number,
     updatePostDto: UpdatePostDto,
@@ -143,8 +81,10 @@ export class PostsService {
     const newMediaProvided = medias_data && medias_data.length > 0;
 
     if (newMediaProvided) {
-      await this.prisma.media.deleteMany({ where: { post_id: postId } });
-      this.savePostEmbedding
+      const deleteResponse = await this.prisma.media.deleteMany({
+        where: { post_id: postId },
+      });
+      this.updatePostEmbedding(existingPost);
     }
 
     const updatedPost = await this.prisma.post.update({
@@ -182,7 +122,7 @@ export class PostsService {
 
     if (post.medias && post.medias.length > 0) {
       await Promise.all(
-        post.medias.map((media) => this.storageService.deleteFile(media.url))
+        post.medias.map((media) => this.storageService.deleteFile(media.url)),
       );
     }
 
@@ -223,47 +163,134 @@ export class PostsService {
     });
   }
 
-  async searchPosts(query: string): Promise<(Post | undefined)[]> {
-    const queryEmbedding = await this.embeddingService.generateEmbeddingFromText(query);
-
-    try {
-      const searchResponse = await this.qdrantClient.query(this.qdrantCollectionName, {
+  @TryCatch()
+  async searchPosts(
+    query: string,
+    page: number,
+    page_size: number,
+  ): Promise<(Post | undefined)[]> {
+    console.log('page:', page, 'page_size:', page_size);
+    const queryEmbedding =
+      await this.embeddingService.generateEmbeddingFromText(query);
+    const searchResponse = await this.qdrantClient.query(
+      this.qdrantCollectionName,
+      {
         prefetch: [
           {
             query: queryEmbedding,
-            using: "images"
+            using: 'images',
           },
           {
             query: queryEmbedding,
-            using: "description"
+            using: 'description',
           },
           {
             query: queryEmbedding,
-            using: "title"
-          }
+            using: 'title',
+          },
         ],
         query: {
-          fusion: "dbsf",
-          limit: 10,
-        }
+          fusion: 'dbsf',
+        },
+        offset: (page - 1) * page_size,
+        limit: page_size,
         // with_payload: true,
-      });
+      },
+    );
 
-      console.log('Search response:', searchResponse.points);
+    const pointIds: number[] = searchResponse.points.map((point) =>
+      Number(point.id),
+    );
 
-      const pointIds: number[] = searchResponse.points.map(point => Number(point.id));
+    const posts = await this.prisma.post.findMany({
+      where: { id: { in: pointIds } },
+      include: { medias: true, user: true, categories: true },
+    });
 
-      const posts = await this.prisma.post.findMany({
-        where: { id: { in: pointIds } },
-        include: { medias: true, user: true, categories: true },
-      });
+    // Sort posts in the same order as returned by Qdrant
+    const sortedPosts = pointIds.map((id) =>
+      posts.find((post) => post.id === id),
+    );
+    return sortedPosts;
+  }
 
-      // Sort posts in the same order as returned by Qdrant
-      const sortedPosts = pointIds.map((id) => posts.find((post) => post.id === id));
-      return sortedPosts;
-    } catch (error) {
-      console.error('Error searching Qdrant:', error);
-      throw new Error('Failed to search Qdrant');
-    }
+  private async getVectorParams(
+    post: Post & { medias: Media[] },
+  ): Promise<VectorParams> {
+    const [titleEmbedding, descriptionEmbedding, imageEmbeddings] =
+      await Promise.all([
+        post.title
+          ? this.embeddingService.generateEmbeddingFromText(post.title)
+          : undefined,
+        post.description
+          ? this.embeddingService.generateEmbeddingFromText(post.description)
+          : undefined,
+        post.medias && post.medias.length > 0
+          ? Promise.all(
+              post.medias.map((media) =>
+                this.embeddingService.generateEmbeddingFromImage(media.url),
+              ),
+            )
+          : undefined,
+      ]);
+
+    return {
+      title: titleEmbedding,
+      description: descriptionEmbedding,
+      images: imageEmbeddings,
+    };
+  }
+
+  @TryCatch()
+  private async savePostEmbedding(
+    post: Post & { medias: Media[] },
+  ): Promise<void> {
+    const { title, description, images } = await this.getVectorParams(post);
+
+    const operationInfo = await this.qdrantClient.upsert(
+      this.qdrantCollectionName,
+      {
+        wait: true,
+        points: [
+          {
+            id: post.id,
+            vector: {
+              title: title,
+              description: description,
+              images: images,
+            },
+            payload: { postId: post.id },
+          },
+        ],
+      },
+    );
+
+    console.log('Upsert operation info:', operationInfo);
+  }
+
+  @TryCatch()
+  private async updatePostEmbedding(
+    post: Post & { medias: Media[] },
+  ): Promise<void> {
+    const { title, description, images }: VectorParams =
+      await this.getVectorParams(post);
+
+    const operationInfo = await this.qdrantClient.updateVectors(
+      this.qdrantCollectionName,
+      {
+        points: [
+          {
+            id: post.id,
+            vector: {
+              title: title,
+              description: description,
+              images: images,
+            },
+          },
+        ],
+      },
+    );
+
+    console.log('Update operation info:', operationInfo);
   }
 }
