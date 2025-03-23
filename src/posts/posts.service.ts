@@ -9,6 +9,7 @@ import { TryCatch } from 'src/common/try-catch.decorator.';
 import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
+import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 
 class VectorParams {
   title?: number[];
@@ -127,14 +128,22 @@ export class PostsService {
     return this.prisma.post.delete({ where: { id: postId } });
   }
 
-  async getForYouPosts(userId: number): Promise<Post[]> {
+  async getForYouPosts(
+    userId: number,
+    page: number,
+    page_size: number
+  ): Promise<Post[]> {
+    const skip = (page - 1) * page_size;
+  
     return this.prisma.post.findMany({
       where: { is_published: true },
       orderBy: { share_count: 'desc' },
-      take: 10,
+      take: page_size,
+      skip,
       include: { medias: true },
     });
   }
+  
 
   async getPostDetails(postId: number): Promise<PostDetailsResponseDto> {
     const post = await this.prisma.post.findUnique({
@@ -148,25 +157,46 @@ export class PostsService {
     return plainToInstance(PostDetailsResponseDto, post);
   }
 
-  async getFollowingPosts(userId: number, filter?: string): Promise<Post[]> {
-    // Note: This is a placeholder. You may want to adjust the query to fetch posts from followed users.
-    return this.prisma.post.findMany({
-      where: {
-        is_published: true,
-        user: { id: userId },
-      },
-      orderBy: { created_at: 'desc' },
-      include: { medias: true },
-      take: 10,
+  async getFollowingPosts(
+    userId: number,
+    page: number,
+    page_size: number
+  ): Promise<PostListItemResponseDto[]> {
+    const followingUsers = await this.prisma.follow.findMany({
+      where: { follower_id: userId },
+      select: { following_id: true },
     });
+  
+    const followingIds = followingUsers.map(follow => follow.following_id);
+  
+    const skip = (page - 1) * page_size;
+  
+    const posts = await this.prisma.post.findMany({
+      where: {
+        user_id: { in: followingIds },
+      },
+      skip,
+      take: page_size,
+      include: {
+        medias: true,
+        user: true,
+        categories: true,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+  
+    return plainToInstance(PostListItemResponseDto, posts);
   }
+  
 
   @TryCatch()
   async searchPosts(
     query: string,
     page: number,
     page_size: number,
-  ): Promise<(Post | undefined)[]> {
+  ): Promise<PostListItemResponseDto[]> {
     console.log('page:', page, 'page_size:', page_size);
     const queryEmbedding =
       await this.embeddingService.generateEmbeddingFromText(query);
@@ -209,7 +239,7 @@ export class PostsService {
     const sortedPosts = pointIds.map((id) =>
       posts.find((post) => post.id === id),
     );
-    return sortedPosts;
+    return plainToInstance(PostListItemResponseDto, sortedPosts);
   }
 
   private async getVectorParams(

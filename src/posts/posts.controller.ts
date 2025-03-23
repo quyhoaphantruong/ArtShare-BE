@@ -7,14 +7,12 @@ import {
   Patch,
   Post,
   Query,
-  UseInterceptors,
 } from '@nestjs/common';
 import { PostsService } from './posts.service';
-import { FilesInterceptor } from '@nestjs/platform-express';
 import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
-import { ApiBody } from '@nestjs/swagger';
+import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 
 @Controller('posts')
 export class PostsController {
@@ -25,7 +23,7 @@ export class PostsController {
     @Body() createPostDto: CreatePostDto,
   ): Promise<PostDetailsResponseDto> {
     // TODO: will extract from accesstoken
-    const userId = 1;
+    const userId = 2;
     return this.postsService.createPost(createPostDto, userId);
   }
 
@@ -47,10 +45,31 @@ export class PostsController {
   @Get('search')
   async searchPosts(
     @Query('q') query: string,
-    @Query('page') page: number = 1,
-    @Query('page_size') page_size: number = 25,
+    @Query('page') page: string = '1', // using string here because somehow default value is not working with number
+    @Query('page_size') page_size: string = '25',
+  ): Promise<PostListItemResponseDto[]> {
+    return this.postsService.searchPosts(query, Number(page), Number(page_size));
+  }
+
+  @Get('for-you')
+  async getForYouPosts(
+    @Query('page') page: string = '1',
+    @Query('page_size') page_size: string = '25',
   ) {
-    return this.postsService.searchPosts(query, page, page_size);
+    // TODO: get user_id from access token
+    const userId = 1;
+    return this.postsService.getForYouPosts(userId, Number(page), Number(page_size));
+  }
+
+  @Get('following')
+  async getFollowingPosts(
+    @Query('page') page: string = '1',
+    @Query('page_size') page_size: string = '25',
+  ): Promise<PostListItemResponseDto[]> {
+    // TODO: get user_id from access token
+    const userId = 1;
+  
+    return this.postsService.getFollowingPosts(userId, Number(page), Number(page_size));
   }
 
   @Get(':post_id')
@@ -58,19 +77,5 @@ export class PostsController {
     @Param('post_id') postId: number,
   ): Promise<PostDetailsResponseDto> {
     return this.postsService.getPostDetails(Number(postId));
-  }
-
-  @Get('for-you')
-  async getForYouPosts() {
-    // TODO: get user_id from access token
-    const userId = 1;
-    return this.postsService.getForYouPosts(userId);
-  }
-
-  @Get('following')
-  async getFollowingPosts() {
-    // TODO: get user_id from access token
-    const userId = 1;
-    return this.postsService.getFollowingPosts(Number(userId));
   }
 }
