@@ -42,6 +42,7 @@ export class PostsService {
       data: {
         user_id: userId,
         ...postData,
+        thumbnail_url: medias_data[0].url,
         medias: {
           create: medias_data.map(({ url, media_type }) => ({
             media_type,

@@ -20,7 +20,7 @@ export class PostDetailsResponseDto {
   medias: MediaResponseDto[];
 
   @Type(() => UserResponseDto)
-  user: UserResponseDto[];
+  user: UserResponseDto;
 
   @Type(() => CategoryResponseDto)
   categories: CategoryResponseDto[];

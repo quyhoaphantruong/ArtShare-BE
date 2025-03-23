@@ -12,6 +12,10 @@ export class UpdatePostDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  thumbnail_url?: string;
+
+  @IsOptional()
   @IsArray()
   @IsInt({ each: true })
   cate_ids?: number[];

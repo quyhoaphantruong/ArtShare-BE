@@ -1,7 +1,6 @@
 export class CategoryResponseDto {
-  id: number;
-  name: string;
+  cate_id: number;
   cate_name: string;
-  url: string;
+  url: string | null;
   created_at: Date;
 }
