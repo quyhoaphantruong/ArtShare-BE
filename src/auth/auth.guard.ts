@@ -17,7 +17,7 @@ export class AuthGuard implements CanActivate {
       await this.authService.verifyToken(token); // Xác minh token
       return true;
     } catch (error) {
-      throw new Error('Unauthorized');
+      throw new Error(`'Unauthorized' ${error}`);
     }
   }
 }

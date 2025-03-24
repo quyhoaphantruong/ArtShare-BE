@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin'; // Firebase Admin SDK
-import { PrismaService } from 'src/prisma.service'; // PrismaService để quản lý người dùng
+import { PrismaService } from 'src/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { JwtPayload } from './types/jwtPayload.type';
@@ -22,16 +22,16 @@ export class AuthService {
   ): Promise<any> {
     try {
       // Check if the username already exists
-      let existingUser = await this.prisma.user.findUnique({
+      const existingUser = await this.prisma.user.findUnique({
         where: { email },
       });
-
+      this.logger.log(username);
       if (existingUser) {
         // return to let frontend know that user already signup
         return {
-          message_type: "USER_ALREADY_EXIST",
-          user: existingUser
-        }
+          message_type: 'USER_ALREADY_EXIST',
+          user: existingUser,
+        };
       }
 
       const user = await this.prisma.user.create({
@@ -58,36 +58,43 @@ export class AuthService {
       this.logger.log(
         'Decoded token successfully: ' + JSON.stringify(decodedToken),
       ); // Log decoded token
-            const userFromDb = await this.prisma.user.findUnique({
-                where: { email: decodedToken.email },
-              });
-              if (!userFromDb) {
-                throw new Error(`User with email ${decodedToken.email} not found in database`);
-              }
-      this.logger.log(`User info: ${userFromDb.id}`)
-      const tokens = await this.getTokens(userFromDb.id, decodedToken.email);
+      const userFromDb = await this.prisma.user.findUnique({
+        where: { email: decodedToken.email },
+      });
+      if (!userFromDb) {
+        throw new Error(
+          `User with email ${decodedToken.email} not found in database`,
+        );
+      }
+      this.logger.log(`User info: ${userFromDb.id}`);
+      const tokens = await this.getTokens(userFromDb.id, decodedToken.email!);
       console.log('tokens: ', tokens);
       // Create access_token, refresh_token
       let user = null;
+      this.logger.log(user);
       try {
-               user = await this.prisma.user.update({
-                  where: { email: decodedToken.email }, // Tìm user theo email từ Firebase token
-                  data: { refresh_token: tokens.refresh_token }, // Cập nhật refresh_token
-                });
-                this.logger.log(`Refresh token updated for user with email: ${decodedToken.email}`);
-              } catch (dbError) {
-                this.logger.error('Error updating refresh token in database:', dbError.stack);
-                // Quyết định xem bạn có muốn throw lỗi ở đây hay không.
-                // Nếu việc cập nhật refresh token thất bại, có thể ảnh hưởng đến việc làm mới token sau này.
-                // Tùy thuộc vào yêu cầu nghiệp vụ của bạn.
-                // Có thể bạn chỉ muốn log lỗi và tiếp tục.
-              }
+        user = await this.prisma.user.update({
+          where: { email: decodedToken.email }, // Tìm user theo email từ Firebase token
+          data: { refresh_token: tokens.refresh_token }, // Cập nhật refresh_token
+        });
+        this.logger.log(
+          `Refresh token updated for user with email: ${decodedToken.email}`,
+        );
+      } catch (dbError) {
+        this.logger.error(
+          'Error updating refresh token in database:',
+          dbError.stack,
+        ); // Quyết định xem bạn có muốn throw lỗi ở đây hay không.
+        // Nếu việc cập nhật refresh token thất bại, có thể ảnh hưởng đến việc làm mới token sau này.
+        // Tùy thuộc vào yêu cầu nghiệp vụ của bạn.
+        // Có thể bạn chỉ muốn log lỗi và tiếp tục.
+      }
 
       // Store access_token, refresh_token
       // Return user information (can be customized to return more details or save to DB)
       return {
-        access_token:  tokens.access_token,
-        refresh_token: tokens.refresh_token,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
       };
     } catch (error) {
       this.logger.error('Error during token verification', error.stack); // Log the error message and stack trace
@@ -120,6 +127,7 @@ export class AuthService {
     try {
       return await admin.auth().verifyIdToken(idToken);
     } catch (error) {
+      this.logger.error(error.stack);
       throw new Error('Unauthorized');
     }
   }
@@ -146,8 +154,8 @@ export class AuthService {
       refresh_token: rt,
     };
   }
-  
+
   createRandomUsername(): string {
-    return `user_${crypto.randomUUID()}`
+    return `user_${crypto.randomUUID()}`;
   }
 }

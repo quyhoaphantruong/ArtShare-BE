@@ -20,7 +20,7 @@ export class UserController {
 
   @Get()
   async findAll(@CurrentUser() user: any): Promise<User[] | null> {
-    console.log('user extracted from auth guard',user);
+    console.log('user extracted from auth guard', user);
     return this.userService.findAll();
   }
 
@@ -47,7 +47,6 @@ export class UserController {
       bio?: string;
       profile_picture_url?: string;
     },
-    @CurrentUser() user: any
   ): Promise<User> {
     return this.userService.updateUser(id, updateUserDto);
   }
