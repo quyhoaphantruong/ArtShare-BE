@@ -42,13 +42,14 @@
     "redis": "^4.7.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.21"
+    "typeorm": "^0.3.21",
+    "yarn": "^1.22.22"
   },
   "devDependencies": {
-    "@nestjs/cli": "^10.0.0",
+    "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",
-    "@swc/cli": "^0.6.0",
+    "@swc/cli": "^0.5.2",
     "@swc/core": "^1.11.8",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.2",
