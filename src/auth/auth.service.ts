@@ -16,6 +16,7 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name); // Create an instance of Logger for this service
   // Đăng ký người dùng mới
   async signup(
+    userId: string,
     email: string,
     password: string | '',
     username: string,
@@ -36,6 +37,7 @@ export class AuthService {
 
       const user = await this.prisma.user.create({
         data: {
+          id: userId,
           email,
           password_hash: password ? password : '', // If password is null, we can store it as null or handle accordingly
           username: this.createRandomUsername(),
@@ -128,7 +130,9 @@ export class AuthService {
       return await admin.auth().verifyIdToken(idToken);
     } catch (error) {
       this.logger.error(error.stack);
-      throw new UnauthorizedException('You are not authorized to access this resource');
+      throw new UnauthorizedException(
+        'You are not authorized to access this resource',
+      );
     }
   }
 
