@@ -6,17 +6,6 @@ import { User } from '@prisma/client'; // Import User type
 export class UserService {
   constructor(private prisma: PrismaService) {}
 
-  // Tạo người dùng mới
-  async createUser(data: {
-    email: string;
-    password_hash: string;
-    username: string;
-  }): Promise<User> {
-    return this.prisma.user.create({
-      data,
-    });
-  }
-
   // Tìm người dùng theo email
   async findUserByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({
@@ -32,7 +21,7 @@ export class UserService {
   }
 
   // Cập nhật thông tin người dùng
-  async updateUser(id: number, data: Partial<User>): Promise<User> {
+  async updateUser(id: string, data: Partial<User>): Promise<User> {
     return this.prisma.user.update({
       where: { id },
       data,

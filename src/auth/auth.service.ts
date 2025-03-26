@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import * as admin from 'firebase-admin'; // Firebase Admin SDK
 import { PrismaService } from 'src/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -16,6 +16,7 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name); // Create an instance of Logger for this service
   // Đăng ký người dùng mới
   async signup(
+    userId: string,
     email: string,
     password: string | '',
     username: string,
@@ -23,7 +24,7 @@ export class AuthService {
     try {
       // Check if the username already exists
       const existingUser = await this.prisma.user.findUnique({
-        where: { email },
+        where: { id: userId },
       });
       this.logger.log(username);
       if (existingUser) {
@@ -36,6 +37,7 @@ export class AuthService {
 
       const user = await this.prisma.user.create({
         data: {
+          id: userId,
           email,
           password_hash: password ? password : '', // If password is null, we can store it as null or handle accordingly
           username: this.createRandomUsername(),
@@ -128,11 +130,13 @@ export class AuthService {
       return await admin.auth().verifyIdToken(idToken);
     } catch (error) {
       this.logger.error(error.stack);
-      throw new Error('Unauthorized');
+      throw new UnauthorizedException(
+        'You are not authorized to access this resource',
+      );
     }
   }
 
-  async getTokens(userId: number, email: string): Promise<Tokens> {
+  async getTokens(userId: string, email: string): Promise<Tokens> {
     const jwtPayload: JwtPayload = {
       userId: userId,
       email: email,
