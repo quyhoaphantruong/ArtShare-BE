@@ -24,23 +24,10 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  // Tạo mới người dùng
-  @Post('create')
-  async create(
-    @Body()
-    createUserDto: {
-      email: string;
-      password_hash: string;
-      username: string;
-    },
-  ): Promise<User> {
-    return this.userService.createUser(createUserDto);
-  }
-
   // Cập nhật thông tin người dùng
   @Put(':id')
   async update(
-    @Param('id') id: number,
+    @Param('id') id: string,
     @Body()
     updateUserDto: {
       full_name?: string;
