@@ -1,4 +1,4 @@
-import { TargetType } from "@prisma/client";
+import { TargetType } from '@prisma/client';
 
 export class LikeDetailsDto {
   user_id: number;

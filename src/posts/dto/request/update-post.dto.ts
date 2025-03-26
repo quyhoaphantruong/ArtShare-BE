@@ -1,5 +1,5 @@
-import { Transform, Type } from "class-transformer";
-import { IsArray, IsInt, IsOptional, IsString, ValidateNested } from "class-validator";
+import { Transform } from 'class-transformer';
+import { IsArray, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class UpdatePostDto {
   @IsOptional()

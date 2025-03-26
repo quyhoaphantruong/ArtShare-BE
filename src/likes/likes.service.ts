@@ -5,15 +5,19 @@ import { TargetType } from '@prisma/client';
 import { plainToClass } from 'class-transformer';
 import { LikeDetailsDto } from './dto/response/like-details.dto';
 import { RemoveLikeDto } from './dto/request/remove-like.dto';
-import e from 'express';
 
 @Injectable()
 export class LikesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createLike(createLikeDto: CreateLikeDto, userId: number): Promise<LikeDetailsDto> {
-
-    await this.verifyTargetExists(createLikeDto.target_id, createLikeDto.target_type);
+  async createLike(
+    createLikeDto: CreateLikeDto,
+    userId: number,
+  ): Promise<LikeDetailsDto> {
+    await this.verifyTargetExists(
+      createLikeDto.target_id,
+      createLikeDto.target_type,
+    );
 
     await this.verifyLikeAlreadyExists(createLikeDto, userId);
 
@@ -47,7 +51,9 @@ export class LikesService {
 
   private async verifyTargetExists(targetId: number, targetType: TargetType) {
     if (targetType === TargetType.POST) {
-      const post = await this.prisma.post.findUnique({ where: { id: targetId } });
+      const post = await this.prisma.post.findUnique({
+        where: { id: targetId },
+      });
       if (!post) {
         throw new BadRequestException('Post not found');
       }
@@ -60,22 +66,42 @@ export class LikesService {
     }
   }
 
-  private async verifyLikeAlreadyExists(createLikeDto: CreateLikeDto, userId: number) {
-    const existingLike = await this.findLike(createLikeDto.target_id, createLikeDto.target_type, userId);
+  private async verifyLikeAlreadyExists(
+    createLikeDto: CreateLikeDto,
+    userId: number,
+  ) {
+    const existingLike = await this.findLike(
+      createLikeDto.target_id,
+      createLikeDto.target_type,
+      userId,
+    );
     if (existingLike) {
       throw new BadRequestException('You have already liked this target');
     }
   }
 
-  private async verifyLikeNotExists(removeLikeDto: RemoveLikeDto, userId: number) {
-    const existingLike = await this.findLike(removeLikeDto.target_id, removeLikeDto.target_type, userId);
+  private async verifyLikeNotExists(
+    removeLikeDto: RemoveLikeDto,
+    userId: number,
+  ) {
+    const existingLike = await this.findLike(
+      removeLikeDto.target_id,
+      removeLikeDto.target_type,
+      userId,
+    );
 
     if (!existingLike) {
-      throw new BadRequestException('Can\'t remove because you have not liked this target');
+      throw new BadRequestException(
+        "Can't remove because you have not liked this target",
+      );
     }
   }
 
-  private async findLike(target_id: number, target_type: TargetType, userId: number) {
+  private async findLike(
+    target_id: number,
+    target_type: TargetType,
+    userId: number,
+  ) {
     return this.prisma.like.findFirst({
       where: {
         user_id: userId,
@@ -86,8 +112,10 @@ export class LikesService {
   }
 
   async removeLike(createLikeDto: RemoveLikeDto, userId: number) {
-
-    await this.verifyTargetExists(createLikeDto.target_id, createLikeDto.target_type);
+    await this.verifyTargetExists(
+      createLikeDto.target_id,
+      createLikeDto.target_type,
+    );
 
     await this.verifyLikeNotExists(createLikeDto, userId);
 

@@ -41,7 +41,12 @@ export class PostsController {
   ): Promise<PostDetailsResponseDto> {
     // TODO: will extract from accesstoken
     const userId = 1;
-    return this.postsService.updatePost(Number(postId), updatePostDto, images, userId);
+    return this.postsService.updatePost(
+      Number(postId),
+      updatePostDto,
+      images,
+      userId,
+    );
   }
 
   @Delete(':post_id')
@@ -55,7 +60,11 @@ export class PostsController {
     @Query('page') page: string = '1', // using string here because somehow default value is not working with number
     @Query('page_size') page_size: string = '25',
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsService.searchPosts(query, Number(page), Number(page_size));
+    return this.postsService.searchPosts(
+      query,
+      Number(page),
+      Number(page_size),
+    );
   }
 
   @Get('for-you')
@@ -65,7 +74,11 @@ export class PostsController {
   ) {
     // TODO: get user_id from access token
     const userId = 1;
-    return this.postsService.getForYouPosts(userId, Number(page), Number(page_size));
+    return this.postsService.getForYouPosts(
+      userId,
+      Number(page),
+      Number(page_size),
+    );
   }
 
   @Get('following')
@@ -75,8 +88,12 @@ export class PostsController {
   ): Promise<PostListItemResponseDto[]> {
     // TODO: get user_id from access token
     const userId = 1;
-  
-    return this.postsService.getFollowingPosts(userId, Number(page), Number(page_size));
+
+    return this.postsService.getFollowingPosts(
+      userId,
+      Number(page),
+      Number(page_size),
+    );
   }
 
   @Get(':post_id')

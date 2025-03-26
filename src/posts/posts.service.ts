@@ -1,9 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
 import { EmbeddingService } from 'src/embedding/embedding.service';
-import { Media, MediaType, Post } from '@prisma/client';
+import { MediaType, Post } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { TryCatch } from 'src/common/try-catch.decorator.';
 import { CreatePostDto } from './dto/request/create-post.dto';
@@ -36,7 +40,7 @@ export class PostsService {
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly embeddingService: EmbeddingService,
-  ) { }
+  ) {}
 
   @TryCatch()
   async createPost(
@@ -50,7 +54,8 @@ export class PostsService {
       throw new BadRequestException('At least one image is required');
     }
 
-    const imageUploads: FileUploadResponse[] = await this.storageService.uploadFiles(images, 'posts');
+    const imageUploads: FileUploadResponse[] =
+      await this.storageService.uploadFiles(images, 'posts');
 
     const mediasData = [
       ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
@@ -76,7 +81,12 @@ export class PostsService {
       include: { medias: true, user: true, categories: true },
     });
 
-    await this.savePostEmbedding(post.id, createPostData.title, createPostData.description, images);
+    await this.savePostEmbedding(
+      post.id,
+      createPostData.title,
+      createPostData.description,
+      images,
+    );
 
     return plainToInstance(PostDetailsResponseDto, post);
   }
@@ -88,7 +98,6 @@ export class PostsService {
     images: Express.Multer.File[],
     userId: number,
   ): Promise<PostDetailsResponseDto> {
-
     const existingPost = await this.prisma.post.findUnique({
       where: { id: postId },
       include: { medias: true },
@@ -105,7 +114,9 @@ export class PostsService {
       // do this to delete in db and s3 at the same time
       const deleteImagePromises = [
         this.prisma.media.deleteMany({ where: { post_id: postId } }),
-        this.storageService.deleteFiles(existingPost.medias.map((media) => media.url)),
+        this.storageService.deleteFiles(
+          existingPost.medias.map((media) => media.url),
+        ),
       ];
       await Promise.all(deleteImagePromises);
       newImageUploads = await this.storageService.uploadFiles(images, 'posts');
@@ -119,14 +130,17 @@ export class PostsService {
         const deleteVideoPromise = [
           this.prisma.media.delete({ where: { id: existingVideo.id } }),
           this.storageService.deleteFiles([existingVideo.url]),
-        ]
+        ];
         await Promise.all(deleteVideoPromise);
       }
     }
 
     const mediasData: MediaData[] = [
       ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
-      ...newImageUploads.map(({ url }) => ({ url, media_type: MediaType.image })),
+      ...newImageUploads.map(({ url }) => ({
+        url,
+        media_type: MediaType.image,
+      })),
     ];
 
     const updatedPost = await this.prisma.post.update({
@@ -149,8 +163,12 @@ export class PostsService {
       include: { medias: true, user: true, categories: true },
     });
 
-    this.updatePostEmbedding(postId, postUpdateData.title, postUpdateData.description, images);
-
+    this.updatePostEmbedding(
+      postId,
+      postUpdateData.title,
+      postUpdateData.description,
+      images,
+    );
 
     return plainToInstance(PostDetailsResponseDto, updatedPost);
   }
@@ -167,7 +185,9 @@ export class PostsService {
 
     if (post.medias && post.medias.length > 0) {
       await Promise.all(
-        post.medias.map((media) => this.storageService.deleteFiles([media.url])),
+        post.medias.map((media) =>
+          this.storageService.deleteFiles([media.url]),
+        ),
       );
     }
 
@@ -177,7 +197,7 @@ export class PostsService {
   async getForYouPosts(
     userId: number,
     page: number,
-    page_size: number
+    page_size: number,
   ): Promise<Post[]> {
     const skip = (page - 1) * page_size;
 
@@ -189,7 +209,6 @@ export class PostsService {
       include: { medias: true },
     });
   }
-
 
   async getPostDetails(postId: number): Promise<PostDetailsResponseDto> {
     const post = await this.prisma.post.findUnique({
@@ -206,14 +225,14 @@ export class PostsService {
   async getFollowingPosts(
     userId: number,
     page: number,
-    page_size: number
+    page_size: number,
   ): Promise<PostListItemResponseDto[]> {
     const followingUsers = await this.prisma.follow.findMany({
       where: { follower_id: userId },
       select: { following_id: true },
     });
 
-    const followingIds = followingUsers.map(follow => follow.following_id);
+    const followingIds = followingUsers.map((follow) => follow.following_id);
 
     const skip = (page - 1) * page_size;
 
@@ -235,7 +254,6 @@ export class PostsService {
 
     return plainToInstance(PostListItemResponseDto, posts);
   }
-
 
   @TryCatch()
   async searchPosts(
@@ -303,10 +321,12 @@ export class PostsService {
           : undefined,
         imageFiles && imageFiles.length > 0
           ? Promise.all(
-            imageFiles.map((image) =>
-              this.embeddingService.generateEmbeddingFromImageBlob(new Blob([image.buffer])),
-            ),
-          )
+              imageFiles.map((image) =>
+                this.embeddingService.generateEmbeddingFromImageBlob(
+                  new Blob([image.buffer]),
+                ),
+              ),
+            )
           : undefined,
       ]);
 
@@ -355,10 +375,15 @@ export class PostsService {
     description: string | undefined,
     imageFiles: Express.Multer.File[],
   ): Promise<void> {
-
-    const { titleEmbedding, descriptionEmbdding, imagesEmbedding }: VectorParams =
-      await this.getVectorParams(title, description, imageFiles);
-
+    const {
+      titleEmbedding,
+      descriptionEmbdding,
+      imagesEmbedding,
+    }: VectorParams = await this.getVectorParams(
+      title,
+      description,
+      imageFiles,
+    );
 
     const operationInfo = await this.qdrantClient.updateVectors(
       this.qdrantCollectionName,

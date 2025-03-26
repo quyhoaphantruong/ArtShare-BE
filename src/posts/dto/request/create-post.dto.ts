@@ -1,6 +1,11 @@
-import { Transform, Type } from "class-transformer";
-import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, ValidateNested } from "class-validator";
-import { MediaDto } from "./media.dto";
+import { Transform } from 'class-transformer';
+import {
+  IsArray,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class CreatePostDto {
   @IsString()
@@ -19,5 +24,4 @@ export class CreatePostDto {
   @IsInt({ each: true })
   @Transform(({ value }) => JSON.parse(value), { toClassOnly: true })
   cate_ids: number[];
-  
 }

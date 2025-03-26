@@ -1,5 +1,5 @@
-import { MediaType } from "@prisma/client";
-import { Exclude } from "class-transformer";
+import { MediaType } from '@prisma/client';
+import { Exclude } from 'class-transformer';
 
 export class MediaResponseDto {
   @Exclude() id: number;

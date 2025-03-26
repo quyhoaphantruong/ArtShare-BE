@@ -74,7 +74,10 @@ export class S3StorageProvider implements IStorageProvider {
   }
 
   @TryCatch()
-  async uploadFiles(files: Express.Multer.File[], directory: string): Promise<{ url: string; key: string }[]> {
+  async uploadFiles(
+    files: Express.Multer.File[],
+    directory: string,
+  ): Promise<{ url: string; key: string }[]> {
     const uploadPromises = files.map((file) => {
       const key = `${directory}/${nanoid()}_${file.originalname}`;
 
@@ -85,9 +88,12 @@ export class S3StorageProvider implements IStorageProvider {
         ContentType: file.mimetype,
       };
 
-      return this.s3.upload(params).promise().then((data) => {
-        return { url: data.Location, key };
-      });
+      return this.s3
+        .upload(params)
+        .promise()
+        .then((data) => {
+          return { url: data.Location, key };
+        });
     });
 
     // Wait for all files to upload

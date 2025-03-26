@@ -9,7 +9,9 @@ export class LikesController {
   constructor(private readonly likesService: LikesService) {}
 
   @Post()
-  async createLike(@Body() createLikeDto: CreateLikeDto): Promise<LikeDetailsDto> {
+  async createLike(
+    @Body() createLikeDto: CreateLikeDto,
+  ): Promise<LikeDetailsDto> {
     // TODO: get user_id from access token
     const userId = 1;
     return this.likesService.createLike(createLikeDto, userId);
