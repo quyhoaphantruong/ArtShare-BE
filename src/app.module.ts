@@ -7,9 +7,13 @@ import { LikesModule } from './likes/likes.module';
 import { SharesModule } from './shares/shares.module';
 import { StorageModule } from './storage/storage.module';
 import { EmbeddingModule } from './embedding/embedding.module';
+import { AuthModule } from './auth/auth.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
+    UserModule,
+    AuthModule,
     PostsModule,
     LikesModule,
     SharesModule,
