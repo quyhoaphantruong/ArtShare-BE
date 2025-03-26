@@ -9,7 +9,7 @@ import { CurrentUserType } from 'src/auth/types/current-user.type';
 @Controller('shares')
 @UseGuards(AuthGuard)
 export class SharesController {
-  constructor(private readonly sharesService: SharesService) { }
+  constructor(private readonly sharesService: SharesService) {}
 
   @Post()
   async createShare(
@@ -22,7 +22,7 @@ export class SharesController {
   @Delete()
   async removeShare(
     @Body() removeShareDto: RemoveShareDto,
-    @CurrentUser() user: CurrentUserType
+    @CurrentUser() user: CurrentUserType,
   ) {
     return this.sharesService.removeShare(removeShareDto, user.id);
   }

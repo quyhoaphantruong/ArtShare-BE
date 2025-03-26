@@ -1,4 +1,4 @@
-import { Exclude, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { MediaResponseDto } from './media.dto';
 import { UserResponseDto } from './user.dto';
 import { CategoryResponseDto } from './category.dto';

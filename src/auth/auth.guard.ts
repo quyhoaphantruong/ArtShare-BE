@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service'; // Sử dụng AuthService để xác minh token
 
 @Injectable()
@@ -14,11 +19,14 @@ export class AuthGuard implements CanActivate {
     }
 
     try {
-      const {user_id, email} = await this.authService.verifyToken(token); // Xác minh token
-      request.user = {id: user_id, email};
+      const { user_id, email } = await this.authService.verifyToken(token); // Xác minh token
+      request.user = { id: user_id, email };
       return true;
     } catch (error) {
-      throw new UnauthorizedException(`'You are not authroized to access this resource`);
+      console.error(error);
+      throw new UnauthorizedException(
+        `'You are not authroized to access this resource`,
+      );
     }
   }
 }
