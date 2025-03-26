@@ -24,7 +24,7 @@ export class AuthService {
     try {
       // Check if the username already exists
       const existingUser = await this.prisma.user.findUnique({
-        where: { email },
+        where: { id: userId },
       });
       this.logger.log(username);
       if (existingUser) {
@@ -136,7 +136,7 @@ export class AuthService {
     }
   }
 
-  async getTokens(userId: number, email: string): Promise<Tokens> {
+  async getTokens(userId: string, email: string): Promise<Tokens> {
     const jwtPayload: JwtPayload = {
       userId: userId,
       email: email,
