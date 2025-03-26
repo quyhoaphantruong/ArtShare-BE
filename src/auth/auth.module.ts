@@ -4,8 +4,6 @@ import { AuthController } from './auth.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config'; // If using environment variables
 import * as admin from 'firebase-admin'; // Firebase Admin SDK
 import { PrismaService } from 'src/prisma.service'; // Import PrismaService
-import { readFileSync } from 'fs'; // Import fs module for file reading
-import * as path from 'path'; // For path resolution
 import { JwtModule } from '@nestjs/jwt';
 import { AtStrategy } from './strategies/at.strategy';
 import { RtStrategy } from './strategies/rt.strategy';
