@@ -46,7 +46,7 @@ export class PostsService {
   async createPost(
     createPostDto: CreatePostDto,
     images: Express.Multer.File[],
-    userId: number,
+    userId: string,
   ): Promise<PostDetailsResponseDto> {
     const { cate_ids, video_url, ...createPostData } = createPostDto;
 
@@ -96,7 +96,7 @@ export class PostsService {
     postId: number,
     updatePostDto: UpdatePostDto,
     images: Express.Multer.File[],
-    userId: number,
+    userId: string,
   ): Promise<PostDetailsResponseDto> {
     const existingPost = await this.prisma.post.findUnique({
       where: { id: postId },
@@ -195,7 +195,7 @@ export class PostsService {
   }
 
   async getForYouPosts(
-    userId: number,
+    userId: string,
     page: number,
     page_size: number,
   ): Promise<Post[]> {
@@ -223,7 +223,7 @@ export class PostsService {
   }
 
   async getFollowingPosts(
-    userId: number,
+    userId: string,
     page: number,
     page_size: number,
   ): Promise<PostListItemResponseDto[]> {

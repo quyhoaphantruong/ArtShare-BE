@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { PostsService } from './posts.service';
@@ -16,7 +17,11 @@ import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { AuthGuard } from 'src/auth/auth.guard';
+import { CurrentUser } from 'src/auth/decorators/users.decorator';
+import { CurrentUserType } from 'src/auth/types/current-user.type';
 
+@UseGuards(AuthGuard)
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
@@ -26,10 +31,10 @@ export class PostsController {
   async createPost(
     @Body() createPostDto: CreatePostDto,
     @UploadedFiles() images: Express.Multer.File[],
+    @CurrentUser() user: CurrentUserType,
   ): Promise<any> {
-    // TODO: will extract from accesstoken
-    const userId = 2;
-    return this.postsService.createPost(createPostDto, images, userId);
+    console.log('user', user);
+    return this.postsService.createPost(createPostDto, images, user.id);
   }
 
   @Patch(':post_id')
@@ -38,14 +43,13 @@ export class PostsController {
     @Param('post_id') postId: number,
     @Body() updatePostDto: UpdatePostDto,
     @UploadedFiles() images: Express.Multer.File[],
+    @CurrentUser() user: CurrentUserType,
   ): Promise<PostDetailsResponseDto> {
-    // TODO: will extract from accesstoken
-    const userId = 1;
     return this.postsService.updatePost(
       Number(postId),
       updatePostDto,
       images,
-      userId,
+      user.id,
     );
   }
 
@@ -71,11 +75,10 @@ export class PostsController {
   async getForYouPosts(
     @Query('page') page: string = '1',
     @Query('page_size') page_size: string = '25',
+    @CurrentUser() user: CurrentUserType,
   ) {
-    // TODO: get user_id from access token
-    const userId = 1;
     return this.postsService.getForYouPosts(
-      userId,
+      user.id,
       Number(page),
       Number(page_size),
     );
@@ -85,12 +88,10 @@ export class PostsController {
   async getFollowingPosts(
     @Query('page') page: string = '1',
     @Query('page_size') page_size: string = '25',
+    @CurrentUser() user: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    // TODO: get user_id from access token
-    const userId = 1;
-
     return this.postsService.getFollowingPosts(
-      userId,
+      user.id,
       Number(page),
       Number(page_size),
     );

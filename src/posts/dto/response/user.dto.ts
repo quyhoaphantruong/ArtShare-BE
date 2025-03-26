@@ -1,7 +1,7 @@
 import { Exclude } from 'class-transformer';
 
 export class UserResponseDto {
-  @Exclude() id: number;
+  id: string;
   username: string;
   @Exclude() email: string;
   @Exclude() password_hash: string;

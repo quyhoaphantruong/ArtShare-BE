@@ -5,7 +5,7 @@ import { CategoryResponseDto } from './category.dto';
 
 export class PostDetailsResponseDto {
   id: number;
-  @Exclude() user_id: number;
+  user_id: string;
   title: string;
   description?: string;
   thumbnail_url: string;
