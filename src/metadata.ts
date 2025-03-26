@@ -202,7 +202,7 @@ export default async () => {
           import('./likes/dto/response/like-details.dto'),
           {
             LikeDetailsDto: {
-              user_id: { required: true, type: () => Number },
+              user_id: { required: true, type: () => String },
               target_id: { required: true, type: () => Number },
               target_type: { required: true, type: () => Object },
               created_at: { required: true, type: () => Date },
