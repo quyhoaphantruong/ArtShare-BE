@@ -12,7 +12,7 @@ export class LikesService {
 
   async createLike(
     createLikeDto: CreateLikeDto,
-    userId: number,
+    userId: string,
   ): Promise<LikeDetailsDto> {
     await this.verifyTargetExists(
       createLikeDto.target_id,
@@ -68,7 +68,7 @@ export class LikesService {
 
   private async verifyLikeAlreadyExists(
     createLikeDto: CreateLikeDto,
-    userId: number,
+    userId: string,
   ) {
     const existingLike = await this.findLike(
       createLikeDto.target_id,
@@ -82,7 +82,7 @@ export class LikesService {
 
   private async verifyLikeNotExists(
     removeLikeDto: RemoveLikeDto,
-    userId: number,
+    userId: string,
   ) {
     const existingLike = await this.findLike(
       removeLikeDto.target_id,
@@ -100,7 +100,7 @@ export class LikesService {
   private async findLike(
     target_id: number,
     target_type: TargetType,
-    userId: number,
+    userId: string,
   ) {
     return this.prisma.like.findFirst({
       where: {
@@ -111,7 +111,7 @@ export class LikesService {
     });
   }
 
-  async removeLike(createLikeDto: RemoveLikeDto, userId: number) {
+  async removeLike(createLikeDto: RemoveLikeDto, userId: string) {
     await this.verifyTargetExists(
       createLikeDto.target_id,
       createLikeDto.target_type,

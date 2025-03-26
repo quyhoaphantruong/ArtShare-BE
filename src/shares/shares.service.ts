@@ -9,7 +9,7 @@ export class SharesService {
   constructor(private readonly prisma: PrismaService) {}
 
   // CREATE a new share and increment the share_count if target is a post
-  async createShare(dto: CreateShareDto, userId: number) {
+  async createShare(dto: CreateShareDto, userId: string) {
     return this.prisma.$transaction(async (tx) => {
       // 1. Create the share record
       const share = await tx.share.create({
@@ -36,7 +36,7 @@ export class SharesService {
   }
 
   // (OPTIONAL) REMOVE a share and decrement the share_count
-  async removeShare(dto: RemoveShareDto, userId: number) {
+  async removeShare(dto: RemoveShareDto, userId: string) {
     return this.prisma.$transaction(async (tx) => {
       // 1. Delete the share record
       await tx.share.deleteMany({
