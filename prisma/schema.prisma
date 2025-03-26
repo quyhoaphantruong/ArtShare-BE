@@ -88,7 +88,7 @@ model Media {
 }
 
 model Category {
-  cate_id    Int      @id @default(autoincrement())
+  id    Int      @id @default(autoincrement())
   cate_name  String   @unique
   url        String?  @unique
   created_at DateTime @default(now())

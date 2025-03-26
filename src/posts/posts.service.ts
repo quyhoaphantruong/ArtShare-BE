@@ -75,7 +75,7 @@ export class PostsService {
           })),
         },
         categories: {
-          connect: (cate_ids || []).map((cate_id) => ({ cate_id })),
+          connect: (cate_ids || []).map((cate_id) => ({ id: cate_id })),
         },
       },
       include: { medias: true, user: true, categories: true },
@@ -148,7 +148,7 @@ export class PostsService {
       data: {
         ...postUpdateData,
         categories: {
-          set: (cate_ids || []).map((cate_id) => ({ cate_id })),
+          set: (cate_ids || []).map((cate_id) => ({ id: cate_id })),
         },
         ...(mediasData.length > 0 && {
           medias: {
