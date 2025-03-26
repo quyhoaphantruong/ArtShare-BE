@@ -1,6 +1,5 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import { IsArray, IsInt, IsOptional, IsString, ValidateNested } from "class-validator";
-import { MediaDto } from "./media.dto";
 
 export class UpdatePostDto {
   @IsOptional()
@@ -16,13 +15,12 @@ export class UpdatePostDto {
   thumbnail_url?: string;
 
   @IsOptional()
-  @IsArray()
-  @IsInt({ each: true })
-  cate_ids?: number[];
+  @IsString()
+  video_url?: string;
 
   @IsOptional()
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => MediaDto)
-  medias_data?: MediaDto[];
+  @IsInt({ each: true })
+  @Transform(({ value }) => JSON.parse(value), { toClassOnly: true })
+  cate_ids?: number[];
 }

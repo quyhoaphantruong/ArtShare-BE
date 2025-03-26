@@ -1,10 +1,14 @@
 import { GetPresignedUrlRequestDto } from './dto/request.dto';
-import { GetPresignedUrlResponseDto } from './dto/response.dto';
+import { FileUploadResponse, GetPresignedUrlResponseDto } from './dto/response.dto';
 
 export interface IStorageProvider {
   generatePresignedUrl(
     request: GetPresignedUrlRequestDto,
   ): Promise<GetPresignedUrlResponseDto>;
 
-  deleteFile(url: string): Promise<void>;
+  deleteFiles(urls: string[]): Promise<void>;
+
+  uploadFiles(files: Express.Multer.File[], directory: string): Promise<FileUploadResponse[]>;
+
+  getBucketUrl(): string;
 }

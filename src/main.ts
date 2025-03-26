@@ -12,6 +12,7 @@ async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true, // allows "true"/"false" to become boolean
       },
+      whitelist: true
     }),
   );
 

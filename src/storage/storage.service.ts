@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { IStorageProvider } from './storage.interface';
 import { S3StorageProvider } from './providers/s3-storage.provider';
 import { GetPresignedUrlRequestDto } from './dto/request.dto';
-import { GetPresignedUrlResponseDto } from './dto/response.dto';
+import { FileUploadResponse, GetPresignedUrlResponseDto } from './dto/response.dto';
 
 @Injectable()
 export class StorageService {
@@ -21,7 +21,16 @@ export class StorageService {
     return this.storageProvider.generatePresignedUrl(request);
   }
 
-  async deleteFile(fileUrl: string) {
-    return this.storageProvider.deleteFile(fileUrl);
+  async deleteFiles(fileUrls: string[]) {
+    return this.storageProvider.deleteFiles(fileUrls);
+  }
+
+  async uploadFiles(files: Express.Multer.File[], directory: string): Promise<FileUploadResponse[]> {
+    return this.storageProvider.uploadFiles(files, directory);
+  }
+
+  async getBucketUrl() {
+    return this.storageProvider.getBucketUrl();
   }
 }
+

@@ -7,34 +7,41 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
   @Post()
+  @UseInterceptors(FilesInterceptor('images'))
   async createPost(
     @Body() createPostDto: CreatePostDto,
-  ): Promise<PostDetailsResponseDto> {
+    @UploadedFiles() images: Express.Multer.File[],
+  ): Promise<any> {
     // TODO: will extract from accesstoken
     const userId = 2;
-    return this.postsService.createPost(createPostDto, userId);
+    return this.postsService.createPost(createPostDto, images, userId);
   }
 
   @Patch(':post_id')
+  @UseInterceptors(FilesInterceptor('images'))
   async updatePost(
     @Param('post_id') postId: number,
     @Body() updatePostDto: UpdatePostDto,
+    @UploadedFiles() images: Express.Multer.File[],
   ): Promise<PostDetailsResponseDto> {
     // TODO: will extract from accesstoken
     const userId = 1;
-    return this.postsService.updatePost(Number(postId), updatePostDto, userId);
+    return this.postsService.updatePost(Number(postId), updatePostDto, images, userId);
   }
 
   @Delete(':post_id')

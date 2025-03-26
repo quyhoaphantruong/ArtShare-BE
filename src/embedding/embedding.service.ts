@@ -7,6 +7,7 @@ import {
   CLIPTextModelWithProjection,
   RawImage,
 } from '@xenova/transformers';
+import { TryCatch } from 'src/common/try-catch.decorator.';
 
 @Injectable()
 export class EmbeddingService {
@@ -37,7 +38,7 @@ export class EmbeddingService {
     return Object.values(text_embeds.data);
   }
 
-  async generateEmbeddingFromImage(image_url: string): Promise<number[]> {
+  async generateEmbeddingFromImageUrl(image_url: string): Promise<number[]> {
     const processor = await this.processorPromise;
     const visionModel = await this.visionModelPromise;
     try {
@@ -52,5 +53,17 @@ export class EmbeddingService {
       console.error(`Error processing ${image_url}:`, err);
       return [];
     }
+  }
+
+  @TryCatch()
+  async generateEmbeddingFromImageBlob(imageBlob: Blob): Promise<number[]> {
+    const processor = await this.processorPromise;
+    const visionModel = await this.visionModelPromise;
+
+    const image_inputs = await processor(await RawImage.fromBlob(imageBlob));
+
+    const { image_embeds } = await visionModel(image_inputs);
+
+    return Object.values(image_embeds.data);
   }
 }

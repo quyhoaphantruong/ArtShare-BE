@@ -10,11 +10,17 @@ import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
+import { FileUploadResponse } from 'src/storage/dto/response.dto';
 
 class VectorParams {
-  title?: number[];
-  description?: number[];
-  images?: number[][];
+  titleEmbedding?: number[];
+  descriptionEmbdding?: number[];
+  imagesEmbedding?: number[][];
+}
+
+export class MediaData {
+  url: string;
+  media_type: MediaType;
 }
 
 @Injectable()
@@ -30,28 +36,34 @@ export class PostsService {
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly embeddingService: EmbeddingService,
-  ) {}
+  ) { }
 
   @TryCatch()
   async createPost(
     createPostDto: CreatePostDto,
+    images: Express.Multer.File[],
     userId: number,
   ): Promise<PostDetailsResponseDto> {
-    const { cate_ids, medias_data, ...postData } = createPostDto;
+    const { cate_ids, video_url, ...createPostData } = createPostDto;
 
-    const firstImage = medias_data.find((media) => media.media_type === MediaType.image);
-
-    if (!firstImage) {
-      throw new BadRequestException('At least one image is required to create a post');
+    if (images.length === 0) {
+      throw new BadRequestException('At least one image is required');
     }
-    
+
+    const imageUploads: FileUploadResponse[] = await this.storageService.uploadFiles(images, 'posts');
+
+    const mediasData = [
+      ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
+      ...imageUploads.map(({ url }) => ({ url, media_type: MediaType.image })),
+    ];
+
     const post = await this.prisma.post.create({
       data: {
         user_id: userId,
-        ...postData,
-        thumbnail_url: firstImage.url,
+        ...createPostData,
+        thumbnail_url: imageUploads[0].url, // Set thumbnail_url to the first image
         medias: {
-          create: medias_data.map(({ url, media_type }) => ({
+          create: mediasData.map(({ url, media_type }) => ({
             media_type,
             url,
             creator_id: userId,
@@ -64,15 +76,19 @@ export class PostsService {
       include: { medias: true, user: true, categories: true },
     });
 
-    await this.savePostEmbedding(post);
+    await this.savePostEmbedding(post.id, createPostData.title, createPostData.description, images);
+
     return plainToInstance(PostDetailsResponseDto, post);
   }
 
+  @TryCatch()
   async updatePost(
     postId: number,
     updatePostDto: UpdatePostDto,
+    images: Express.Multer.File[],
     userId: number,
   ): Promise<PostDetailsResponseDto> {
+
     const existingPost = await this.prisma.post.findUnique({
       where: { id: postId },
       include: { medias: true },
@@ -82,26 +98,47 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
 
-    const { cate_ids, medias_data, ...postData } = updatePostDto;
-    const newMediaProvided = medias_data && medias_data.length > 0;
+    const { cate_ids, video_url, ...postUpdateData } = updatePostDto;
 
-    if (newMediaProvided) {
-      const deleteResponse = await this.prisma.media.deleteMany({
-        where: { post_id: postId },
-      });
-      this.updatePostEmbedding(existingPost);
+    let newImageUploads: FileUploadResponse[] = [];
+    if (images && images.length > 0) {
+      // do this to delete in db and s3 at the same time
+      const deleteImagePromises = [
+        this.prisma.media.deleteMany({ where: { post_id: postId } }),
+        this.storageService.deleteFiles(existingPost.medias.map((media) => media.url)),
+      ];
+      await Promise.all(deleteImagePromises);
+      newImageUploads = await this.storageService.uploadFiles(images, 'posts');
     }
+
+    if (video_url) {
+      const existingVideo = existingPost.medias.find(
+        (media) => media.media_type === MediaType.video,
+      );
+      if (existingVideo) {
+        const deleteVideoPromise = [
+          this.prisma.media.delete({ where: { id: existingVideo.id } }),
+          this.storageService.deleteFiles([existingVideo.url]),
+        ]
+        await Promise.all(deleteVideoPromise);
+      }
+    }
+
+    const mediasData: MediaData[] = [
+      ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
+      ...newImageUploads.map(({ url }) => ({ url, media_type: MediaType.image })),
+    ];
 
     const updatedPost = await this.prisma.post.update({
       where: { id: postId },
       data: {
-        ...postData,
+        ...postUpdateData,
         categories: {
           set: (cate_ids || []).map((cate_id) => ({ cate_id })),
         },
-        ...(newMediaProvided && {
+        ...(mediasData.length > 0 && {
           medias: {
-            create: medias_data.map(({ url, media_type }) => ({
+            create: mediasData.map(({ url, media_type }) => ({
               media_type,
               url,
               creator_id: userId,
@@ -111,6 +148,9 @@ export class PostsService {
       },
       include: { medias: true, user: true, categories: true },
     });
+
+    this.updatePostEmbedding(postId, postUpdateData.title, postUpdateData.description, images);
+
 
     return plainToInstance(PostDetailsResponseDto, updatedPost);
   }
@@ -127,7 +167,7 @@ export class PostsService {
 
     if (post.medias && post.medias.length > 0) {
       await Promise.all(
-        post.medias.map((media) => this.storageService.deleteFile(media.url)),
+        post.medias.map((media) => this.storageService.deleteFiles([media.url])),
       );
     }
 
@@ -140,7 +180,7 @@ export class PostsService {
     page_size: number
   ): Promise<Post[]> {
     const skip = (page - 1) * page_size;
-  
+
     return this.prisma.post.findMany({
       where: { is_published: true },
       orderBy: { share_count: 'desc' },
@@ -149,7 +189,7 @@ export class PostsService {
       include: { medias: true },
     });
   }
-  
+
 
   async getPostDetails(postId: number): Promise<PostDetailsResponseDto> {
     const post = await this.prisma.post.findUnique({
@@ -172,11 +212,11 @@ export class PostsService {
       where: { follower_id: userId },
       select: { following_id: true },
     });
-  
+
     const followingIds = followingUsers.map(follow => follow.following_id);
-  
+
     const skip = (page - 1) * page_size;
-  
+
     const posts = await this.prisma.post.findMany({
       where: {
         user_id: { in: followingIds },
@@ -192,10 +232,10 @@ export class PostsService {
         created_at: 'desc',
       },
     });
-  
+
     return plainToInstance(PostListItemResponseDto, posts);
   }
-  
+
 
   @TryCatch()
   async searchPosts(
@@ -249,37 +289,43 @@ export class PostsService {
   }
 
   private async getVectorParams(
-    post: Post & { medias: Media[] },
+    title: string | undefined,
+    description: string | undefined,
+    imageFiles: Express.Multer.File[],
   ): Promise<VectorParams> {
     const [titleEmbedding, descriptionEmbedding, imageEmbeddings] =
       await Promise.all([
-        post.title
-          ? this.embeddingService.generateEmbeddingFromText(post.title)
+        title
+          ? this.embeddingService.generateEmbeddingFromText(title)
           : undefined,
-        post.description
-          ? this.embeddingService.generateEmbeddingFromText(post.description)
+        description
+          ? this.embeddingService.generateEmbeddingFromText(description)
           : undefined,
-        post.medias && post.medias.length > 0
+        imageFiles && imageFiles.length > 0
           ? Promise.all(
-              post.medias.map((media) =>
-                this.embeddingService.generateEmbeddingFromImage(media.url),
-              ),
-            )
+            imageFiles.map((image) =>
+              this.embeddingService.generateEmbeddingFromImageBlob(new Blob([image.buffer])),
+            ),
+          )
           : undefined,
       ]);
 
     return {
-      title: titleEmbedding,
-      description: descriptionEmbedding,
-      images: imageEmbeddings,
+      titleEmbedding: titleEmbedding,
+      descriptionEmbdding: descriptionEmbedding,
+      imagesEmbedding: imageEmbeddings,
     };
   }
 
   @TryCatch()
   private async savePostEmbedding(
-    post: Post & { medias: Media[] },
+    postId: number,
+    title: string,
+    description: string | undefined,
+    imageFiles: Express.Multer.File[],
   ): Promise<void> {
-    const { title, description, images } = await this.getVectorParams(post);
+    const { titleEmbedding, descriptionEmbdding, imagesEmbedding } =
+      await this.getVectorParams(title, description, imageFiles);
 
     const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
@@ -287,13 +333,13 @@ export class PostsService {
         wait: true,
         points: [
           {
-            id: post.id,
+            id: postId,
             vector: {
-              title: title,
-              description: description,
-              images: images,
+              title: titleEmbedding,
+              description: descriptionEmbdding,
+              images: imagesEmbedding,
             },
-            payload: { postId: post.id },
+            payload: { postId: postId },
           },
         ],
       },
@@ -304,21 +350,26 @@ export class PostsService {
 
   @TryCatch()
   private async updatePostEmbedding(
-    post: Post & { medias: Media[] },
+    postId: number,
+    title: string | undefined,
+    description: string | undefined,
+    imageFiles: Express.Multer.File[],
   ): Promise<void> {
-    const { title, description, images }: VectorParams =
-      await this.getVectorParams(post);
+
+    const { titleEmbedding, descriptionEmbdding, imagesEmbedding }: VectorParams =
+      await this.getVectorParams(title, description, imageFiles);
+
 
     const operationInfo = await this.qdrantClient.updateVectors(
       this.qdrantCollectionName,
       {
         points: [
           {
-            id: post.id,
+            id: postId,
             vector: {
-              title: title,
-              description: description,
-              images: images,
+              title: titleEmbedding,
+              description: descriptionEmbdding,
+              images: imagesEmbedding,
             },
           },
         ],

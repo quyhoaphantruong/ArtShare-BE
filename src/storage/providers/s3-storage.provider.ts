@@ -3,12 +3,13 @@ import { S3 } from 'aws-sdk';
 import { nanoid } from 'nanoid';
 import { IStorageProvider } from '../storage.interface';
 import { GetPresignedUrlRequestDto } from '../dto/request.dto';
+import { TryCatch } from 'src/common/try-catch.decorator.';
 
 @Injectable()
 export class S3StorageProvider implements IStorageProvider {
   private s3: S3;
-  public bucketName: string;
-  public region: string;
+  private bucketName: string;
+  private region: string;
   private bucketUrl: string;
 
   constructor() {
@@ -48,24 +49,53 @@ export class S3StorageProvider implements IStorageProvider {
     }
   }
 
-  async deleteFile(url: string): Promise<void> {
-    if (!url.startsWith(this.bucketUrl)) {
-      throw new Error(`Invalid file URL: ${url}`);
-    }
+  @TryCatch()
+  async deleteFiles(urls: string[]): Promise<void> {
+    const objectsToDelete = urls.map((url) => {
+      if (!url.startsWith(this.bucketUrl)) {
+        throw new Error(`Invalid file URL: ${url}`);
+      }
+      const key = url.replace(this.bucketUrl, '');
+      if (!key) {
+        throw new Error('Failed to extract file key from URL');
+      }
+      return { Key: key };
+    });
 
-    const key = url.replace(this.bucketUrl, '');
+    const params = {
+      Bucket: this.bucketName,
+      Delete: {
+        Objects: objectsToDelete,
+        Quiet: false, // If set to true, S3 doesn't return a list of deleted objects
+      },
+    };
 
-    if (!key) {
-      throw new Error('Failed to extract file key from URL');
-    }
+    await this.s3.deleteObjects(params).promise();
+  }
 
-    try {
-      await this.s3
-        .deleteObject({ Bucket: this.bucketName, Key: key })
-        .promise();
-    } catch (error) {
-      console.error(`Error deleting file from S3 (Key: ${key}):`, error);
-      throw new Error(`Failed to delete file from S3: ${key}`);
-    }
+  @TryCatch()
+  async uploadFiles(files: Express.Multer.File[], directory: string): Promise<{ url: string; key: string }[]> {
+    const uploadPromises = files.map((file) => {
+      const key = `${directory}/${nanoid()}_${file.originalname}`;
+
+      const params = {
+        Bucket: this.bucketName,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      };
+
+      return this.s3.upload(params).promise().then((data) => {
+        return { url: data.Location, key };
+      });
+    });
+
+    // Wait for all files to upload
+    const uploadedFiles = await Promise.all(uploadPromises);
+    return uploadedFiles;
+  }
+
+  getBucketUrl(): string {
+    return this.bucketUrl;
   }
 }
