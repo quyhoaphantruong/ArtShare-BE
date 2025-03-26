@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import * as admin from 'firebase-admin'; // Firebase Admin SDK
 import { PrismaService } from 'src/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -128,7 +128,7 @@ export class AuthService {
       return await admin.auth().verifyIdToken(idToken);
     } catch (error) {
       this.logger.error(error.stack);
-      throw new Error('Unauthorized');
+      throw new UnauthorizedException('You are not authorized to access this resource');
     }
   }
 
