@@ -12,6 +12,10 @@ export class UpdatePostDto {
 
   @IsOptional()
   @IsString()
+  hasMatureContent?: string;
+
+  @IsOptional()
+  @IsString()
   thumbnail_url?: string;
 
   @IsOptional()

@@ -52,6 +52,7 @@ model Post {
   user_id       String // Foreign key to User
   title         String
   description   String?
+  has_mature_content Boolean   @default(false)
   thumbnail_url String
   is_published  Boolean   @default(false)
   is_private    Boolean   @default(false)

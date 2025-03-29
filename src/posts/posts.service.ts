@@ -48,7 +48,7 @@ export class PostsService {
     images: Express.Multer.File[],
     userId: string,
   ): Promise<PostDetailsResponseDto> {
-    const { cate_ids, video_url, ...createPostData } = createPostDto;
+    const { cate_ids, video_url, thumbnail_url, ...createPostData } = createPostDto;
 
     if (images.length === 0) {
       throw new BadRequestException('At least one image is required');
@@ -66,7 +66,7 @@ export class PostsService {
       data: {
         user_id: userId,
         ...createPostData,
-        thumbnail_url: imageUploads[0].url, // Set thumbnail_url to the first image
+        thumbnail_url: thumbnail_url || imageUploads[0].url, // Set thumbnail_url to the first image
         medias: {
           create: mediasData.map(({ url, media_type }) => ({
             media_type,
