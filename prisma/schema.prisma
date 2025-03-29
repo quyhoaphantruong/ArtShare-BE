@@ -158,3 +158,5 @@ model Follow {
   @@id([follower_id, following_id])
   @@map("follow")
 }
+
+

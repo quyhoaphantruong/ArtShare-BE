@@ -1,6 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service'; // Import PrismaService
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma.service'; // Import PrismaService
 import { User } from '@prisma/client'; // Import User type
+import { UserProfileDTO } from './dto/user-profile.dto';
+import { DeleteUsersDTO } from './dto/delete-users.dto';
+import { UpdateUserDTO } from './dto/update-users.dto';
 
 @Injectable()
 export class UserService {
@@ -13,6 +16,48 @@ export class UserService {
         email,
       },
     });
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfileDTO> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        username: true,
+        email: true,
+        full_name: true,
+        profile_picture_url: true,
+        bio: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    return user;
+  }
+
+  async updateUserProfile(userId: string, updateUserDto: UpdateUserDTO) {
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: updateUserDto,
+        select: {
+          username: true,
+          email: true,
+          full_name: true,
+          profile_picture_url: true,
+          bio: true,
+        },
+      });
+      return updatedUser;
+    } catch (error) {
+      // Handle the case where the user is not found, or any other prisma related error.
+      if (error.code === 'P2025') {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+      throw error;
+    }
   }
 
   // Lấy thông tin người dùng đầu tiên (findFirst)
@@ -28,8 +73,86 @@ export class UserService {
     });
   }
 
-  // Xoá người dùng
-  async deleteUser(): Promise<any> {
-    return this.prisma.user.deleteMany();
+  // Xoá nhiều người dùng
+  async deleteUsers(deleteUserDTO: DeleteUsersDTO): Promise<any> {
+    return this.prisma.user.deleteMany({
+      where: {
+        id: {
+          in: deleteUserDTO.userIds,
+        },
+      },
+    });
+  }
+
+  async deleteUserById(userId: string): Promise<any> {
+    return this.prisma.user.delete({
+      where: {
+        id: userId,
+      },
+    });
+  }
+
+  async followUser(followerId: string, followingId: string): Promise<string> {
+    if (followerId === followingId) {
+      throw new Error('Cannot follow yourself.');
+    }
+
+    const followerExists = await this.prisma.user.findUnique({
+      where: { id: followerId },
+    });
+
+    const followingExists = await this.prisma.user.findUnique({
+      where: { id: followingId },
+    });
+
+    if (!followerExists || !followingExists) {
+      return 'User not found';
+    }
+
+    const existingFollow = await this.prisma.follow.findUnique({
+      where: {
+        follower_id_following_id: {
+          follower_id: followerId,
+          following_id: followingId,
+        },
+      },
+    });
+
+    if (existingFollow) {
+      return 'Already following.';
+    }
+
+    await this.prisma.follow.create({
+      data: {
+        follower_id: followerId,
+        following_id: followingId,
+      },
+    });
+    return 'Followed successfully.';
+  }
+
+  async unfollowUser(followerId: string, followingId: string): Promise<string> {
+    const existingFollow = await this.prisma.follow.findUnique({
+      where: {
+        follower_id_following_id: {
+          follower_id: followerId,
+          following_id: followingId,
+        },
+      },
+    });
+
+    if (!existingFollow) {
+      return 'Not following';
+    }
+
+    await this.prisma.follow.delete({
+      where: {
+        follower_id_following_id: {
+          follower_id: followerId,
+          following_id: followingId,
+        },
+      },
+    });
+    return 'Unfollowed successfully.';
   }
 }
