@@ -48,7 +48,8 @@ export class PostsService {
     images: Express.Multer.File[],
     userId: string,
   ): Promise<PostDetailsResponseDto> {
-    const { cate_ids, video_url, thumbnail_url, ...createPostData } = createPostDto;
+    const { cate_ids, video_url, thumbnail_url, ...createPostData } =
+      createPostDto;
 
     if (images.length === 0) {
       throw new BadRequestException('At least one image is required');
