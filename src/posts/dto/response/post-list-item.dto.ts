@@ -16,9 +16,9 @@ export class PostListItemResponseDto {
   comment_count: number;
   created_at: Date;
 
-  @Exclude() medias: MediaResponseDto[];
+  medias: MediaResponseDto[];
 
-  @Exclude() user: UserResponseDto;
+  user: UserResponseDto;
 
   @Exclude() categories: CategoryResponseDto[];
 }

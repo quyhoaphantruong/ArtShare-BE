@@ -20,6 +20,14 @@ export class CreatePostDto {
   @IsString()
   video_url?: string;
 
+  @IsOptional()
+  @IsString()
+  thumbnail_url?: string;
+
+  @IsOptional()
+  @IsString()
+  hasMatureContent?: string;
+
   @IsArray()
   @IsInt({ each: true })
   @Transform(({ value }) => JSON.parse(value), { toClassOnly: true })

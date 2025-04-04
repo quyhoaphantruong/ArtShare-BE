@@ -1,6 +1,6 @@
 export class GetPresignedUrlResponseDto {
-  url: string;
-  key: string;
+  presignedUrl: string;
+  fileUrl: string;
 }
 
 export class FileUploadResponse {
