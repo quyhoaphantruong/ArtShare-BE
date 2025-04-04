@@ -16,13 +16,18 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { UpdateUserDTO } from './dto/update-users.dto';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
+import { Roles } from 'src/auth/decorators/roles.decorators';
+import { Role } from 'src/auth/enums/role.enum';
+import { RolesGuard } from 'src/auth/roles.guard';
+import { ApiResponse } from 'src/common/api-response';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
+  @Roles(Role.ADMIN)
   async findAll(@CurrentUser() user: CurrentUserType): Promise<User[] | null> {
     console.log('user extracted from auth guard', user);
     return this.userService.findAll();
@@ -60,7 +65,8 @@ export class UserController {
   async followUser(
     @Param('userId') userIdToFollow: string,
     @CurrentUser() currentUser: CurrentUserType,
-  ): Promise<string> {
+  ): Promise<ApiResponse<any>> {
+    console.log(`User ${currentUser} follow ${userIdToFollow}`);
     return this.userService.followUser(currentUser.userId, userIdToFollow);
   }
 
@@ -68,7 +74,8 @@ export class UserController {
   async unfollowUser(
     @Param('userId') userIdToUnfollow: string,
     @CurrentUser() currentUser: CurrentUserType,
-  ): Promise<string> {
+  ): Promise<ApiResponse<any>> {
+    console.log(`User ${currentUser} unfollow ${userIdToUnfollow}`);
     return this.userService.unfollowUser(currentUser.userId, userIdToUnfollow);
   }
 }

@@ -1,9 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service'; // Import PrismaService
 import { User } from '@prisma/client'; // Import User type
 import { UserProfileDTO } from './dto/user-profile.dto';
 import { DeleteUsersDTO } from './dto/delete-users.dto';
 import { UpdateUserDTO } from './dto/update-users.dto';
+import { ApiResponse } from 'src/common/api-response';
 
 @Injectable()
 export class UserService {
@@ -92,21 +100,29 @@ export class UserService {
     });
   }
 
-  async followUser(followerId: string, followingId: string): Promise<string> {
+  async followUser(
+    followerId: string,
+    followingId: string,
+  ): Promise<ApiResponse<any>> {
     if (followerId === followingId) {
-      throw new Error('Cannot follow yourself.');
+      throw new BadRequestException('Cannot follow yourself.');
     }
 
-    const followerExists = await this.prisma.user.findUnique({
-      where: { id: followerId },
-    });
-
-    const followingExists = await this.prisma.user.findUnique({
-      where: { id: followingId },
-    });
+    const [followerExists, followingExists] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: followerId },
+        select: { id: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: followingId },
+        select: { id: true },
+      }),
+    ]);
 
     if (!followerExists || !followingExists) {
-      return 'User not found';
+      // Throw NotFoundException if either user doesn't exist
+      const notFoundUserId = !followerExists ? followerId : followingId;
+      throw new NotFoundException(`User with ID ${notFoundUserId} not found.`);
     }
 
     const existingFollow = await this.prisma.follow.findUnique({
@@ -119,19 +135,34 @@ export class UserService {
     });
 
     if (existingFollow) {
-      return 'Already following.';
+      throw new ConflictException('Already following this user.');
     }
 
-    await this.prisma.follow.create({
-      data: {
-        follower_id: followerId,
-        following_id: followingId,
-      },
-    });
-    return 'Followed successfully.';
+    try {
+      await this.prisma.follow.create({
+        data: {
+          follower_id: followerId,
+          following_id: followingId,
+        },
+      });
+
+      // 5. Return standard success response
+      return {
+        success: true,
+        message: 'Followed successfully.',
+        statusCode: HttpStatus.CREATED, // Use 201 Created for successful creation
+      };
+    } catch (error) {
+      // Catch potential database errors during creation
+      throw new HttpException(
+        'Could not follow user.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        { cause: error },
+      );
+    }
   }
 
-  async unfollowUser(followerId: string, followingId: string): Promise<string> {
+  async unfollowUser(followerId: string, followingId: string): Promise<ApiResponse<any>> {
     const existingFollow = await this.prisma.follow.findUnique({
       where: {
         follower_id_following_id: {
@@ -142,17 +173,37 @@ export class UserService {
     });
 
     if (!existingFollow) {
-      return 'Not following';
+      throw new NotFoundException('You are not following this user.');
     }
 
-    await this.prisma.follow.delete({
-      where: {
-        follower_id_following_id: {
-          follower_id: followerId,
-          following_id: followingId,
+    try {
+      await this.prisma.follow.delete({
+        where: {
+          follower_id_following_id: {
+            follower_id: followerId,
+            following_id: followingId,
+          },
         },
-      },
-    });
-    return 'Unfollowed successfully.';
+      });
+
+      // 5. Return standard success response
+      return {
+        success: true,
+        message: 'Unfollowed successfully.',
+        statusCode: HttpStatus.OK, // Use 200 OK for successful update/delete
+      };
+    } catch (error) {
+      // Catch potential database errors during deletion (though P2025 handled above)
+      // Prisma's P2025 error (Record to delete does not exist) should ideally be caught
+      // by the `followToDelete` check above, but this is a fallback.
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Follow relationship not found to delete.'); // More specific
+      }
+      throw new HttpException(
+        'Could not unfollow user.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        { cause: error },
+      );
+    }
   }
 }
