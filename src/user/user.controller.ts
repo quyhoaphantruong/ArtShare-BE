@@ -37,7 +37,7 @@ export class UserController {
   async getProfile(
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<UserProfileDTO> {
-    return this.userService.getUserProfile(currentUser.userId);
+    return this.userService.getUserProfile(currentUser.id);
   }
 
   @Patch('profile')
@@ -46,7 +46,10 @@ export class UserController {
     @Body() updateUserDto: UpdateUserDTO,
   ) {
     console.log('user patch profile', currentUser);
-    return this.userService.updateUserProfile(currentUser.userId, updateUserDto);
+    return this.userService.updateUserProfile(
+      currentUser.id,
+      updateUserDto,
+    );
   }
 
   // Xoá nhiều người dùng
@@ -67,7 +70,7 @@ export class UserController {
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<ApiResponse<any>> {
     console.log(`User ${currentUser} follow ${userIdToFollow}`);
-    return this.userService.followUser(currentUser.userId, userIdToFollow);
+    return this.userService.followUser(currentUser.id, userIdToFollow);
   }
 
   @Post(':userId/unfollow')
@@ -76,6 +79,6 @@ export class UserController {
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<ApiResponse<any>> {
     console.log(`User ${currentUser} unfollow ${userIdToUnfollow}`);
-    return this.userService.unfollowUser(currentUser.userId, userIdToUnfollow);
+    return this.userService.unfollowUser(currentUser.id, userIdToUnfollow);
   }
 }

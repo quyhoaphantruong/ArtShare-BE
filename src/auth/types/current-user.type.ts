@@ -1,4 +1,4 @@
 export type CurrentUserType = {
-  userId: string;
+  id: string;
   email: string;
 };

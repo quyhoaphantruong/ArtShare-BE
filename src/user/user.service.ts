@@ -162,7 +162,10 @@ export class UserService {
     }
   }
 
-  async unfollowUser(followerId: string, followingId: string): Promise<ApiResponse<any>> {
+  async unfollowUser(
+    followerId: string,
+    followingId: string,
+  ): Promise<ApiResponse<any>> {
     const existingFollow = await this.prisma.follow.findUnique({
       where: {
         follower_id_following_id: {
