@@ -72,6 +72,7 @@ model Category {
   created_at DateTime @default(now())
   url        String?  @unique
   id         Int      @id @default(autoincrement())
+  type       CategoryType @default(ATTRIBUTE)
   posts      Post[]   @relation("CategoryToPost")
 
   @@map("category")
@@ -145,4 +146,9 @@ enum SharePlatform {
   FACEBOOK
   TWITTER
   LINKEDIN
+}
+
+enum CategoryType {
+  ATTRIBUTE
+  MEDIUM
 }
