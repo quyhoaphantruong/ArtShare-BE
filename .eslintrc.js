@@ -15,8 +15,7 @@ module.exports = {
     node: true,
     jest: true,
   },
-  ignorePatterns: ['.eslintrc.js', 'node_modules/', 'dist/', './github/'],
-  skipFiles: ['**/metadata.ts'],
+  ignorePatterns: ['.eslintrc.js', 'node_modules/', 'dist/', './github/', 'src/metadata.ts'],
   rules: {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
