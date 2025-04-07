@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -24,9 +25,17 @@ export class CreatePostDto {
   @IsString()
   thumbnail_url?: string;
 
-  @IsOptional()
-  @IsString()
-  hasMatureContent?: string;
+  @IsBoolean()
+  @Transform(({obj, key}) => {
+    return obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key];
+  })
+  is_mature: boolean = false;
+
+  @IsBoolean()
+  @Transform(({obj, key}) => {
+    return obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key];
+  })
+  ai_created: boolean = false;
 
   @IsArray()
   @IsInt({ each: true })

@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class UpdatePostDto {
   @IsOptional()
@@ -10,9 +10,17 @@ export class UpdatePostDto {
   @IsString()
   description?: string;
 
-  @IsOptional()
-  @IsString()
-  hasMatureContent?: string;
+  @IsBoolean()
+  @Transform(({obj, key}) => {
+    return obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key];
+  })
+  is_mature: boolean = false;
+
+  @IsBoolean()
+  @Transform(({obj, key}) => {
+    return obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key];
+  })
+  ai_created: boolean = false;
 
   @IsOptional()
   @IsString()
