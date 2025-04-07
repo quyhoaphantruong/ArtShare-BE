@@ -57,7 +57,11 @@ export class PostsService {
       ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
       ...imageUploads.map(({ url }) => ({ url, media_type: MediaType.image })),
     ];
+    console.log('DTO received:', createPostDto);
+    console.log('Raw is_mature:', typeof createPostDto.is_mature, createPostDto.is_mature);
 
+    console.log("@@ createPostData", createPostData);
+    console.log("@@userid: ", userId);
     const post = await this.prisma.post.create({
       data: {
         user_id: userId,

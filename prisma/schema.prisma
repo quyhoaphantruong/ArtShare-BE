@@ -29,26 +29,27 @@ model User {
 }
 
 model Post {
-  id                 Int        @id @default(autoincrement())
-  user_id            String
-  title              String
-  description        String?
-  created_at         DateTime   @default(now())
-  is_published       Boolean    @default(false)
-  is_private         Boolean    @default(false)
-  group_id           Int?
-  share_count        Int        @default(0)
-  comment_count      Int        @default(0)
-  like_count         Int        @default(0)
-  thumbnail_url      String
-  updated_at         DateTime?  @updatedAt
-  has_mature_content Boolean    @default(false)
-  comments           Comment[]
-  likes              Like[]
-  medias             Media[]
-  user               User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  shares             Share[]
-  categories         Category[] @relation("CategoryToPost")
+  id            Int        @id @default(autoincrement())
+  user_id       String
+  title         String
+  description   String?
+  created_at    DateTime   @default(now())
+  is_published  Boolean    @default(false)
+  is_private    Boolean    @default(false)
+  group_id      Int?
+  share_count   Int        @default(0)
+  comment_count Int        @default(0)
+  like_count    Int        @default(0)
+  thumbnail_url String
+  updated_at    DateTime?  @updatedAt
+  is_mature     Boolean    @default(false)
+  ai_created    Boolean    @default(false)
+  comments      Comment[]
+  likes         Like[]
+  medias        Media[]
+  user          User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shares        Share[]
+  categories    Category[] @relation("CategoryToPost")
 
   @@map("post")
 }
