@@ -51,7 +51,7 @@ export class AuthModule implements OnModuleInit {
 
       console.log('✅ Firebase Admin initialized with environment variables');
     } catch (error) {
-      console.error('❌ Failed to initialize Firebase Admin:', error.message);
+      console.error('❌ Failed to initialize Firebase Admin:', (error as Error).message);
       throw new Error('Failed to initialize Firebase Admin');
     }
   }
