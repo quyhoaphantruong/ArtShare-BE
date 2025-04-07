@@ -39,14 +39,13 @@ export class AuthService {
         data: {
           id: userId,
           email,
-          password_hash: password ? password : '', // If password is null, we can store it as null or handle accordingly
           username: this.createRandomUsername(),
         },
       });
 
       return { message_type: 'SIGNUP_SUCCESS', user };
     } catch (error) {
-      throw new Error(`Error creating user: ${error.message}`);
+      throw new Error(`Error creating user: ${(error as Error).message}`);
     }
   }
 
@@ -85,7 +84,7 @@ export class AuthService {
       } catch (dbError) {
         this.logger.error(
           'Error updating refresh token in database:',
-          dbError.stack,
+          (dbError as Error).stack,
         ); // Quyết định xem bạn có muốn throw lỗi ở đây hay không.
         // Nếu việc cập nhật refresh token thất bại, có thể ảnh hưởng đến việc làm mới token sau này.
         // Tùy thuộc vào yêu cầu nghiệp vụ của bạn.
@@ -99,16 +98,16 @@ export class AuthService {
         refresh_token: tokens.refresh_token,
       };
     } catch (error) {
-      this.logger.error('Error during token verification', error.stack); // Log the error message and stack trace
+      this.logger.error('Error during token verification', (error as Error).stack); // Log the error message and stack trace
 
       // Handle specific Firebase error codes if necessary
-      if (error.code === 'auth/argument-error') {
+      if ((error as admin.FirebaseError).code === 'auth/argument-error') {
         this.logger.error('The ID token is invalid or malformed.');
         throw new Error('The ID token is invalid or malformed.');
       }
 
       // General error handling
-      this.logger.error('Invalid token', error.stack);
+      this.logger.error('Invalid token', (error as Error).stack);
       throw new Error('Invalid token');
     }
   }
@@ -120,7 +119,7 @@ export class AuthService {
       await admin.auth().revokeRefreshTokens(uid);
       return { message: 'User signed out successfully' };
     } catch (error) {
-      throw new Error(`Error signing out: ${error.message}`);
+      throw new Error(`Error signing out: ${(error as Error).message}`);
     }
   }
 
@@ -129,7 +128,7 @@ export class AuthService {
     try {
       return await admin.auth().verifyIdToken(idToken);
     } catch (error) {
-      this.logger.error(error.stack);
+      this.logger.error((error as Error).stack);
       throw new UnauthorizedException(
         'You are not authorized to access this resource',
       );

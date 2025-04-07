@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
@@ -57,16 +54,11 @@ export class PostsService {
       ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
       ...imageUploads.map(({ url }) => ({ url, media_type: MediaType.image })),
     ];
-    console.log('DTO received:', createPostDto);
-    console.log('Raw is_mature:', typeof createPostDto.is_mature, createPostDto.is_mature);
-
-    console.log("@@ createPostData", createPostData);
-    console.log("@@userid: ", userId);
     const post = await this.prisma.post.create({
       data: {
         user_id: userId,
         ...createPostData,
-        thumbnail_url: thumbnail_url || imageUploads[0]?.url || "", // Set thumbnail_url to the first image
+        thumbnail_url: thumbnail_url || imageUploads[0]?.url || '', // Set thumbnail_url to the first image
         medias: {
           create: mediasData.map(({ url, media_type }) => ({
             media_type,
