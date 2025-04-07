@@ -4,7 +4,6 @@ export class UserResponseDto {
   id: string;
   username: string;
   @Exclude() email: string;
-  @Exclude() password_hash: string;
   full_name: string;
   profile_picture_url: string;
   @Exclude() bio: string;

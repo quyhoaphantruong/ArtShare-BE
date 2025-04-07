@@ -7,22 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum MediaType {
-  image
-  video
-}
-
-enum TargetType {
-  POST
-  BLOG
-}
-
-enum SharePlatform {
-  FACEBOOK
-  TWITTER
-  LINKEDIN
-}
-
 model Role {
   role_id   Int      @id @default(autoincrement()) // As per your plan
   role_name String   @unique                     // As per your plan (e.g., 'ADMIN', 'USER')
@@ -49,49 +33,45 @@ model User {
   id                  String    @id
   username            String    @unique
   email               String    @unique
-  password_hash       String
   full_name           String?
   profile_picture_url String?
   bio                 String?
   created_at          DateTime  @default(now())
   updated_at          DateTime? @updatedAt
   refresh_token       String?
-
-  posts Post[] // One-to-many relation with Post
-
-  likes    Like[]
-  comments Comment[]
-  shares   Share[]
-
-  followers  Follow[] @relation("Follower")
-  followings Follow[] @relation("Following")
-
-  roles UserRole[]
+  comments            Comment[]
+  followers           Follow[]  @relation("Follower")
+  followings          Follow[]  @relation("Following")
+  likes               Like[]
+  posts               Post[]
+  shares              Share[]
+  roles               UserRole[]
 
   @@map("user")
 }
 
 model Post {
-  id            Int       @id @default(autoincrement())
-  user_id       String // Foreign key to User
+  id            Int        @id @default(autoincrement())
+  user_id       String
   title         String
   description   String?
-  thumbnail_url String
-  is_published  Boolean   @default(false)
-  is_private    Boolean   @default(false)
+  created_at    DateTime   @default(now())
+  is_published  Boolean    @default(false)
+  is_private    Boolean    @default(false)
   group_id      Int?
-  like_count    Int       @default(0)
-  share_count   Int       @default(0)
-  comment_count Int       @default(0)
-  created_at    DateTime  @default(now())
-  updated_at    DateTime? @updatedAt
-
-  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  medias     Media[] // One-to-many relationship with Media
-  likes      Like[]
-  comments   Comment[]
-  shares     Share[]
-  categories Category[] // Many-to-many relation with Category
+  share_count   Int        @default(0)
+  comment_count Int        @default(0)
+  like_count    Int        @default(0)
+  thumbnail_url String
+  updated_at    DateTime?  @updatedAt
+  is_mature     Boolean    @default(false)
+  ai_created    Boolean    @default(false)
+  comments      Comment[]
+  likes         Like[]
+  medias        Media[]
+  user          User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shares        Share[]
+  categories    Category[] @relation("CategoryToPost")
 
   @@map("post")
 }
@@ -102,22 +82,20 @@ model Media {
   media_type  MediaType
   description String?
   url         String
-  creator_id  String
   downloads   Int       @default(0)
   created_at  DateTime  @default(now())
-
-  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  creator_id  String
+  post        Post      @relation(fields: [post_id], references: [id], onDelete: Cascade)
 
   @@map("media")
 }
 
 model Category {
-  id    Int      @id @default(autoincrement())
   cate_name  String   @unique
-  url        String?  @unique
   created_at DateTime @default(now())
-
-  posts Post[] // Many-to-many relation with Post
+  url        String?  @unique
+  id         Int      @id @default(autoincrement())
+  posts      Post[]   @relation("CategoryToPost")
 
   @@map("category")
 }
@@ -127,30 +105,26 @@ model Like {
   target_id   Int
   target_type TargetType
   created_at  DateTime   @default(now())
-
-  // Relations
-  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  post Post? @relation(fields: [target_id], references: [id], onDelete: Cascade)
+  post        Post       @relation(fields: [target_id], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@id([user_id, target_id])
-  // Composite PK ensures a user can only like a given target once
   @@map("like")
 }
 
 model Comment {
   id                Int        @id @default(autoincrement())
   user_id           String
-  target_id         Int
   parent_comment_id Int?
+  target_id         Int
   target_type       TargetType
   content           String
   created_at        DateTime   @default(now())
   updated_at        DateTime?  @updatedAt
-
-  user           User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  post           Post?     @relation(fields: [target_id], references: [id], onDelete: Cascade)
-  parent_comment Comment?  @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: Cascade)
-  replies        Comment[] @relation("CommentReplies")
+  parent_comment    Comment?   @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: Cascade)
+  replies           Comment[]  @relation("CommentReplies")
+  post              Post       @relation(fields: [target_id], references: [id], onDelete: Cascade)
+  user              User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("comment")
 }
@@ -162,10 +136,8 @@ model Share {
   target_type    TargetType
   share_platform SharePlatform
   created_at     DateTime      @default(now())
-
-  // Relations
-  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  post Post? @relation(fields: [target_id], references: [id], onDelete: Cascade)
+  post           Post          @relation(fields: [target_id], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("share")
 }
@@ -175,12 +147,25 @@ model Follow {
   following_id  String
   created_at    DateTime @default(now())
   is_subscribed Boolean  @default(false)
-
-  follower  User @relation("Follower", fields: [follower_id], references: [id], onDelete: Cascade)
-  following User @relation("Following", fields: [following_id], references: [id], onDelete: Cascade)
+  follower      User     @relation("Follower", fields: [follower_id], references: [id], onDelete: Cascade)
+  following     User     @relation("Following", fields: [following_id], references: [id], onDelete: Cascade)
 
   @@id([follower_id, following_id])
   @@map("follow")
 }
 
+enum MediaType {
+  image
+  video
+}
 
+enum TargetType {
+  POST
+  BLOG
+}
+
+enum SharePlatform {
+  FACEBOOK
+  TWITTER
+  LINKEDIN
+}

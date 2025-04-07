@@ -4,6 +4,7 @@ import { S3 } from 'aws-sdk';
 import { IStorageProvider } from '../storage.interface';
 import { GetPresignedUrlRequestDto } from '../dto/request.dto';
 import { TryCatch } from 'src/common/try-catch.decorator.';
+import { GetPresignedUrlResponseDto } from '../dto/response.dto';
 
 @Injectable()
 export class S3StorageProvider implements IStorageProvider {
@@ -31,18 +32,19 @@ export class S3StorageProvider implements IStorageProvider {
     extension,
     mediaType,
     directory,
-  }: GetPresignedUrlRequestDto): Promise<{ url: string; key: string }> {
-    const key = `${directory}/_${fileName}.${extension}`;
+  }: GetPresignedUrlRequestDto): Promise<GetPresignedUrlResponseDto> {
+    const key = `${directory}/${fileName}.${extension}`;
+    const fileUrl = `${this.bucketUrl}${key}`;
 
     try {
-      const url = await this.s3.getSignedUrlPromise('putObject', {
+      const presignedUrl = await this.s3.getSignedUrlPromise('putObject', {
         Bucket: this.bucketName,
         Key: key,
         Expires: 300, // URL valid for 5 minutes
         ContentType: `${mediaType}/${extension}`,
       });
 
-      return { url, key };
+      return { presignedUrl, fileUrl };
     } catch (error) {
       console.error('Error generating pre-signed URL:', error);
       throw new Error('Could not generate a pre-signed URL');

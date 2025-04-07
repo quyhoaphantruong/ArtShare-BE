@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
@@ -48,11 +44,8 @@ export class PostsService {
     images: Express.Multer.File[],
     userId: string,
   ): Promise<PostDetailsResponseDto> {
-    const { cate_ids, video_url, ...createPostData } = createPostDto;
-
-    if (images.length === 0) {
-      throw new BadRequestException('At least one image is required');
-    }
+    const { cate_ids, video_url, thumbnail_url, ...createPostData } =
+      createPostDto;
 
     const imageUploads: FileUploadResponse[] =
       await this.storageService.uploadFiles(images, 'posts');
@@ -61,12 +54,11 @@ export class PostsService {
       ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
       ...imageUploads.map(({ url }) => ({ url, media_type: MediaType.image })),
     ];
-
     const post = await this.prisma.post.create({
       data: {
         user_id: userId,
         ...createPostData,
-        thumbnail_url: imageUploads[0].url, // Set thumbnail_url to the first image
+        thumbnail_url: thumbnail_url || imageUploads[0]?.url || '', // Set thumbnail_url to the first image
         medias: {
           create: mediasData.map(({ url, media_type }) => ({
             media_type,
@@ -202,11 +194,10 @@ export class PostsService {
     const skip = (page - 1) * page_size;
 
     return this.prisma.post.findMany({
-      where: { is_published: true },
       orderBy: { share_count: 'desc' },
       take: page_size,
       skip,
-      include: { medias: true },
+      include: { medias: true, user: true },
     });
   }
 
