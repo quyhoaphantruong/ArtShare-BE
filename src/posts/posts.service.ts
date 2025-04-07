@@ -54,7 +54,6 @@ export class PostsService {
       ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
       ...imageUploads.map(({ url }) => ({ url, media_type: MediaType.image })),
     ];
-
     const post = await this.prisma.post.create({
       data: {
         user_id: userId,
