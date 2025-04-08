@@ -59,7 +59,7 @@ export class UserService {
         },
       });
       return updatedUser;
-    } catch (error) {
+    } catch (error: any) {
       // Handle the case where the user is not found, or any other prisma related error.
       if (error.code === 'P2025') {
         throw new NotFoundException(`User with ID ${userId} not found`);
@@ -195,7 +195,7 @@ export class UserService {
         message: 'Unfollowed successfully.',
         statusCode: HttpStatus.OK, // Use 200 OK for successful update/delete
       };
-    } catch (error) {
+    } catch (error: any) {
       // Catch potential database errors during deletion (though P2025 handled above)
       // Prisma's P2025 error (Record to delete does not exist) should ideally be caught
       // by the `followToDelete` check above, but this is a fallback.
