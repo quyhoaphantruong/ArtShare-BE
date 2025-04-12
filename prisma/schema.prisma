@@ -9,7 +9,7 @@ datasource db {
 
 model Role {
   role_id   Int      @id @default(autoincrement()) // As per your plan
-  role_name String   @unique                     // As per your plan (e.g., 'ADMIN', 'USER')
+  role_name String   @unique // As per your plan (e.g., 'ADMIN', 'USER')
   createdAt DateTime @default(now()) @map("created_at")
 
   users UserRole[]
@@ -18,8 +18,8 @@ model Role {
 }
 
 model UserRole {
-  user_id String   // Foreign key to User
-  role_id Int      // Foreign key to Role
+  user_id    String // Foreign key to User
+  role_id    Int // Foreign key to Role
   assignedAt DateTime @default(now()) @map("assigned_at")
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -30,25 +30,25 @@ model UserRole {
 }
 
 model User {
-  id                  String    @id
-  username            String    @unique
-  email               String    @unique
+  id                  String     @id
+  username            String     @unique
+  email               String     @unique
   full_name           String?
   profile_picture_url String?
   bio                 String?
-  created_at          DateTime  @default(now())
-  updated_at          DateTime? @updatedAt
+  created_at          DateTime   @default(now())
+  updated_at          DateTime?  @updatedAt
   refresh_token       String?
-  roles          UserRole[]
-  comments       Comment[]
-  followers      Follow[]   @relation("Follower")
-  followings     Follow[]   @relation("Following")
-  likes          Like[]
-  posts          Post[]
-  blogs          Blog[]
-  shares         Share[]
-  bookmarks      Bookmark[]
-  ratings        Rating[]
+  roles               UserRole[]
+  comments            Comment[]
+  followers           Follow[]   @relation("Follower")
+  followings          Follow[]   @relation("Following")
+  likes               Like[]
+  posts               Post[]
+  blogs               Blog[]
+  shares              Share[]
+  bookmarks           Bookmark[]
+  ratings             Rating[]
 
   @@map("user")
 }
