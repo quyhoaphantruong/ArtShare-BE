@@ -46,10 +46,7 @@ export class UserController {
     @Body() updateUserDto: UpdateUserDTO,
   ) {
     console.log('user patch profile', currentUser);
-    return this.userService.updateUserProfile(
-      currentUser.id,
-      updateUserDto,
-    );
+    return this.userService.updateUserProfile(currentUser.id, updateUserDto);
   }
 
   // Xoá nhiều người dùng

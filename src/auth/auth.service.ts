@@ -114,7 +114,10 @@ export class AuthService {
         refresh_token: tokens.refresh_token,
       };
     } catch (error) {
-      this.logger.error('Error during token verification', (error as Error).stack); // Log the error message and stack trace
+      this.logger.error(
+        'Error during token verification',
+        (error as Error).stack,
+      ); // Log the error message and stack trace
 
       // Handle specific Firebase error codes if necessary
       if ((error as admin.FirebaseError).code === 'auth/argument-error') {

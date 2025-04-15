@@ -11,7 +11,9 @@ export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   @TryCatch()
-  async create(createCategoryDto: CreateCategoryDto): Promise<CategoryResponseDto> {
+  async create(
+    createCategoryDto: CreateCategoryDto,
+  ): Promise<CategoryResponseDto> {
     const createdCategory = await this.prisma.category.create({
       data: createCategoryDto,
     });
@@ -40,7 +42,7 @@ export class CategoriesService {
   @TryCatch()
   async update(
     id: number,
-    updateCategoryDto: UpdateCategoryDto
+    updateCategoryDto: UpdateCategoryDto,
   ): Promise<CategoryResponseDto> {
     this.checkCategoryExists(id);
 

@@ -78,12 +78,7 @@ export class PostsController {
   ): Promise<PostListItemResponseDto[]> {
     const { page = 1, page_size = 25, filter } = body;
 
-    return this.postsService.getForYouPosts(
-      user.id,
-      page,
-      page_size,
-      filter,
-    );
+    return this.postsService.getForYouPosts(user.id, page, page_size, filter);
   }
 
   @Post('following')
