@@ -95,6 +95,8 @@ model Blog {
   is_protected   Boolean   @default(false)
   average_rating Float     @default(0)
   rating_count   Int       @default(0)
+  pictures       String[]
+  embeddedVideos String[]
 
   user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
   comments   Comment[]
