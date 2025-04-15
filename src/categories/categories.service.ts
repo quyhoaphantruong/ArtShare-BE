@@ -44,7 +44,7 @@ export class CategoriesService {
     id: number,
     updateCategoryDto: UpdateCategoryDto,
   ): Promise<CategoryResponseDto> {
-    this.checkCategoryExists(id);
+    await this.checkCategoryExists(id);
 
     const updatedCategory = await this.prisma.category.update({
       where: { id },
@@ -56,7 +56,7 @@ export class CategoriesService {
 
   @TryCatch()
   async remove(id: number): Promise<CategoryResponseDto> {
-    this.checkCategoryExists(id);
+    await this.checkCategoryExists(id);
 
     const deletedCategory = await this.prisma.category.delete({
       where: { id },
