@@ -4,6 +4,7 @@ import {
   IsOptional,
   MaxLength,
   IsBoolean,
+  IsArray,
 } from 'class-validator';
 
 export class CreateBlogDto {
@@ -19,4 +20,14 @@ export class CreateBlogDto {
   @IsOptional()
   @IsBoolean()
   is_published?: boolean = false;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  pictures?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  embeddedVideos?: string[];
 }

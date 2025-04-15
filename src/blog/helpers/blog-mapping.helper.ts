@@ -50,6 +50,8 @@ export const mapBlogToDetailsDto = (
     like_count: blog.like_count,
     comment_count: blog.comment_count,
     share_count: blog.share_count,
+    pictures: blog.pictures,
+    embeddedVideos: blog.embeddedVideos,
     user: {
       id: blog.user.id,
       username: blog.user.username,
