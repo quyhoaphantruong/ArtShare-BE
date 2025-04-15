@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/request/create-category.dto';
 import { UpdateCategoryDto } from './dto/request/update-category.dto';
 import { PrismaService } from 'src/prisma.service';
-import { TryCatch } from 'src/common/try-catch.decorator.';
+import { TryCatch } from 'src/common/try-catch.decorator';
 import { CategoryResponseDto } from './dto/response/category.dto';
 import { plainToInstance } from 'class-transformer';
 

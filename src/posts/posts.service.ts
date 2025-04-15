@@ -5,7 +5,7 @@ import { StorageService } from 'src/storage/storage.service';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { MediaType, Post } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
-import { TryCatch } from 'src/common/try-catch.decorator.';
+import { TryCatch } from 'src/common/try-catch.decorator';
 import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
