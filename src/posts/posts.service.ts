@@ -186,6 +186,7 @@ export class PostsService {
     return this.prisma.post.delete({ where: { id: postId } });
   }
 
+  @TryCatch()
   async getForYouPosts(
     userId: string,
     page: number,
@@ -195,7 +196,7 @@ export class PostsService {
     const skip = (page - 1) * page_size;
 
     const whereClause =
-      filter.length > 0
+      filter && filter.length > 0
         ? { categories: { some: { cate_name: { in: filter } } } }
         : {};
 
@@ -231,7 +232,7 @@ export class PostsService {
 
     const whereClause = {
       user_id: { in: followingIds },
-      ...(filter.length > 0 && {
+      ...(filter && filter.length > 0 && {
         categories: { some: { cate_name: { in: filter } } },
       }),
     };
@@ -253,6 +254,7 @@ export class PostsService {
     return plainToInstance(PostListItemResponseDto, posts);
   }
 
+  @TryCatch()
   async getPostDetails(postId: number): Promise<PostDetailsResponseDto> {
     const post = await this.prisma.post.findUnique({
       where: { id: postId },

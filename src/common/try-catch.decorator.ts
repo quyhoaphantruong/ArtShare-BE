@@ -7,6 +7,7 @@ export const TryCatch = (): any => {
         return await originalMethod.apply(this, args);
       } catch (error) {
         console.error(`Error in method ${propertyKey}:`, error);
+        console.error(`Arguments:`, args);
         throw error;
       }
     };

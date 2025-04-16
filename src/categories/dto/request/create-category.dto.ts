@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 export enum CategoryType {
   MEDIUM = 'MEDIUM',
   ATTRIBUTE = 'ATTRIBUTE',
@@ -14,4 +14,8 @@ export class CreateCategoryDto {
 
   @IsEnum(CategoryType)
   cate_type: CategoryType;
+
+  @IsString()
+  @IsOptional()
+  cate_description?: string;
 }

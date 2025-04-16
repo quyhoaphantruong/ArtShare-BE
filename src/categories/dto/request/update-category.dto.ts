@@ -13,4 +13,8 @@ export class UpdateCategoryDto {
   @IsEnum(CategoryType)
   @IsOptional()
   cate_type?: CategoryType;
+
+  @IsString()
+  @IsOptional()
+  cate_description?: string;
 }
