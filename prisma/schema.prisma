@@ -93,7 +93,7 @@ model Media {
 model Category {
   id               Int          @id @default(autoincrement())
   cate_name        String       @unique
-  url              String
+  urls             String[]
   cate_type        CategoryType @default(ATTRIBUTE)
   cate_description String?
   created_at       DateTime     @default(now())

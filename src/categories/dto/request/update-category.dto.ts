@@ -1,14 +1,15 @@
 import { CategoryType } from '@prisma/client';
-import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray } from 'class-validator';
 
 export class UpdateCategoryDto {
   @IsString()
   @IsOptional()
   cate_name?: string;
 
-  @IsString()
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  url?: string;
+  urls?: string[];
 
   @IsEnum(CategoryType)
   @IsOptional()
