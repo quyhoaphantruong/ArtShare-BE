@@ -413,4 +413,39 @@ export class PostsService {
 
     console.log('Update operation info:', operationInfo);
   }
+
+
+  @TryCatch()
+  async findPostsByUsername(
+    username: string,
+    page: number,
+    page_size: number,
+  ): Promise<PostListItemResponseDto[]> {
+    const user = await this.prisma.user.findUnique({
+      where: { username: username },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const skip = (page - 1) * page_size;
+
+    const posts = await this.prisma.post.findMany({
+      where: { user_id: user.id },
+      skip,
+      take: page_size,
+      include: {
+        medias: true,
+        user: true,
+        categories: true,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    return plainToInstance(PostListItemResponseDto, posts);
+  }
 }
