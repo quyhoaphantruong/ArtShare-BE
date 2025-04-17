@@ -33,7 +33,6 @@ export class PostsController {
     @UploadedFiles() images: Express.Multer.File[],
     @CurrentUser() user: CurrentUserType,
   ): Promise<any> {
-    console.log('user', user);
     return this.postsService.createPost(createPostDto, images, user.id);
   }
 
@@ -101,5 +100,18 @@ export class PostsController {
     @Param('post_id') postId: number,
   ): Promise<PostDetailsResponseDto> {
     return this.postsService.getPostDetails(Number(postId));
+  }
+
+  @Get('user/:username')
+  async findPostsByUsername(
+    @Param('username') username: string,
+    @Query('page') page: string = '1',
+    @Query('page_size') pageSize: string = '25',
+  ): Promise<PostListItemResponseDto[]> {
+    return this.postsService.findPostsByUsername(
+      username,
+      Number(page),
+      Number(pageSize),
+    );
   }
 }
