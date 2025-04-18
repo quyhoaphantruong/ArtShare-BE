@@ -14,6 +14,11 @@ VALUES
   ('bBc8jNEuqoZZdXPIGJEQ92HyaJb2', 'kiet', 'kietnguyentuan911@gmail.com', 'hashed_password_1', 'Alice Johnson', 'https://example.com/alice.jpg', 'Software Engineer'),
   ('2', 'bob', 'bob@example.com', 'hashed_password_2', 'Bob Smith', 'https://example.com/bob.jpg', 'Tech Enthusiast');
 
+-- Insert Role
+INSERT INTO public.role (role_name)
+VALUES 
+  ('ADMIN'),
+  ('USER')
 
 -- Insert Categories
 INSERT INTO public.category (id, cate_name)
