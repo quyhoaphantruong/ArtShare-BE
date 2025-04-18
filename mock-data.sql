@@ -9,10 +9,10 @@ TRUNCATE TABLE public.user RESTART IDENTITY CASCADE;
 TRUNCATE TABLE public.follow RESTART IDENTITY CASCADE;
 
 -- Insert Users
-INSERT INTO public.user (id, username, email, password_hash, full_name, profile_picture_url, bio)
+INSERT INTO public.user (id, username, email, full_name, profile_picture_url, bio)
 VALUES
-  ('bBc8jNEuqoZZdXPIGJEQ92HyaJb2', 'kiet', 'kietnguyentuan911@gmail.com', 'hashed_password_1', 'Alice Johnson', 'https://example.com/alice.jpg', 'Software Engineer'),
-  ('2', 'bob', 'bob@example.com', 'hashed_password_2', 'Bob Smith', 'https://example.com/bob.jpg', 'Tech Enthusiast');
+  ('bBc8jNEuqoZZdXPIGJEQ92HyaJb2', 'kiet', 'kietnguyentuan911@gmail.com', 'Alice Johnson', 'https://example.com/alice.jpg', 'Software Engineer'),
+  ('2', 'bob', 'bob@example.com', 'Bob Smith', 'https://example.com/bob.jpg', 'Tech Enthusiast');
 
 -- Insert Role
 INSERT INTO public.role (role_name)
