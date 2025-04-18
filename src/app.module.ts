@@ -9,9 +9,13 @@ import { EmbeddingModule } from './embedding/embedding.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { PrismaModule } from './prisma.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true, // <-- Makes ConfigService available globally
+    }),
     UserModule,
     AuthModule,
     PostsModule,
