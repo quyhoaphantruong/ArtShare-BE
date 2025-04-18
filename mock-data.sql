@@ -20,6 +20,12 @@ VALUES
   ('ADMIN'),
   ('USER')
 
+-- Insert User_Role
+INSERT INTO public.user_role (user_id, role_id)
+VALUES 
+  (1, 1),
+  (2, 2)
+
 -- Insert Categories
 INSERT INTO public.category (id, cate_name)
 VALUES
