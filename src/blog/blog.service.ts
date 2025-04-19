@@ -35,7 +35,7 @@ export class BlogService {
     if (categories && categories.length > 0) {
       whereClause.categories = {
         some: {
-          cate_name: {
+          name: {
             in: categories,
             mode: 'insensitive',
           },

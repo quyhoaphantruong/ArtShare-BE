@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { BlogModule } from './blog/blog.module';
 import { PrismaModule } from './prisma.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PrismaModule } from './prisma.module';
     EmbeddingModule,
     PrismaModule,
     BlogModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

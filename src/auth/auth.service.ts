@@ -118,7 +118,6 @@ export class AuthService {
         decodedToken.email!,
         roleNames,
       );
-      console.log('tokens: ', tokens);
       // Create access_token, refresh_token
       let user = null;
       this.logger.log(user);

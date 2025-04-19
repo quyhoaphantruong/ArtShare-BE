@@ -127,10 +127,13 @@ model Media {
 }
 
 model Category {
-  id         Int      @id @default(autoincrement())
-  name       String   @unique
-  created_at DateTime @default(now())
-  url        String?  @unique
+  id             Int          @id @default(autoincrement())
+  name           String       @unique
+  example_images String[]
+  type           CategoryType @default(ATTRIBUTE)
+  description    String?
+  created_at     DateTime     @default(now())
+  updated_at     DateTime?    @updatedAt
 
   posts Post[] @relation("CategoryToPost")
   blogs Blog[] @relation("CategoryToBlog")
@@ -247,4 +250,9 @@ enum SharePlatform {
   FACEBOOK
   TWITTER
   LINKEDIN
+}
+
+enum CategoryType {
+  MEDIUM
+  ATTRIBUTE
 }

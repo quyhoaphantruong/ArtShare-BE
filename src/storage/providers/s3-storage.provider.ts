@@ -3,7 +3,7 @@ import { S3 } from 'aws-sdk';
 import { nanoid } from 'nanoid';
 import { IStorageProvider } from '../storage.interface';
 import { GetPresignedUrlRequestDto } from '../dto/request.dto';
-import { TryCatch } from 'src/common/try-catch.decorator.';
+import { TryCatch } from 'src/common/try-catch.decorator';
 import { GetPresignedUrlResponseDto } from '../dto/response.dto';
 
 @Injectable()
