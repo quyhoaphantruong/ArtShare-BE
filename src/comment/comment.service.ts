@@ -5,7 +5,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { CreateCommentDto } from './dto/create-comment.dto';
+// Ensure TargetType enum and other Prisma types are imported
 import { Prisma, TargetType, Comment } from '@prisma/client';
+// Ensure PrismaService path is correct for your project structure
 import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
@@ -19,17 +21,17 @@ export class CommentService {
     const { content, target_id, target_type, parent_comment_id } =
       createCommentDto;
 
-    // 1. Check if Parent Comment exists (if provided)
     if (parent_comment_id) {
       const parent = await this.prisma.comment.findUnique({
         where: { id: parent_comment_id },
+        select: { id: true, target_id: true, target_type: true },
       });
       if (!parent) {
         throw new NotFoundException(
           `Parent comment with ID ${parent_comment_id} not found.`,
         );
       }
-      // Sanity check: Ensure parent belongs to the same target to prevent cross-posting replies
+      // Ensure parent belongs to the *exact same target*
       if (
         parent.target_id !== target_id ||
         parent.target_type !== target_type
@@ -40,70 +42,146 @@ export class CommentService {
       }
     }
 
-    // 2. Check if Target exists (Post or Blog)
-    //    We need to check based on target_type
+    let dataToCreate: Prisma.CommentCreateInput;
+
     if (target_type === TargetType.POST) {
+      // Check if the target Post exists
       const targetPost = await this.prisma.post.findUnique({
         where: { id: target_id },
-        select: { id: true },
+        select: { id: true }, // Only select necessary field for existence check
       });
       if (!targetPost) {
         throw new NotFoundException(
           `Target Post with ID ${target_id} not found.`,
         );
       }
-      // TODO: Increment comment_count on the Post atomically later if needed
+      dataToCreate = {
+        content,
+        user: { connect: { id: userId } },
+        post: { connect: { id: target_id } },
+        ...(parent_comment_id && {
+          parent_comment: { connect: { id: parent_comment_id } },
+        }),
+      };
     } else if (target_type === TargetType.BLOG) {
-      // TODO: Implement Blog existence check when you have the Blog model/service
-      // const targetBlog = await this.prisma.blog.findUnique({ where: { id: target_id } });
-      // if (!targetBlog) {
-      //   throw new NotFoundException(`Target Blog with ID ${target_id} not found.`);
-      // }
-      console.warn(
-        `Comment Service: TargetType BLOG check not implemented yet.`,
-      );
-      // Depending on requirements, you might throw an error here until implemented,
-      // or allow it if the FK constraint is sufficient for now.
-      // For now, we'll allow it to proceed, relying on potential FK errors later.
+      // Check if the target Blog exists
+      const targetBlog = await this.prisma.blog.findUnique({
+        where: { id: target_id },
+        select: { id: true },
+      });
+      if (!targetBlog) {
+        throw new NotFoundException(
+          `Target Blog with ID ${target_id} not found.`,
+        );
+      }
+
+      dataToCreate = {
+        content,
+        user: { connect: { id: userId } },
+        blog: { connect: { id: target_id } },
+        ...(parent_comment_id && {
+          parent_comment: { connect: { id: parent_comment_id } },
+        }),
+      };
     } else {
-      // Should be caught by enum validation, but good to have a fallback.
-      throw new BadRequestException(`Invalid target_type specified.`);
+      throw new BadRequestException(
+        `Invalid target_type specified: ${target_type}`,
+      );
     }
 
-    // --- Create Comment ---
     try {
       const newComment = await this.prisma.comment.create({
-        data: {
-          content,
-          target_id,
-          target_type,
-          user_id: userId,
-        },
+        data: dataToCreate,
         include: {
           user: {
             select: { id: true, username: true, profile_picture_url: true },
           },
-          // Optionally include parent comment or replies count if needed
-          // parent_comment: true,
-          // _count: { select: { replies: true } }
         },
       });
-      return newComment;
+
+      return newComment; // Return the created comment with included user data
     } catch (error: any) {
       console.error(`Failed to create comment: ${error.message}`, {
         DTO: createCommentDto,
         userId,
+        PreparedData: dataToCreate, // Log the data object you tried to create
+        PrismaError: error, // Log the full Prisma error for better debugging
       });
 
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2003') {
           const field = error.meta?.field_name;
+          let message = `Related entity not found. Foreign key constraint failed on field: ${field}.`;
+          if (String(field).includes('user_id')) {
+            message = `User with ID ${userId} not found or could not be linked.`;
+          } else if (
+            String(field).includes('post_id') ||
+            String(field).includes('blog_id')
+          ) {
+            message = `Target ${target_type} with ID ${target_id} not found or could not be linked.`;
+          } else if (String(field).includes('parent_comment_id')) {
+            message = `Parent comment with ID ${parent_comment_id} not found or could not be linked.`;
+          }
+          throw new NotFoundException(message);
+        }
+        if (error.code === 'P2025') {
           throw new NotFoundException(
-            `Related entity not found for field: ${field}. Ensure user, target, and parent comment (if provided) exist.`,
+            `Failed to connect related entity. ${error.meta?.cause ?? 'Ensure related records (User, Post/Blog, ParentComment) exist.'}`,
           );
         }
       }
-      throw new InternalServerErrorException('Could not create comment.');
+      if (error instanceof Error && error.message.includes('comment_count')) {
+        console.error(
+          'Failed to update comment count after comment creation.',
+          error,
+        );
+      }
+
+      throw new InternalServerErrorException(
+        'Could not create comment or update count.',
+      );
     }
+  }
+
+  async getComments(
+    targetId: number,
+    targetType: TargetType,
+    parentCommentId?: number,
+  ) {
+    const whereClause: any = {
+      ...(targetType === TargetType.POST && { post_id: targetId }),
+      ...(targetType === TargetType.BLOG && { blog_id: targetId }),
+      ...(parentCommentId !== undefined && {
+        parent_comment_id: parentCommentId,
+      }),
+    };
+
+    return this.prisma.comment.findMany({
+      where: whereClause,
+      orderBy: { created_at: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            profile_picture_url: true,
+          },
+        },
+        replies: {
+          select: {
+            id: true,
+            content: true,
+            created_at: true,
+            user: {
+              select: {
+                id: true,
+                username: true,
+                profile_picture_url: true,
+              },
+            },
+          },
+        },
+      },
+    });
   }
 }

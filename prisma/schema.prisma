@@ -157,22 +157,23 @@ model Like {
 }
 
 model Comment {
-  id                Int        @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   user_id           String
   parent_comment_id Int?
-  target_id         Int
-  target_type       TargetType
+  post_id           Int? // separate field for Post relation
+  blog_id           Int? // separate field for Blog relation
   content           String
-  created_at        DateTime   @default(now())
-  updated_at        DateTime?  @updatedAt
+  created_at        DateTime  @default(now())
+  updated_at        DateTime? @updatedAt
 
   parent_comment Comment?  @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
   replies        Comment[] @relation("CommentReplies")
-  post           Post?     @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "comment_post_fkey")
-  blog           Blog?     @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "comment_blog_fkey")
+  post           Post?     @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  blog           Blog?     @relation(fields: [blog_id], references: [id], onDelete: Cascade)
   user           User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([target_id, target_type])
+  @@index([post_id])
+  @@index([blog_id])
   @@index([parent_comment_id])
   @@map("comment")
 }

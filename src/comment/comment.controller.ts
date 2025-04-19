@@ -7,11 +7,14 @@ import {
   UsePipes,
   ValidationPipe,
   HttpStatus,
+  Get,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
-import { Comment } from '@prisma/client';
+import { Comment, TargetType } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
@@ -67,5 +70,27 @@ export class CommentController {
     }
 
     return this.commentService.create(createCommentDto, userId);
+  }
+
+  @Get()
+  async getComments(
+    @Query('target_id') targetId: string,
+    @Query('target_type') targetType: TargetType,
+    @Query('parent_comment_id') parentCommentId?: string,
+  ) {
+    const id = parseInt(targetId);
+    if (isNaN(id)) {
+      throw new BadRequestException('Invalid target_id');
+    }
+
+    if (!Object.values(TargetType).includes(targetType)) {
+      throw new BadRequestException('Invalid target_type');
+    }
+
+    return this.commentService.getComments(
+      id,
+      targetType,
+      parentCommentId ? parseInt(parentCommentId) : undefined,
+    );
   }
 }
