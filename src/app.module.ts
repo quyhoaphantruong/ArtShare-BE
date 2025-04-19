@@ -8,8 +8,10 @@ import { StorageModule } from './storage/storage.module';
 import { EmbeddingModule } from './embedding/embedding.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
+import { BlogModule } from './blog/blog.module';
 import { PrismaModule } from './prisma.module';
 import { ConfigModule } from '@nestjs/config';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { ConfigModule } from '@nestjs/config';
     StorageModule,
     EmbeddingModule,
     PrismaModule,
+    BlogModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

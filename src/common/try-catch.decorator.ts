@@ -6,7 +6,9 @@ export const TryCatch = (): any => {
       try {
         return await originalMethod.apply(this, args);
       } catch (error) {
-        console.error(`Error in method ${propertyKey}:`, error);
+        const className = this.constructor.name;
+        console.error(`Error in ${className}.${propertyKey}:`, error);
+        console.error(`Arguments:`, args);
         throw error;
       }
     };
