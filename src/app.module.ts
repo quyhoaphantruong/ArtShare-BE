@@ -8,6 +8,7 @@ import { StorageModule } from './storage/storage.module';
 import { EmbeddingModule } from './embedding/embedding.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
+import { BlogModule } from './blog/blog.module';
 import { PrismaModule } from './prisma.module';
 
 @Module({
@@ -20,6 +21,7 @@ import { PrismaModule } from './prisma.module';
     StorageModule,
     EmbeddingModule,
     PrismaModule,
+    BlogModule,
   ],
   controllers: [AppController],
   providers: [AppService],
