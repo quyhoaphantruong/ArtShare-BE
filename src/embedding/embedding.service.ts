@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TryCatch } from 'src/common/try-catch.decorator.';
+import { TryCatch } from 'src/common/try-catch.decorator';
 
 @Injectable()
 export class EmbeddingService {

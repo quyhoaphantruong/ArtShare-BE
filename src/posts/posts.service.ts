@@ -5,7 +5,7 @@ import { StorageService } from 'src/storage/storage.service';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { MediaType, Post } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
-import { TryCatch } from 'src/common/try-catch.decorator.';
+import { TryCatch } from 'src/common/try-catch.decorator';
 import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
@@ -186,6 +186,7 @@ export class PostsService {
     return this.prisma.post.delete({ where: { id: postId } });
   }
 
+  @TryCatch()
   async getForYouPosts(
     userId: string,
     page: number,
@@ -195,8 +196,8 @@ export class PostsService {
     const skip = (page - 1) * page_size;
 
     const whereClause =
-      filter.length > 0
-        ? { categories: { some: { cate_name: { in: filter } } } }
+      filter && filter.length > 0
+        ? { categories: { some: { name: { in: filter } } } }
         : {};
 
     const posts = await this.prisma.post.findMany({
@@ -231,8 +232,8 @@ export class PostsService {
 
     const whereClause = {
       user_id: { in: followingIds },
-      ...(filter.length > 0 && {
-        categories: { some: { cate_name: { in: filter } } },
+      ...(filter && filter.length > 0 && {
+        categories: { some: { name: { in: filter } } },
       }),
     };
 
@@ -253,6 +254,7 @@ export class PostsService {
     return plainToInstance(PostListItemResponseDto, posts);
   }
 
+  @TryCatch()
   async getPostDetails(postId: number): Promise<PostDetailsResponseDto> {
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
@@ -271,7 +273,6 @@ export class PostsService {
     page: number,
     page_size: number,
   ): Promise<PostListItemResponseDto[]> {
-    console.log('page:', page, 'page_size:', page_size);
     const queryEmbedding =
       await this.embeddingService.generateEmbeddingFromText(query);
     const searchResponse = await this.qdrantClient.query(
