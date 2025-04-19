@@ -273,7 +273,6 @@ export class PostsService {
     page: number,
     page_size: number,
   ): Promise<PostListItemResponseDto[]> {
-    console.log('page:', page, 'page_size:', page_size);
     const queryEmbedding =
       await this.embeddingService.generateEmbeddingFromText(query);
     const searchResponse = await this.qdrantClient.query(
