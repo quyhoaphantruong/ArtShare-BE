@@ -1,7 +1,11 @@
+import { CategoryType } from "../request/create-category.dto";
+
 export class CategoryResponseDto {
   id: number;
-  cate_name: string;
-  url: string;
-  cate_type: string;
+  name: string;
+  description: string;
+  example_images: string[];
+  type: CategoryType;
   created_at: Date;
+  updated_at: Date;
 }

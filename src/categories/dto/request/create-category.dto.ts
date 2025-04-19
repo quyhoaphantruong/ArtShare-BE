@@ -7,16 +7,16 @@ export enum CategoryType {
 export class CreateCategoryDto {
   @IsString()
   @IsNotEmpty()
-  cate_name: string;
+  name: string;
 
   @IsArray()
   @IsString({ each: true })
-  urls: string[];
+  example_images: string[];
 
   @IsEnum(CategoryType)
-  cate_type: CategoryType;
+  type: CategoryType;
 
   @IsString()
   @IsOptional()
-  cate_description?: string;
+  description?: string;
 }

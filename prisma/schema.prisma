@@ -133,6 +133,7 @@ model Category {
   type           CategoryType @default(ATTRIBUTE)
   description    String?
   created_at     DateTime     @default(now())
+  updated_at     DateTime?    @updatedAt
 
   posts Post[] @relation("CategoryToPost")
   blogs Blog[] @relation("CategoryToBlog")
