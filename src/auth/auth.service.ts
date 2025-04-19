@@ -1,10 +1,16 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as admin from 'firebase-admin'; // Firebase Admin SDK
 import { PrismaService } from 'src/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { JwtPayload } from './types/jwtPayload.type';
 import { Tokens } from './types/tokens.type';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -34,15 +40,42 @@ export class AuthService {
         };
       }
 
-      const user = await this.prisma.user.create({
-        data: {
-          id: userId,
-          email,
-          username: this.createRandomUsername(),
-        },
+      const userRole = await this.prisma.role.findUnique({
+        where: { role_name: 'USER' },
+        select: { role_id: true }, // Only fetch the role_id
       });
 
-      return { message_type: 'SIGNUP_SUCCESS', user };
+      if (!userRole) {
+        this.logger.error(
+          "Default 'USER' role not found in the database. Please run seeding.",
+        );
+        throw new NotFoundException(
+          'System configuration error: Default user role not found.',
+        );
+      }
+
+      const newUser = await this.prisma.$transaction(
+        async (tx: Prisma.TransactionClient) => {
+          const user = await tx.user.create({
+            data: {
+              id: userId,
+              email,
+              username: this.createRandomUsername(),
+            },
+          });
+
+          await tx.userRole.create({
+            data: {
+              user_id: user.id,
+              role_id: userRole.role_id,
+            },
+          });
+
+          return user;
+        },
+      );
+
+      return { message_type: 'SIGNUP_SUCCESS', newUser };
     } catch (error) {
       throw new Error(`Error creating user: ${(error as Error).message}`);
     }

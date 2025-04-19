@@ -35,6 +35,12 @@ export class UserService {
         full_name: true,
         profile_picture_url: true,
         bio: true,
+        _count: {
+          select: {
+            followings: true,
+            followers: true,
+          },
+        },
       },
     });
 
@@ -42,7 +48,15 @@ export class UserService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    return user;
+    return {
+      username: user.username,
+      email: user.email,
+      full_name: user.full_name,
+      profile_picture_url: user.profile_picture_url,
+      bio: user.bio,
+      following_count: user._count?.followings || 0,
+      followers_count: user._count?.followers || 0,
+    };
   }
 
   async updateUserProfile(userId: string, updateUserDto: UpdateUserDTO) {

@@ -22,7 +22,7 @@ import { RolesGuard } from 'src/auth/roles.guard';
 import { ApiResponse } from 'src/common/api-response';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
