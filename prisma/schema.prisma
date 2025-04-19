@@ -127,12 +127,12 @@ model Media {
 }
 
 model Category {
-  id         Int      @id @default(autoincrement())
-  name       String   @unique
-  urls             String[]
-  type        CategoryType @default(ATTRIBUTE)
-  cate_description String?
-  created_at DateTime @default(now())
+  id             Int          @id @default(autoincrement())
+  name           String       @unique
+  example_images String[]
+  type           CategoryType @default(ATTRIBUTE)
+  description    String?
+  created_at     DateTime     @default(now())
 
   posts Post[] @relation("CategoryToPost")
   blogs Blog[] @relation("CategoryToBlog")
