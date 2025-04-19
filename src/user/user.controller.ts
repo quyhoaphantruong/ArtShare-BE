@@ -22,7 +22,7 @@ import { RolesGuard } from 'src/auth/roles.guard';
 import { ApiResponse } from 'src/common/api-response';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -46,10 +46,7 @@ export class UserController {
     @Body() updateUserDto: UpdateUserDTO,
   ) {
     console.log('user patch profile', currentUser);
-    return this.userService.updateUserProfile(
-      currentUser.id,
-      updateUserDto,
-    );
+    return this.userService.updateUserProfile(currentUser.id, updateUserDto);
   }
 
   // Xoá nhiều người dùng

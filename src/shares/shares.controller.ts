@@ -2,12 +2,12 @@ import { Controller, Post, Body, Delete, UseGuards } from '@nestjs/common';
 import { SharesService } from './shares.service';
 import { CreateShareDto } from './dto/create-share.dto';
 import { RemoveShareDto } from './dto/remove-share.dto';
-import { AuthGuard } from 'src/auth/auth.guard';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('shares')
-@UseGuards(AuthGuard)
+@UseGuards(JwtAuthGuard)
 export class SharesController {
   constructor(private readonly sharesService: SharesService) {}
 

@@ -17,11 +17,11 @@ import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { AuthGuard } from 'src/auth/auth.guard';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
-@UseGuards(AuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
@@ -33,7 +33,6 @@ export class PostsController {
     @UploadedFiles() images: Express.Multer.File[],
     @CurrentUser() user: CurrentUserType,
   ): Promise<any> {
-    console.log('user', user);
     return this.postsService.createPost(createPostDto, images, user.id);
   }
 
@@ -78,12 +77,7 @@ export class PostsController {
   ): Promise<PostListItemResponseDto[]> {
     const { page = 1, page_size = 25, filter } = body;
 
-    return this.postsService.getForYouPosts(
-      user.id,
-      page,
-      page_size,
-      filter,
-    );
+    return this.postsService.getForYouPosts(user.id, page, page_size, filter);
   }
 
   @Post('following')
@@ -106,5 +100,18 @@ export class PostsController {
     @Param('post_id') postId: number,
   ): Promise<PostDetailsResponseDto> {
     return this.postsService.getPostDetails(Number(postId));
+  }
+
+  @Get('user/:username')
+  async findPostsByUsername(
+    @Param('username') username: string,
+    @Query('page') page: string = '1',
+    @Query('page_size') pageSize: string = '25',
+  ): Promise<PostListItemResponseDto[]> {
+    return this.postsService.findPostsByUsername(
+      username,
+      Number(page),
+      Number(pageSize),
+    );
   }
 }
