@@ -11,6 +11,7 @@ import { UserModule } from './user/user.module';
 import { BlogModule } from './blog/blog.module';
 import { PrismaModule } from './prisma.module';
 import { CategoriesModule } from './categories/categories.module';
+import { CollectionModule } from './collection/collection.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { CategoriesModule } from './categories/categories.module';
     PrismaModule,
     BlogModule,
     CategoriesModule,
+    CollectionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
