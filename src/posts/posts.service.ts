@@ -94,53 +94,83 @@ export class PostsService {
       where: { id: postId },
       include: { medias: true },
     });
-
+  
     if (!existingPost) {
       throw new NotFoundException('Post not found');
     }
-
-    const { cate_ids, video_url, ...postUpdateData } = updatePostDto;
-
+  
+    const {
+      cate_ids,
+      video_url,
+      existing_image_urls = [],
+      ...postUpdateData
+    } = updatePostDto;
+  
+    const existingImageUrlsSet = new Set(existing_image_urls);
+  
+    /** ────────────── HANDLE IMAGE DELETION ────────────── */
+    const existingImages = existingPost.medias.filter(
+      (m) => m.media_type === MediaType.image,
+    );
+  
+    const imagesToDelete = existingImages.filter(
+      (m) => !existingImageUrlsSet.has(m.url),
+    );
+    console.log('imagesToDelete', imagesToDelete);
+    console.log("existing images", existingImages);
+  
+    if (imagesToDelete.length > 0) {
+      await Promise.all([
+        this.prisma.media.deleteMany({
+          where: {
+            id: { in: imagesToDelete.map((m) => m.id) },
+          },
+        }),
+        this.storageService.deleteFiles(imagesToDelete.map((m) => m.url)),
+      ]);
+    }
+  
+    /** ────────────── HANDLE NEW IMAGE UPLOADS ────────────── */
     let newImageUploads: FileUploadResponse[] = [];
     if (images && images.length > 0) {
-      // do this to delete in db and s3 at the same time
-      const deleteImagePromises = [
-        this.prisma.media.deleteMany({ where: { post_id: postId } }),
-        this.storageService.deleteFiles(
-          existingPost.medias.map((media) => media.url),
-        ),
-      ];
-      await Promise.all(deleteImagePromises);
       newImageUploads = await this.storageService.uploadFiles(images, 'posts');
     }
+  
+    /** ────────────── HANDLE VIDEO UPDATE ────────────── */
+    const existingVideo = existingPost.medias.find(
+      (m) => m.media_type === MediaType.video,
+    );
+    const isDeletionRequest = existingVideo && video_url === ""
+    // Or if you still want “replace when non‑empty and different”:
+    const isReplaceRequest =
+      existingVideo && video_url && existingVideo.url !== video_url
 
-    if (video_url) {
-      const existingVideo = existingPost.medias.find(
-        (media) => media.media_type === MediaType.video,
-      );
-      if (existingVideo) {
-        const deleteVideoPromise = [
-          this.prisma.media.delete({ where: { id: existingVideo.id } }),
-          this.storageService.deleteFiles([existingVideo.url]),
-        ];
-        await Promise.all(deleteVideoPromise);
-      }
+    if (isDeletionRequest || isReplaceRequest) {
+      // delete the old video record + file
+      await Promise.all([
+        this.prisma.media.delete({ where: { id: existingVideo.id } }),
+        this.storageService.deleteFiles([existingVideo.url]),
+      ]);
     }
 
+  
+    /** ────────────── COMBINE NEW MEDIA ────────────── */
     const mediasData: MediaData[] = [
-      ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
+      ...(video_url
+        ? [{ url: video_url, media_type: MediaType.video }]
+        : []),
       ...newImageUploads.map(({ url }) => ({
         url,
         media_type: MediaType.image,
       })),
     ];
-
+  
     const updatedPost = await this.prisma.post.update({
       where: { id: postId },
       data: {
         ...postUpdateData,
         categories: {
-          set: (cate_ids || []).map((cate_id) => ({ id: cate_id })),
+          set: (cate_ids || []).map((id) => ({ id })),
         },
         ...(mediasData.length > 0 && {
           medias: {
@@ -154,14 +184,14 @@ export class PostsService {
       },
       include: { medias: true, user: true, categories: true },
     });
-
+  
     this.updatePostEmbedding(
       postId,
       postUpdateData.title,
       postUpdateData.description,
       images,
     );
-
+  
     return plainToInstance(PostDetailsResponseDto, updatedPost);
   }
 
