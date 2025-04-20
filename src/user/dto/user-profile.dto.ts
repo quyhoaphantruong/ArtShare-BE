@@ -4,6 +4,6 @@ export class UserProfileDTO {
   full_name: string | null;
   profile_picture_url: string | null;
   bio: string | null;
-  following_count: number;
+  followings_count: number;
   followers_count: number;
 }
