@@ -53,7 +53,7 @@ export class CollectionService {
       const newCollection = await this.prisma.collection.create({
         data: {
           name: dto.name.trim(),
-          is_private: dto.isPrivate,
+          is_private: dto.is_private,
           description: dto.description,
           thumbnail_url: dto.thumbnail_url,
           user: {
@@ -258,5 +258,29 @@ export class CollectionService {
       true,
     );
     return mapCollectionToDto(collection as CollectionWithPosts);
+  }
+
+  /**
+   * Deletes a specific collection if the user owns it.
+   */
+  async removeCollection(collectionId: number, userId: string): Promise<void> {
+    await this.findCollectionOwnedByUser(collectionId, userId);
+
+    try {
+      await this.prisma.collection.delete({
+        where: { id: collectionId },
+      });
+    } catch (error) {
+      console.error(`Error deleting collection ${collectionId}:`, error);
+
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException(
+            `Collection with ID ${collectionId} not found.`,
+          );
+        }
+      }
+      throw new InternalServerErrorException('Failed to delete collection.');
+    }
   }
 }

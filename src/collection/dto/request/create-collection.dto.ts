@@ -6,7 +6,7 @@ export class CreateCollectionDto {
   name: string;
 
   @IsBoolean()
-  isPrivate: boolean;
+  is_private: boolean;
 
   @IsString()
   @IsOptional()

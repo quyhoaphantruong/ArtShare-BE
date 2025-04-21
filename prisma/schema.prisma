@@ -39,6 +39,7 @@ model User {
   refresh_token       String?
   followers_count     Int          @default(0)
   followings_count    Int          @default(0)
+  collections         Collection[]
   blogs               Blog[]
   bookmarks           Bookmark[]
   comments            Comment[]
@@ -49,35 +50,33 @@ model User {
   ratings             Rating[]
   shares              Share[]
   roles               UserRole[]
-  collections         Collection[]
 
   @@map("user")
 }
 
 model Post {
-  id            Int         @id @default(autoincrement())
+  id            Int          @id @default(autoincrement())
   user_id       String
   title         String
   description   String?
-  created_at    DateTime    @default(now())
-  is_published  Boolean     @default(false)
-  is_private    Boolean     @default(false)
+  created_at    DateTime     @default(now())
+  is_published  Boolean      @default(false)
+  is_private    Boolean      @default(false)
   group_id      Int?
-  share_count   Int         @default(0)
-  comment_count Int         @default(0)
-  like_count    Int         @default(0)
+  share_count   Int          @default(0)
+  comment_count Int          @default(0)
+  like_count    Int          @default(0)
   thumbnail_url String
-  updated_at    DateTime?   @updatedAt
-  is_mature     Boolean     @default(false)
-  ai_created    Boolean     @default(false)
+  updated_at    DateTime?    @updatedAt
+  is_mature     Boolean      @default(false)
+  ai_created    Boolean      @default(false)
   comment       Comment[]
   likes         Like[]
   medias        Media[]
-  user          User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  collections   Collection[]
+  user          User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   shares        Share[]
-  categories    Category[]  @relation("CategoryToPost")
-  Collection    Collection? @relation(fields: [collectionId], references: [id])
-  collectionId  Int?
+  categories    Category[]   @relation("CategoryToPost")
 
   @@index([user_id])
   @@map("post")
@@ -183,8 +182,8 @@ model Share {
   target_type    TargetType
   share_platform SharePlatform
   created_at     DateTime      @default(now())
-  blog           Blog          @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "share_blog_fkey")
-  post           Post          @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "share_post_fkey")
+  blog           Blog?         @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "share_blog_fkey")
+  post           Post?         @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "share_post_fkey")
   user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([target_id, target_type])
@@ -238,10 +237,10 @@ model Collection {
   is_private    Boolean  @default(false)
   thumbnail_url String?
   user_id       String
-  user          User     @relation(fields: [user_id], references: [id])
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
-  posts         Post[]
+  user          User     @relation(fields: [user_id], references: [id])
+  posts          Post[]
 
   @@index([user_id])
 }

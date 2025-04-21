@@ -110,4 +110,16 @@ export class CollectionController {
       user.id,
     );
   }
+
+  /**
+   * DELETE /collections/:id - Delete a specific collection owned by the user
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeCollection(
+    @Param('id', ParseIntPipe) collectionId: number,
+    @CurrentUser() user: CurrentUserType,
+  ): Promise<void> {
+    await this.collectionService.removeCollection(collectionId, user.id);
+  }
 }
