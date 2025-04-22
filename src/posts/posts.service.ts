@@ -232,9 +232,10 @@ export class PostsService {
 
     const whereClause = {
       user_id: { in: followingIds },
-      ...(filter && filter.length > 0 && {
-        categories: { some: { name: { in: filter } } },
-      }),
+      ...(filter &&
+        filter.length > 0 && {
+          categories: { some: { name: { in: filter } } },
+        }),
     };
 
     const posts = await this.prisma.post.findMany({
@@ -414,7 +415,6 @@ export class PostsService {
 
     console.log('Update operation info:', operationInfo);
   }
-
 
   @TryCatch()
   async findPostsByUsername(

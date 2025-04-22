@@ -142,17 +142,18 @@ model Category {
 }
 
 model Like {
-  user_id     String
-  target_id   Int
-  target_type TargetType
-  created_at  DateTime   @default(now())
+  id         Int      @id @default(autoincrement())
+  user_id    String
+  post_id    Int?
+  blog_id    Int?
+  created_at DateTime @default(now())
 
-  post Post? @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "like_post_fkey")
-  blog Blog? @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "like_blog_fkey")
+  post Post? @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  blog Blog? @relation(fields: [blog_id], references: [id], onDelete: Cascade)
   user User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@id([user_id, target_id, target_type])
-  @@index([target_id, target_type])
+  @@unique([user_id, post_id], map: "unique_user_post_like")
+  @@unique([user_id, blog_id], map: "unique_user_blog_like")
   @@map("like")
 }
 
