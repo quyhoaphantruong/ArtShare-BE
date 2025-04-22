@@ -20,10 +20,23 @@ import {
 import { BookmarkResponseDto } from './dto/response/bookmark-response.dto';
 import { ProtectResponseDto } from './dto/response/protect-response.dto';
 import { RatingResponseDto } from './dto/response/rating-response.dto';
+import { TryCatch } from 'src/common/try-catch.decorator';
+import { EmbeddingService } from 'src/embedding/embedding.service';
+import { QdrantClient } from '@qdrant/js-client-rest';
 
 @Injectable()
 export class BlogService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private embeddingService: EmbeddingService,
+  ) {}
+
+  private readonly qdrantClient = new QdrantClient({
+    url: process.env.QDRANT_URL,
+    port: 6333,
+    apiKey: process.env.QDRANT_API_KEY,
+  });
+  private readonly qdrantCollectionName = 'blogs';
 
   private async applyCommonBlogFilters(
     baseWhere: Prisma.BlogWhereInput,
@@ -57,10 +70,51 @@ export class BlogService {
     };
 
     if (search) {
-      whereClause.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
-      ];
+      // whereClause.OR = [
+      //   { title: { contains: search, mode: 'insensitive' } },
+      //   { content: { contains: search, mode: 'insensitive' } },
+      // ];
+      const queryEmbedding =
+        await this.embeddingService.generateEmbeddingFromText(search);
+      const searchResponse = await this.qdrantClient.query(
+        this.qdrantCollectionName,
+        {
+          prefetch: [
+            {
+              query: queryEmbedding,
+              using: 'title',
+            },
+            {
+              query: queryEmbedding,
+              using: 'content',
+            },
+          ],
+          query: {
+            fusion: 'dbsf',
+          },
+          offset: skip,
+          limit: take,
+          // with_payload: true,
+        },
+      );
+
+      const pointIds: number[] = searchResponse.points.map((point) =>
+        Number(point.id),
+      );
+
+      const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
+        where: { id: { in: pointIds } },
+        select: blogListItemSelect,
+      });
+
+      // Sort posts in the same order as returned by Qdrant
+      const sortedBlogs = pointIds
+        .map((id) => blogs.find((blog) => blog.id === id))
+        .filter((blog) => blog !== undefined);
+
+      return sortedBlogs
+        .map(mapBlogToListItemDto)
+        .filter((b): b is BlogListItemResponseDto => b !== null);
     }
 
     const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
@@ -120,7 +174,44 @@ export class BlogService {
         'Failed to process blog details after creation.',
       );
     }
+
+    await this.saveBlogEmbeddings(
+      mappedBlog.id,
+      mappedBlog.title,
+      mappedBlog.content,
+    );
     return mappedBlog;
+  }
+
+  @TryCatch()
+  private async saveBlogEmbeddings(
+    blogId: number,
+    title: string,
+    content: string,
+  ): Promise<void> {
+    const [titleEmbedding, contentEmbedding] = await Promise.all([
+      this.embeddingService.generateEmbeddingFromText(title),
+      this.embeddingService.generateEmbeddingFromText(content),
+    ]);
+
+    const operationInfo = await this.qdrantClient.upsert(
+      this.qdrantCollectionName,
+      {
+        wait: true,
+        points: [
+          {
+            id: blogId,
+            vector: {
+              title: titleEmbedding,
+              content: contentEmbedding,
+            },
+            payload: { blogId: blogId },
+          },
+        ],
+      },
+    );
+
+    console.log('Upsert operation info:', operationInfo);
   }
 
   async findBlogById(
@@ -185,7 +276,46 @@ export class BlogService {
         'Failed to process blog details after update.',
       );
     }
+
+    await this.updateBlogEmbeddings(
+      mappedBlog.id,
+      mappedBlog.title,
+      mappedBlog.content,
+    )
     return mappedBlog;
+  }
+
+  @TryCatch()
+  private async updateBlogEmbeddings(
+    postId: number,
+    title: string | undefined,
+    content: string | undefined,
+  ): Promise<void> {
+    const [titleEmbedding, contentEmbedding] = await Promise.all([
+      title
+        ? this.embeddingService.generateEmbeddingFromText(title)
+        : undefined,
+      content
+        ? this.embeddingService.generateEmbeddingFromText(content)
+        : undefined,
+    ]);
+
+    const operationInfo = await this.qdrantClient.updateVectors(
+      this.qdrantCollectionName,
+      {
+        points: [
+          {
+            id: postId,
+            vector: {
+              title: titleEmbedding,
+              content: contentEmbedding,
+            },
+          },
+        ],
+      },
+    );
+
+    console.log('Update operation info:', operationInfo);
   }
 
   async deleteBlog(id: number, userId: string): Promise<void> {

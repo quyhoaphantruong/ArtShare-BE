@@ -30,25 +30,26 @@ model UserRole {
 }
 
 model User {
-  id                  String     @id
-  username            String     @unique
-  email               String     @unique
+  id                  String    @id
+  username            String    @unique
+  email               String    @unique
   full_name           String?
   profile_picture_url String?
   bio                 String?
-  created_at          DateTime   @default(now())
-  updated_at          DateTime?  @updatedAt
+  created_at          DateTime  @default(now())
+  updated_at          DateTime? @updatedAt
   refresh_token       String?
-  roles               UserRole[]
-  comments            Comment[]
-  followers           Follow[]   @relation("Follower")
-  followings          Follow[]   @relation("Following")
-  likes               Like[]
-  posts               Post[]
-  blogs               Blog[]
-  shares              Share[]
-  bookmarks           Bookmark[]
-  ratings             Rating[]
+
+  roles      UserRole[]
+  comments   Comment[]
+  followers  Follow[]   @relation("Follower")
+  followings Follow[]   @relation("Following")
+  likes      Like[]
+  posts      Post[]
+  blogs      Blog[]
+  shares     Share[]
+  bookmarks  Bookmark[]
+  ratings    Rating[]
 
   @@map("user")
 }
