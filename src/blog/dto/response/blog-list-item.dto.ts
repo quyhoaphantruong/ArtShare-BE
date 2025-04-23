@@ -7,6 +7,6 @@ export class BlogListItemResponseDto {
   like_count: number;
   comment_count: number;
   share_count: number;
-  user: BlogUserInfoResponseDto; 
+  user: BlogUserInfoResponseDto;
   is_published: boolean;
 }

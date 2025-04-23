@@ -11,42 +11,71 @@ export class LikesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createLike(
-    createLikeDto: CreateLikeDto,
+    dto: CreateLikeDto,
     userId: string,
   ): Promise<LikeDetailsDto> {
-    await this.verifyTargetExists(
-      createLikeDto.target_id,
-      createLikeDto.target_type,
-    );
+    await this.verifyTargetExists(dto.target_id, dto.target_type);
+    await this.verifyLikeAlreadyExists(dto, userId);
 
-    await this.verifyLikeAlreadyExists(createLikeDto, userId);
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const like = await tx.like.create({
+    const like = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.like.create({
         data: {
           user_id: userId,
-          target_id: createLikeDto.target_id,
-          target_type: createLikeDto.target_type,
+          ...(dto.target_type === TargetType.POST
+            ? { post_id: dto.target_id }
+            : { blog_id: dto.target_id }),
         },
       });
 
-      if (createLikeDto.target_type === TargetType.POST) {
+      if (dto.target_type === TargetType.POST) {
         await tx.post.update({
-          where: { id: createLikeDto.target_id },
+          where: { id: dto.target_id },
           data: { like_count: { increment: 1 } },
         });
-      } else if (createLikeDto.target_type === TargetType.BLOG) {
-        // TODO: will un comment this when blog model is created
-        // For blogs, assuming you have a Blog model with like_count
-        // await tx.blog.update({
-        //   where: { id: createLikeDto.target_id },
-        //   data: { like_count: { increment: 1 } },
-        // });
+      } else {
+        await tx.blog.update({
+          where: { id: dto.target_id },
+          data: { like_count: { increment: 1 } },
+        });
       }
-      return like;
+
+      return created;
     });
 
-    return plainToClass(LikeDetailsDto, result);
+    return plainToClass(LikeDetailsDto, like);
+  }
+
+  async removeLike(
+    dto: RemoveLikeDto,
+    userId: string,
+  ): Promise<{ success: boolean }> {
+    await this.verifyTargetExists(dto.target_id, dto.target_type);
+    await this.verifyLikeNotExists(dto, userId);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.like.deleteMany({
+        where: {
+          user_id: userId,
+          ...(dto.target_type === TargetType.POST
+            ? { post_id: dto.target_id }
+            : { blog_id: dto.target_id }),
+        },
+      });
+
+      if (dto.target_type === TargetType.POST) {
+        await tx.post.update({
+          where: { id: dto.target_id },
+          data: { like_count: { decrement: 1 } },
+        });
+      } else {
+        await tx.blog.update({
+          where: { id: dto.target_id },
+          data: { like_count: { decrement: 1 } },
+        });
+      }
+    });
+
+    return { success: true };
   }
 
   private async verifyTargetExists(targetId: number, targetType: TargetType) {
@@ -54,93 +83,47 @@ export class LikesService {
       const post = await this.prisma.post.findUnique({
         where: { id: targetId },
       });
-      if (!post) {
-        throw new BadRequestException('Post not found');
-      }
-    } else if (targetType === TargetType.BLOG) {
-      // TODO: will un comment this when blog model is created
-      // const blog = await this.prisma.blog.findUnique({ where: { id: targetId } });
-      // if (!blog) {
-      //   throw new BadRequestException('Blog not found');
-      // }
+      if (!post) throw new BadRequestException('Post not found');
+    } else {
+      const blog = await this.prisma.blog.findUnique({
+        where: { id: targetId },
+      });
+      if (!blog) throw new BadRequestException('Blog not found');
     }
   }
 
-  private async verifyLikeAlreadyExists(
-    createLikeDto: CreateLikeDto,
-    userId: string,
-  ) {
-    const existingLike = await this.findLike(
-      createLikeDto.target_id,
-      createLikeDto.target_type,
+  private async verifyLikeAlreadyExists(dto: CreateLikeDto, userId: string) {
+    const existing = await this.findLike(
+      dto.target_id,
+      dto.target_type,
       userId,
     );
-    if (existingLike) {
-      throw new BadRequestException('You have already liked this target');
-    }
+    if (existing) throw new BadRequestException('You have already liked this');
   }
 
-  private async verifyLikeNotExists(
-    removeLikeDto: RemoveLikeDto,
-    userId: string,
-  ) {
-    const existingLike = await this.findLike(
-      removeLikeDto.target_id,
-      removeLikeDto.target_type,
+  private async verifyLikeNotExists(dto: RemoveLikeDto, userId: string) {
+    const existing = await this.findLike(
+      dto.target_id,
+      dto.target_type,
       userId,
     );
-
-    if (!existingLike) {
-      throw new BadRequestException(
-        "Can't remove because you have not liked this target",
-      );
-    }
+    if (!existing)
+      throw new BadRequestException("Can't remove like; none found");
   }
 
   private async findLike(
-    target_id: number,
-    target_type: TargetType,
+    targetId: number,
+    targetType: TargetType,
     userId: string,
   ) {
-    return this.prisma.like.findFirst({
-      where: {
-        user_id: userId,
-        target_id,
-        target_type,
-      },
-    });
-  }
-
-  async removeLike(createLikeDto: RemoveLikeDto, userId: string) {
-    await this.verifyTargetExists(
-      createLikeDto.target_id,
-      createLikeDto.target_type,
-    );
-
-    await this.verifyLikeNotExists(createLikeDto, userId);
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      await tx.like.deleteMany({
-        where: {
-          user_id: userId,
-          target_id: createLikeDto.target_id,
-          target_type: createLikeDto.target_type,
-        },
+    if (targetType === TargetType.POST) {
+      return this.prisma.like.findFirst({
+        where: { user_id: userId, post_id: targetId },
       });
-
-      if (createLikeDto.target_type === TargetType.POST) {
-        await tx.post.update({
-          where: { id: createLikeDto.target_id },
-          data: { like_count: { decrement: 1 } },
-        });
-      } else if (createLikeDto.target_type === TargetType.BLOG) {
-        // TODO: will un comment this when blog model is created
-        // await tx.blog.update({
-        //   where: { id: createLikeDto.target_id },
-        //   data: { like_count: { decrement: 1 } },
-        // });
-      }
-    });
-    return result;
+    } else {
+      return this.prisma.like.findFirst({
+        where: { user_id: userId, blog_id: targetId },
+      });
+    }
   }
 }
