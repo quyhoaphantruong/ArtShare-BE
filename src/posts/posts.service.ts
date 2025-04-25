@@ -11,6 +11,7 @@ import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
+import { randomUUID } from 'crypto';
 
 class VectorParams {
   titleEmbedding?: number[];
@@ -37,6 +38,25 @@ export class PostsService {
     private readonly storageService: StorageService,
     private readonly embeddingService: EmbeddingService,
   ) {}
+
+  private async ensureQdrantCollectionExists() {
+    const collections = await this.qdrantClient.getCollections();
+    const exists = collections.collections.some(
+      (col) => col.name === this.qdrantCollectionName,
+    );
+  
+    if (!exists) {
+      await this.qdrantClient.createCollection(this.qdrantCollectionName, {
+        vectors: {
+          title: { size: 512, distance: 'Cosine' },
+          description: { size: 512, distance: 'Cosine' },
+          images: { size: 512, distance: 'Cosine' },
+        },
+      });
+  
+      console.log(`Created Qdrant collection '${this.qdrantCollectionName}' with named vectors`);
+    }
+  }
 
   @TryCatch()
   async createPost(
@@ -73,6 +93,8 @@ export class PostsService {
       include: { medias: true, user: true, categories: true },
     });
 
+    await this.ensureQdrantCollectionExists()
+
     await this.savePostEmbedding(
       post.id,
       createPostData.title,
@@ -99,36 +121,69 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
 
-    const { cate_ids, video_url, ...postUpdateData } = updatePostDto;
+    const {
+      cate_ids,
+      video_url,
+      existing_image_urls = [],
+      ...postUpdateData
+    } = updatePostDto;
 
+    const existingImageUrlsSet = new Set(existing_image_urls);
+
+    /** ────────────── HANDLE IMAGE DELETION ────────────── */
+    const existingImages = existingPost.medias.filter(
+      (m) => m.media_type === MediaType.image,
+    );
+
+    const imagesToDelete = existingImages.filter(
+      (m) => !existingImageUrlsSet.has(m.url),
+    );
+    console.log('imagesToDelete', imagesToDelete);
+    console.log('existing images', existingImages);
+
+    if (imagesToDelete.length > 0) {
+      await Promise.all([
+        this.prisma.media.deleteMany({
+          where: {
+            id: { in: imagesToDelete.map((m) => m.id) },
+          },
+        }),
+        this.storageService.deleteFiles(imagesToDelete.map((m) => m.url)),
+      ]);
+    }
+
+    /** ────────────── HANDLE NEW IMAGE UPLOADS ────────────── */
     let newImageUploads: FileUploadResponse[] = [];
     if (images && images.length > 0) {
-      // do this to delete in db and s3 at the same time
-      const deleteImagePromises = [
-        this.prisma.media.deleteMany({ where: { post_id: postId } }),
-        this.storageService.deleteFiles(
-          existingPost.medias.map((media) => media.url),
-        ),
-      ];
-      await Promise.all(deleteImagePromises);
       newImageUploads = await this.storageService.uploadFiles(images, 'posts');
     }
 
-    if (video_url) {
-      const existingVideo = existingPost.medias.find(
-        (media) => media.media_type === MediaType.video,
-      );
-      if (existingVideo) {
-        const deleteVideoPromise = [
-          this.prisma.media.delete({ where: { id: existingVideo.id } }),
-          this.storageService.deleteFiles([existingVideo.url]),
-        ];
-        await Promise.all(deleteVideoPromise);
-      }
+    /** ────────────── HANDLE VIDEO UPDATE ────────────── */
+    /* 1️⃣ normalise the raw value coming from the DTO */
+    const videoUrl = (video_url ?? '').trim(); // '' when user deletes
+    const existingVideo = existingPost.medias.find(
+      (m) => m.media_type === MediaType.video,
+    );
+
+    /* 2️⃣ decide what the user wants to do */
+    const wantsDeletion = existingVideo && videoUrl === '';
+    const wantsReplace =
+      existingVideo && videoUrl && videoUrl !== existingVideo.url;
+    const wantsNewUpload = !existingVideo && videoUrl; // first‑time video
+
+    /* 3️⃣ delete the old video row + file only when needed */
+    if (wantsDeletion || wantsReplace) {
+      await Promise.all([
+        this.prisma.media.delete({ where: { id: existingVideo.id } }),
+        this.storageService.deleteFiles([existingVideo.url]),
+      ]);
     }
 
+    /** ────────────── COMBINE NEW MEDIA ────────────── */
     const mediasData: MediaData[] = [
-      ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
+      ...(wantsReplace || wantsNewUpload
+        ? [{ url: videoUrl, media_type: MediaType.video }]
+        : []),
       ...newImageUploads.map(({ url }) => ({
         url,
         media_type: MediaType.image,
@@ -140,7 +195,7 @@ export class PostsService {
       data: {
         ...postUpdateData,
         categories: {
-          set: (cate_ids || []).map((cate_id) => ({ id: cate_id })),
+          set: (cate_ids || []).map((id) => ({ id })),
         },
         ...(mediasData.length > 0 && {
           medias: {
@@ -358,22 +413,24 @@ export class PostsService {
   ): Promise<void> {
     const { titleEmbedding, descriptionEmbdding, imagesEmbedding } =
       await this.getVectorParams(title, description, imageFiles);
+    
+    const pointsVector: any[] = imagesEmbedding?.map((imageEmbedding) => {
+      return {
+        id: randomUUID(),
+        vector: {
+          title: titleEmbedding,
+          description: descriptionEmbdding,
+          images: imageEmbedding,
+        },
+        payload: { postId: postId },
+      }
+    }) as any[]
 
     const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
       {
         wait: true,
-        points: [
-          {
-            id: postId,
-            vector: {
-              title: titleEmbedding,
-              description: descriptionEmbdding,
-              images: imagesEmbedding,
-            },
-            payload: { postId: postId },
-          },
-        ],
+        points: pointsVector
       },
     );
 
