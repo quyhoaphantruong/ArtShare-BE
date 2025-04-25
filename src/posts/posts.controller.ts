@@ -20,6 +20,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
@@ -95,6 +96,7 @@ export class PostsController {
     );
   }
 
+  @Public()
   @Get(':post_id')
   async getPostDetails(
     @Param('post_id') postId: number,
