@@ -44,7 +44,7 @@ export class PostsService {
     const exists = collections.collections.some(
       (col) => col.name === this.qdrantCollectionName,
     );
-  
+
     if (!exists) {
       await this.qdrantClient.createCollection(this.qdrantCollectionName, {
         vectors: {
@@ -53,8 +53,10 @@ export class PostsService {
           images: { size: 512, distance: 'Cosine' },
         },
       });
-  
-      console.log(`Created Qdrant collection '${this.qdrantCollectionName}' with named vectors`);
+
+      console.log(
+        `Created Qdrant collection '${this.qdrantCollectionName}' with named vectors`,
+      );
     }
   }
 
@@ -93,7 +95,7 @@ export class PostsService {
       include: { medias: true, user: true, categories: true },
     });
 
-    await this.ensureQdrantCollectionExists()
+    await this.ensureQdrantCollectionExists();
 
     await this.savePostEmbedding(
       post.id,
@@ -413,7 +415,7 @@ export class PostsService {
   ): Promise<void> {
     const { titleEmbedding, descriptionEmbdding, imagesEmbedding } =
       await this.getVectorParams(title, description, imageFiles);
-    
+
     const pointsVector: any[] = imagesEmbedding?.map((imageEmbedding) => {
       return {
         id: randomUUID(),
@@ -423,14 +425,14 @@ export class PostsService {
           images: imageEmbedding,
         },
         payload: { postId: postId },
-      }
-    }) as any[]
+      };
+    }) as any[];
 
     const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
       {
         wait: true,
-        points: pointsVector
+        points: pointsVector,
       },
     );
 

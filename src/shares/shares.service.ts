@@ -45,10 +45,7 @@ export class SharesService {
     return plainToClass(ShareDetailsDto, share);
   }
 
-  private async verifyTargetExists(
-    targetId: number,
-    targetType: TargetType,
-  ) {
+  private async verifyTargetExists(targetId: number, targetType: TargetType) {
     if (targetType === TargetType.POST) {
       const post = await this.prisma.post.findUnique({
         where: { id: targetId },
@@ -62,10 +59,7 @@ export class SharesService {
     }
   }
 
-  private async verifyShareAlreadyExists(
-    dto: CreateShareDto,
-    userId: string,
-  ) {
+  private async verifyShareAlreadyExists(dto: CreateShareDto, userId: string) {
     const existing = await this.findShare(
       dto.target_id,
       dto.target_type,
