@@ -1,5 +1,5 @@
 export class RatingResponseDto {
   blogId: number;
-  newAverageRating: number | null; 
+  newAverageRating: number | null;
   userRating: number;
 }

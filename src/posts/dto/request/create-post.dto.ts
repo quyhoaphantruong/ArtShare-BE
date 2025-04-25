@@ -39,17 +39,20 @@ export class CreatePostDto {
   @IsArray()
   @IsInt({ each: true })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (!value) return [];
-    try {
-      return typeof value === 'string'
-        ? JSON.parse(value).map((v: any) => Number(v))
-        : Array.isArray(value)
-        ? value.map(Number)
-        : [];
-    } catch {
-      return [];
-    }
-  }, { toClassOnly: true })
+  @Transform(
+    ({ value }) => {
+      if (!value) return [];
+      try {
+        return typeof value === 'string'
+          ? JSON.parse(value).map((v: any) => Number(v))
+          : Array.isArray(value)
+            ? value.map(Number)
+            : [];
+      } catch {
+        return [];
+      }
+    },
+    { toClassOnly: true },
+  )
   cate_ids?: number[];
 }

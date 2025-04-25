@@ -1,4 +1,4 @@
-import { CategoryType } from "../request/create-category.dto";
+import { CategoryType } from '../request/create-category.dto';
 
 export class CategoryResponseDto {
   id: number;

@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { Blog, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { CreateBlogDto } from './dto/request/create-blog.dto';
 import { UpdateBlogDto } from './dto/request/update-blog.dto';
 import { BlogListItemResponseDto } from './dto/response/blog-list-item.dto';
@@ -281,7 +281,7 @@ export class BlogService {
       mappedBlog.id,
       mappedBlog.title,
       mappedBlog.content,
-    )
+    );
     return mappedBlog;
   }
 
