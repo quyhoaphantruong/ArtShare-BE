@@ -11,6 +11,7 @@ import { UserModule } from './user/user.module';
 import { BlogModule } from './blog/blog.module';
 import { PrismaModule } from './prisma.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -24,6 +25,9 @@ import { CategoriesModule } from './categories/categories.module';
     PrismaModule,
     BlogModule,
     CategoriesModule,
+    ConfigModule.forRoot({
+      isGlobal: true, // ✅ optional but useful
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],

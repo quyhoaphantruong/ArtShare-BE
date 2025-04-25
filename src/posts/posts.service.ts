@@ -11,6 +11,7 @@ import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
+import { randomUUID } from 'crypto';
 
 class VectorParams {
   titleEmbedding?: number[];
@@ -37,6 +38,25 @@ export class PostsService {
     private readonly storageService: StorageService,
     private readonly embeddingService: EmbeddingService,
   ) {}
+
+  private async ensureQdrantCollectionExists() {
+    const collections = await this.qdrantClient.getCollections();
+    const exists = collections.collections.some(
+      (col) => col.name === this.qdrantCollectionName,
+    );
+  
+    if (!exists) {
+      await this.qdrantClient.createCollection(this.qdrantCollectionName, {
+        vectors: {
+          title: { size: 512, distance: 'Cosine' },
+          description: { size: 512, distance: 'Cosine' },
+          images: { size: 512, distance: 'Cosine' },
+        },
+      });
+  
+      console.log(`Created Qdrant collection '${this.qdrantCollectionName}' with named vectors`);
+    }
+  }
 
   @TryCatch()
   async createPost(
@@ -72,6 +92,8 @@ export class PostsService {
       },
       include: { medias: true, user: true, categories: true },
     });
+
+    await this.ensureQdrantCollectionExists()
 
     await this.savePostEmbedding(
       post.id,
@@ -391,22 +413,24 @@ export class PostsService {
   ): Promise<void> {
     const { titleEmbedding, descriptionEmbdding, imagesEmbedding } =
       await this.getVectorParams(title, description, imageFiles);
+    
+    const pointsVector: any[] = imagesEmbedding?.map((imageEmbedding) => {
+      return {
+        id: randomUUID(),
+        vector: {
+          title: titleEmbedding,
+          description: descriptionEmbdding,
+          images: imageEmbedding,
+        },
+        payload: { postId: postId },
+      }
+    }) as any[]
 
     const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
       {
         wait: true,
-        points: [
-          {
-            id: postId,
-            vector: {
-              title: titleEmbedding,
-              description: descriptionEmbdding,
-              images: imagesEmbedding,
-            },
-            payload: { postId: postId },
-          },
-        ],
+        points: pointsVector
       },
     );
 
