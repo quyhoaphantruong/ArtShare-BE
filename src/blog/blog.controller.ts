@@ -25,9 +25,9 @@ import { BookmarkResponseDto } from './dto/response/bookmark-response.dto';
 import { ProtectResponseDto } from './dto/response/protect-response.dto';
 import { RatingResponseDto } from './dto/response/rating-response.dto';
 
-import { AuthGuard } from 'src/auth/auth.guard';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('blogs')
 export class BlogController {
@@ -69,7 +69,7 @@ export class BlogController {
   /**
    * GET /blogs/following - Get blogs from followed users, optionally filtered by categories
    */
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('following')
   async getFollowingBlogs(
     @Query() query: GetBlogsQueryDto,
@@ -105,7 +105,7 @@ export class BlogController {
   /**
    * GET /blogs/me - Get blogs created by the current user
    */
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   async findMyBlogs(
     @CurrentUser() user: CurrentUserType,
@@ -133,7 +133,7 @@ export class BlogController {
   /**
    * POST /blogs - Create a new blog post (Standard REST, replaces /blogs/create)
    */
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createBlog(
@@ -146,7 +146,7 @@ export class BlogController {
   /**
    * PATCH /blogs/{id} - Update an existing blog post
    */
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateBlog(
     @Param('id', ParseIntPipe) id: number,
@@ -159,7 +159,7 @@ export class BlogController {
   /**
    * DELETE /blogs/{id} - Delete a blog post
    */
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteBlog(
@@ -173,7 +173,7 @@ export class BlogController {
   /**
    * POST /blogs/{id}/bookmark - Toggle bookmark status for a blog
    */
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post(':id/bookmark')
   @HttpCode(HttpStatus.OK)
   async toggleBookmark(
@@ -186,7 +186,7 @@ export class BlogController {
   /**
    * POST /blogs/{id}/protect - Apply protection (details TBD)
    */
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post(':id/protect')
   @HttpCode(HttpStatus.OK)
   async protectBlog(
@@ -199,7 +199,7 @@ export class BlogController {
   /**
    * POST /blogs/{id}/rate - Rate a blog
    */
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post(':id/rate')
   @HttpCode(HttpStatus.OK)
   async rateBlog(

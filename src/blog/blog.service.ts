@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Blog, Prisma } from '@prisma/client';
 import { CreateBlogDto } from './dto/request/create-blog.dto';
 import { UpdateBlogDto } from './dto/request/update-blog.dto';
 import { BlogListItemResponseDto } from './dto/response/blog-list-item.dto';
@@ -108,7 +108,7 @@ export class BlogService {
       });
 
       // Sort posts in the same order as returned by Qdrant
-      const sortedBlogs = pointIds
+      const sortedBlogs: BlogForListItemPayload[] = pointIds
         .map((id) => blogs.find((blog) => blog.id === id))
         .filter((blog) => blog !== undefined);
 
