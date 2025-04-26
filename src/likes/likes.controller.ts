@@ -3,7 +3,6 @@ import { LikesService } from './likes.service';
 import { CreateLikeDto } from './dto/request/create-like.dto';
 import { RemoveLikeDto } from './dto/request/remove-like.dto';
 import { LikeDetailsDto } from './dto/response/like-details.dto';
-import { AuthGuard } from 'src/auth/auth.guard';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
