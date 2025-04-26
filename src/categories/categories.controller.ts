@@ -12,15 +12,15 @@ import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/request/create-category.dto';
 import { UpdateCategoryDto } from './dto/request/update-category.dto';
 import { CategoryResponseDto } from './dto/response/category.dto';
-import { AuthGuard } from 'src/auth/auth.guard';
 import { RolesGuard } from 'src/auth/roles.guard';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
-  @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles(Role.ADMIN) // TODO: uncomment when huy fix
   async create(
     @Body() createCategoryDto: CreateCategoryDto,
@@ -39,7 +39,7 @@ export class CategoriesController {
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles(Role.ADMIN) // TODO: uncomment when huy fix
   async update(
     @Param('id') id: number,
@@ -49,7 +49,7 @@ export class CategoriesController {
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles(Role.ADMIN) // TODO: uncomment when huy fix
   async remove(@Param('id') id: number): Promise<CategoryResponseDto> {
     return this.categoriesService.remove(Number(id));
