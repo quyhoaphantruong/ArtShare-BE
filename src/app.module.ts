@@ -12,6 +12,7 @@ import { BlogModule } from './blog/blog.module';
 import { PrismaModule } from './prisma.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CollectionModule } from './collection/collection.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -26,6 +27,9 @@ import { CollectionModule } from './collection/collection.module';
     BlogModule,
     CategoriesModule,
     CollectionModule,
+    ConfigModule.forRoot({
+      isGlobal: true, // ✅ optional but useful
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],
