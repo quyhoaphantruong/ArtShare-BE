@@ -96,7 +96,7 @@ model Blog {
   average_rating Float      @default(0)
   is_protected   Boolean    @default(false)
   rating_count   Int        @default(0)
-  embeddedVideos String[]
+  embedded_videos String[]
   pictures       String[]
   user           User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
   bookmarks      Bookmark[]
