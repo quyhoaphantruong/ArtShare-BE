@@ -125,6 +125,7 @@ export class PostsService {
       cate_ids,
       video_url,
       existing_image_urls = [],
+      thumbnail_url,            
       ...postUpdateData
     } = updatePostDto;
 
@@ -138,8 +139,12 @@ export class PostsService {
     const imagesToDelete = existingImages.filter(
       (m) => !existingImageUrlsSet.has(m.url),
     );
-    console.log('imagesToDelete', imagesToDelete);
-    console.log('existing images', existingImages);
+
+    // 1️⃣ Delete the old thumbnail if it’s been replaced
+    const oldThumb = existingPost.thumbnail_url;
+    if (thumbnail_url && oldThumb && thumbnail_url !== oldThumb) {
+      await this.storageService.deleteFiles([oldThumb]);
+    }
 
     if (imagesToDelete.length > 0) {
       await Promise.all([
@@ -194,6 +199,7 @@ export class PostsService {
       where: { id: postId },
       data: {
         ...postUpdateData,
+        thumbnail_url: thumbnail_url,
         categories: {
           set: (cate_ids || []).map((id) => ({ id })),
         },
