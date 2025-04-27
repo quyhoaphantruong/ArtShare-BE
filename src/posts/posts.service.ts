@@ -3,7 +3,7 @@ import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
 import { EmbeddingService } from 'src/embedding/embedding.service';
-import { MediaType, Post } from '@prisma/client';
+import { MediaType, Post, Prisma } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { CreatePostDto } from './dto/request/create-post.dto';
@@ -11,7 +11,12 @@ import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
+import { SearchPostDto } from './dto/request/search-post.dto';
 
+
+type PostDetails = Prisma.PostGetPayload<{
+  include: { categories: true, user: true, medias: true },
+  }>
 class VectorParams {
   titleEmbedding?: number[];
   descriptionEmbedding?: number[];
@@ -332,12 +337,11 @@ export class PostsService {
 
   @TryCatch()
   async searchPosts(
-    query: string,
-    page: number,
-    page_size: number,
+    body: SearchPostDto,
   ): Promise<PostListItemResponseDto[]> {
-    const queryEmbedding =
-      await this.embeddingService.generateEmbeddingFromText(query);
+    const { q, page = 1, page_size = 25, filter } = body;
+
+    const queryEmbedding = await this.embeddingService.generateEmbeddingFromText(q);
     const searchResponse = await this.qdrantClient.query(
       this.qdrantCollectionName,
       {
@@ -367,16 +371,25 @@ export class PostsService {
     const pointIds: number[] = searchResponse.points.map((point) =>
       Number(point.id),
     );
+    console.log('Qdrant search response:', pointIds);
 
-    const posts = await this.prisma.post.findMany({
+    const posts: PostDetails[] = await this.prisma.post.findMany({
       where: { id: { in: pointIds } },
       include: { medias: true, user: true, categories: true },
     });
 
     // Sort posts in the same order as returned by Qdrant
-    const sortedPosts = pointIds.map((id) =>
-      posts.find((post) => post.id === id),
-    );
+    let sortedPosts: PostDetails[] = pointIds
+      .map((id) => posts.find((post: PostDetails) => post.id === id))
+      .filter((post): post is PostDetails => post !== undefined);
+    
+    if (filter && filter.length > 0) {
+      sortedPosts = sortedPosts.filter((post) =>
+        post.categories.some((category) =>
+          filter.includes(category.name),
+        ),
+      );
+    }
     return plainToInstance(PostListItemResponseDto, sortedPosts);
   }
 
