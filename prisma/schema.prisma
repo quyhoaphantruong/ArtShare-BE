@@ -49,9 +49,10 @@ model User {
   shares              Share[]
   bookmarks           Bookmark[]
   ratings             Rating[]
+  Report              Report[]    @relation("UserReports")
 
-  followers_count  Int @default(0)
-  followings_count Int @default(0)
+  followers_count     Int         @default(0)
+  followings_count    Int         @default(0)
 
   @@map("user")
 }
@@ -239,6 +240,27 @@ model Rating {
   @@map("rating")
 }
 
+model Report {
+  id Int @id @default(autoincrement())
+
+  reporter_id String
+  target_id   Int
+  target_type ReportTargetType
+
+  reason String       @db.Text
+  status ReportStatus @default(PENDING)
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  reporter User    @relation("UserReports", fields: [reporter_id], references: [id], onDelete: Cascade)
+  
+  // --- Indexes ---
+  @@index([reporter_id])
+  @@index([status])
+  @@index([target_id, target_type])
+  @@map("report")
+}
+
 enum MediaType {
   image
   video
@@ -258,4 +280,16 @@ enum SharePlatform {
 enum CategoryType {
   MEDIUM
   ATTRIBUTE
+}
+
+enum ReportTargetType {
+  POST
+  BLOG
+  COMMENT
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
 }

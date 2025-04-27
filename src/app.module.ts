@@ -12,6 +12,7 @@ import { BlogModule } from './blog/blog.module';
 import { PrismaModule } from './prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { CategoriesModule } from './categories/categories.module';
+import { ReportModule } from './report/report.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { CategoriesModule } from './categories/categories.module';
     PrismaModule,
     BlogModule,
     CategoriesModule,
+    ReportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

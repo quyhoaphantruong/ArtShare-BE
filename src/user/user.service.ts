@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service'; // Import PrismaService
@@ -12,6 +13,7 @@ import { UserProfileDTO } from './dto/user-profile.dto';
 import { DeleteUsersDTO } from './dto/delete-users.dto';
 import { UpdateUserDTO } from './dto/update-users.dto';
 import { ApiResponse } from 'src/common/api-response';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class UserService {
@@ -55,7 +57,10 @@ export class UserService {
     };
   }
 
-  async updateUserProfile(userId: string, updateUserDto: UpdateUserDTO) {
+  async updateUserProfile(
+    userId: string,
+    updateUserDto: UpdateUserDTO,
+  ): Promise<Pick<User, 'username' | 'email' | 'full_name' | 'profile_picture_url' | 'bio'>> {
     try {
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
@@ -70,11 +75,16 @@ export class UserService {
       });
       return updatedUser;
     } catch (error: any) {
-      // Handle the case where the user is not found, or any other prisma related error.
-      if (error.code === 'P2025') {
-        throw new NotFoundException(`User with ID ${userId} not found`);
+      if (error instanceof PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException(`User with ID ${userId} not found.`);
+        }
+        if (error.code === 'P2002') {
+          const target = (error.meta?.target as string[]).join(', ');
+          throw new ConflictException(`Duplicate value for field(s): ${target}.`);
+        }
       }
-      throw error;
+      throw new InternalServerErrorException('Could not update user profile.');
     }
   }
 
