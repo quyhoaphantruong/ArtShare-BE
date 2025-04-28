@@ -49,10 +49,10 @@ model User {
   shares              Share[]
   bookmarks           Bookmark[]
   ratings             Rating[]
-  Report              Report[]    @relation("UserReports")
+  Report              Report[]   @relation("UserReports")
 
-  followers_count     Int         @default(0)
-  followings_count    Int         @default(0)
+  followers_count  Int @default(0)
+  followings_count Int @default(0)
 
   @@map("user")
 }
@@ -74,7 +74,6 @@ model Post {
   is_mature     Boolean   @default(false)
   ai_created    Boolean   @default(false)
 
-  comments   Comment[]
   likes      Like[]
   medias     Media[]
   user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -103,7 +102,6 @@ model Blog {
   embeddedVideos String[]
 
   user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  comments   Comment[]
   likes      Like[]
   shares     Share[]
   bookmarks  Bookmark[]
@@ -172,8 +170,6 @@ model Comment {
 
   parent_comment Comment?  @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
   replies        Comment[] @relation("CommentReplies")
-  post           Post?     @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "comment_post_fkey")
-  blog           Blog?     @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "comment_blog_fkey")
   user           User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([target_id, target_type])
@@ -252,8 +248,8 @@ model Report {
 
   created_at DateTime @default(now()) @map("created_at")
 
-  reporter User    @relation("UserReports", fields: [reporter_id], references: [id], onDelete: Cascade)
-  
+  reporter User @relation("UserReports", fields: [reporter_id], references: [id], onDelete: Cascade)
+
   // --- Indexes ---
   @@index([reporter_id])
   @@index([status])

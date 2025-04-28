@@ -13,6 +13,7 @@ import { PrismaModule } from './prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { CategoriesModule } from './categories/categories.module';
 import { ReportModule } from './report/report.module';
+import { CommentModule } from './comment/comment.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ReportModule } from './report/report.module';
     BlogModule,
     CategoriesModule,
     ReportModule,
+    CommentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
