@@ -11,11 +11,10 @@ import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
-import { randomUUID } from 'crypto';
 
 class VectorParams {
   titleEmbedding?: number[];
-  descriptionEmbdding?: number[];
+  descriptionEmbedding?: number[];
   imagesEmbedding?: number[][];
 }
 
@@ -127,6 +126,7 @@ export class PostsService {
       cate_ids,
       video_url,
       existing_image_urls = [],
+      thumbnail_url,
       ...postUpdateData
     } = updatePostDto;
 
@@ -140,8 +140,12 @@ export class PostsService {
     const imagesToDelete = existingImages.filter(
       (m) => !existingImageUrlsSet.has(m.url),
     );
-    console.log('imagesToDelete', imagesToDelete);
-    console.log('existing images', existingImages);
+
+    // 1️⃣ Delete the old thumbnail if it’s been replaced
+    const oldThumb = existingPost.thumbnail_url;
+    if (thumbnail_url && oldThumb && thumbnail_url !== oldThumb) {
+      await this.storageService.deleteFiles([oldThumb]);
+    }
 
     if (imagesToDelete.length > 0) {
       await Promise.all([
@@ -196,6 +200,7 @@ export class PostsService {
       where: { id: postId },
       data: {
         ...postUpdateData,
+        thumbnail_url: thumbnail_url,
         categories: {
           set: (cate_ids || []).map((id) => ({ id })),
         },
@@ -401,9 +406,21 @@ export class PostsService {
 
     return {
       titleEmbedding: titleEmbedding,
-      descriptionEmbdding: descriptionEmbedding,
+      descriptionEmbedding: descriptionEmbedding,
       imagesEmbedding: imageEmbeddings,
     };
+  }
+
+  private averageEmbeddings(embeddings: number[][]): number[] {
+    if (!embeddings || embeddings.length === 0) return []; // handle empty case safely
+    const length = embeddings[0].length;
+    const sum = new Array(length).fill(0);
+    embeddings.forEach((vec) => {
+      for (let i = 0; i < length; i++) {
+        sum[i] += vec[i];
+      }
+    });
+    return sum.map((val) => val / embeddings.length);
   }
 
   @TryCatch()
@@ -413,20 +430,29 @@ export class PostsService {
     description: string | undefined,
     imageFiles: Express.Multer.File[],
   ): Promise<void> {
-    const { titleEmbedding, descriptionEmbdding, imagesEmbedding } =
+    const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
       await this.getVectorParams(title, description, imageFiles);
 
-    const pointsVector: any[] = imagesEmbedding?.map((imageEmbedding) => {
-      return {
-        id: randomUUID(),
+    // 🔥 Ensure no undefined is passed!
+    if (!titleEmbedding) {
+      throw new Error('titleEmbedding is required but missing!');
+    }
+    const averageImagesEmbedding =
+      imagesEmbedding && imagesEmbedding.length > 0
+        ? this.averageEmbeddings(imagesEmbedding)
+        : new Array(512).fill(0); // 512 = your images vector size
+    const safeDescriptionEmbedding =
+      descriptionEmbedding ?? new Array(512).fill(0); // 768 = your description vector size
+    const pointsVector = [
+      {
+        id: postId,
         vector: {
           title: titleEmbedding,
-          description: descriptionEmbdding,
-          images: imageEmbedding,
-        },
-        payload: { postId: postId },
-      };
-    }) as any[];
+          description: safeDescriptionEmbedding,
+          images: averageImagesEmbedding,
+        } as Record<string, number[]>,
+      },
+    ];
 
     const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
@@ -448,7 +474,7 @@ export class PostsService {
   ): Promise<void> {
     const {
       titleEmbedding,
-      descriptionEmbdding,
+      descriptionEmbedding,
       imagesEmbedding,
     }: VectorParams = await this.getVectorParams(
       title,
@@ -456,19 +482,33 @@ export class PostsService {
       imageFiles,
     );
 
+    if (!titleEmbedding) {
+      throw new Error('titleEmbedding is required but missing!');
+    }
+
+    const safeDescriptionEmbedding =
+      descriptionEmbedding ?? new Array(512).fill(0);
+
+    const averageImagesEmbedding =
+      imagesEmbedding && imagesEmbedding.length > 0
+        ? this.averageEmbeddings(imagesEmbedding)
+        : new Array(512).fill(0);
+
+    const pointVector = [
+      {
+        id: postId,
+        vector: {
+          title: titleEmbedding,
+          description: safeDescriptionEmbedding,
+          images: averageImagesEmbedding,
+        } as Record<string, number[]>,
+      },
+    ];
+
     const operationInfo = await this.qdrantClient.updateVectors(
       this.qdrantCollectionName,
       {
-        points: [
-          {
-            id: postId,
-            vector: {
-              title: titleEmbedding,
-              description: descriptionEmbdding,
-              images: imagesEmbedding,
-            },
-          },
-        ],
+        points: pointVector,
       },
     );
 
