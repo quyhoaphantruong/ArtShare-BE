@@ -29,6 +29,7 @@ import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('blogs')
 export class BlogController {
   constructor(private readonly blogService: BlogService) {}
