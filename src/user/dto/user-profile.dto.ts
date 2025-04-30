@@ -6,4 +6,5 @@ export class UserProfileDTO {
   bio: string | null;
   followings_count: number;
   followers_count: number;
+  birthday: Date | null;
 }

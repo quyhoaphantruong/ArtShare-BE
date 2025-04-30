@@ -9,6 +9,11 @@ import {
     Get,
     Query,
     BadRequestException,
+    Patch,
+    Param,
+    ParseIntPipe,
+    Delete,
+    HttpCode,
   } from '@nestjs/common';
   import { CommentService } from './comment.service';
   import { CreateCommentDto } from './dto/create-comment.dto';
@@ -17,6 +22,7 @@ import {
   import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
   import { CurrentUserType } from 'src/auth/types/current-user.type';
   import { CurrentUser } from 'src/auth/decorators/users.decorator';
+import { UpdateCommentDto } from './dto/update-comment.dto';
   
 @ApiTags('comments')
 @Controller('comments')
@@ -91,5 +97,28 @@ export class CommentController {
         targetType,
         parentCommentId ? parseInt(parentCommentId) : undefined,
       );
+    }
+
+    @Patch(':id')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: 'Edit your own comment' })
+    async updateComment(
+      @Param('id', ParseIntPipe) commentId: number,
+      @Body() dto: UpdateCommentDto,
+      @CurrentUser() user: CurrentUserType,
+    ): Promise<Comment> {
+      return this.commentService.update(commentId, dto, user.id);
+    }
+
+    @Delete('/:id')
+    @UseGuards(JwtAuthGuard)
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @ApiOperation({ summary: 'Delete your own comment' })
+    async deleteComment(
+      @Param('id', ParseIntPipe) commentId: number,
+      @CurrentUser() user: CurrentUserType,
+    ): Promise<void> {
+      console.log('user comment', user)
+      await this.commentService.remove(commentId, user.id);
     }
 }

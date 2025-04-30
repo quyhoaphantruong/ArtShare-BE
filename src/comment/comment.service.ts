@@ -3,11 +3,13 @@ import {
     NotFoundException,
     BadRequestException,
     InternalServerErrorException,
+    ForbiddenException,
   } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { Comment, TargetType } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { UpdateCommentDto } from './dto/update-comment.dto';
   
   @Injectable()
   export class CommentService {
@@ -125,6 +127,77 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
           },
         },
       });
+    }
+
+    async update(
+      commentId: number,
+      dto: UpdateCommentDto,
+      userId: string,
+    ): Promise<Comment> {
+      const existing = await this.prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { id: true, user_id: true },
+      });
+      if (!existing) {
+        throw new NotFoundException(`Comment with ID ${commentId} not found.`);
+      }
+  
+      if (existing.user_id !== userId) {
+        throw new ForbiddenException(`You cannot edit someone else's comment.`);
+      }
+  
+      // 3) Perform the update
+      try {
+        return await this.prisma.comment.update({
+          where: { id: commentId },
+          data: {
+            content: dto.content,
+          },
+        });
+      } catch (err: any) {
+        if (
+          err instanceof PrismaClientKnownRequestError &&
+          err.code === 'P2025'
+        ) {
+          throw new NotFoundException(`Comment with ID ${commentId} not found.`);
+        }
+        console.error('Error updating comment', { commentId, dto, err });
+        throw new InternalServerErrorException(
+          'Could not update the comment.',
+        );
+      }
+    }
+
+    async remove(commentId: number, userId: string): Promise<void> {
+      // 1) Verify the comment exists and belongs to the user
+      const existing = await this.prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { id: true, user_id: true },
+      });
+      if (!existing) {
+        throw new NotFoundException(`Comment with ID ${commentId} not found.`);
+      }
+      if (existing.user_id !== userId) {
+        throw new ForbiddenException(`You cannot delete someone else's comment.`);
+      }
+  
+      // 2) Perform the deletion
+      try {
+        await this.prisma.comment.delete({
+          where: { id: commentId },
+        });
+      } catch (err: any) {
+        if (
+          err instanceof PrismaClientKnownRequestError &&
+          err.code === 'P2025'
+        ) {
+          throw new NotFoundException(`Comment with ID ${commentId} not found.`);
+        }
+        console.error('Error deleting comment', { commentId, err });
+        throw new InternalServerErrorException(
+          'Could not delete the comment.',
+        );
+      }
     }
   }
   

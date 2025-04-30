@@ -39,6 +39,7 @@ export class UserService {
         bio: true,
         followers_count: true,
         followings_count: true,
+        birthday: true,
       },
     });
 
@@ -54,13 +55,14 @@ export class UserService {
       bio: user.bio,
       followings_count: user.followings_count,
       followers_count: user.followers_count,
+      birthday: user.birthday ?? null,
     };
   }
 
   async updateUserProfile(
     userId: string,
     updateUserDto: UpdateUserDTO,
-  ): Promise<Pick<User, 'username' | 'email' | 'full_name' | 'profile_picture_url' | 'bio'>> {
+  ): Promise<Pick<User, 'username' | 'email' | 'full_name' | 'profile_picture_url' | 'bio' | 'birthday'>> {
     try {
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
@@ -71,6 +73,7 @@ export class UserService {
           full_name: true,
           profile_picture_url: true,
           bio: true,
+          birthday: true,
         },
       });
       return updatedUser;

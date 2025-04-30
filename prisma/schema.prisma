@@ -36,6 +36,7 @@ model User {
   full_name           String?
   profile_picture_url String?
   bio                 String?
+  birthday            DateTime?  @db.Date
   created_at          DateTime   @default(now())
   updated_at          DateTime?  @updatedAt
   refresh_token       String?
