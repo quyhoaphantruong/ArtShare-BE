@@ -145,6 +145,11 @@ export class BlogService {
       return null;
     }
 
+    // update view count
+    await this.prisma.blog.update({
+      where: { id },
+      data: { view_count: { increment: 1 } },
+    });
     return mapBlogToDetailsDto(blog);
   }
 
