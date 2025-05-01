@@ -406,4 +406,30 @@ export class BlogService {
       userRating: result.userRating,
     };
   }
+
+  async getBlogsByUsername(
+    username: string,
+    take: number,
+    skip: number,
+  ): Promise<BlogListItemResponseDto[]> {
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with username ${username} not found.`);
+    }
+
+    const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
+      where: { user_id: user.id },
+      select: blogListItemSelect,
+      orderBy: { created_at: 'desc' },
+      take: take,
+      skip: skip,
+    });
+
+    return blogs
+      .map(mapBlogToListItemDto)
+      .filter((b): b is BlogListItemResponseDto => b !== null);
+  }
 }
