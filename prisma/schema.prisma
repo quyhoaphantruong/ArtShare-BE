@@ -180,15 +180,18 @@ model Comment {
 model Share {
   id             Int           @id @default(autoincrement())
   user_id        String
-  target_id      Int
-  target_type    TargetType
+  post_id        Int?
+  blog_id        Int?
   share_platform SharePlatform
   created_at     DateTime      @default(now())
-  blog           Blog?         @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "share_blog_fkey")
-  post           Post?         @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "share_post_fkey")
-  user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([target_id, target_type])
+  /// Relations
+  post           Post?  @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  blog           Blog?  @relation(fields: [blog_id], references: [id], onDelete: Cascade)
+  user           User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, post_id], map: "unique_user_post_share")
+  @@unique([user_id, blog_id], map: "unique_user_blog_share")
   @@map("share")
 }
 
@@ -259,8 +262,7 @@ enum TargetType {
 
 enum SharePlatform {
   FACEBOOK
-  TWITTER
-  LINKEDIN
+  GOOGLE
 }
 
 enum CategoryType {
