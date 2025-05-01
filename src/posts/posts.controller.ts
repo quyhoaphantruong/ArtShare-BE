@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -21,6 +22,7 @@ import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { PatchThumbnailDto } from './dto/request/patch-thumbnail.dto';
 import { SearchPostDto } from './dto/request/search-post.dto';
 
 @UseGuards(JwtAuthGuard)
@@ -99,6 +101,7 @@ export class PostsController {
     return this.postsService.getPostDetails(Number(postId));
   }
 
+  @Public()
   @Get('user/:username')
   async findPostsByUsername(
     @Param('username') username: string,
@@ -111,4 +114,14 @@ export class PostsController {
       Number(pageSize),
     );
   }
+
+  @Patch(':id/thumbnail-crop')
+  async patchThumbnailCropMeta(
+    @Param('id', ParseIntPipe) postId: number,
+    @Body() dto: PatchThumbnailDto,
+    @CurrentUser() user: CurrentUserType,
+  ) {
+    return this.postsService.updateThumbnailCropMeta(postId, dto, user.id);
+  }
+
 }
