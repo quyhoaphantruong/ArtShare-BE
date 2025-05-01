@@ -19,8 +19,8 @@ class VectorParams {
 }
 
 export class MediaData {
-  url: string;
-  media_type: MediaType;
+  url!: string;
+  media_type!: MediaType;
 }
 
 @Injectable()
