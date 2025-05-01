@@ -331,7 +331,7 @@ export class PostsService {
     // update the view count
     await this.prisma.post.update({
       where: { id: postId },
-      data: { view_count: post.view_count + 1 },
+      data: { view_count: { increment: 1 } },
     });
     return plainToInstance(PostDetailsResponseDto, post);
   }
