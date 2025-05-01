@@ -75,4 +75,7 @@ export class UpdatePostDto {
     { toClassOnly: true },
   )
   existing_image_urls?: string[];
+  
+  @IsString()
+  thumbnail_crop_meta: string = "{}";
 }

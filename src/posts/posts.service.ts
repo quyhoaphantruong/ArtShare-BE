@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
@@ -11,6 +11,7 @@ import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
+import { PatchThumbnailDto } from './dto/request/patch-thumbnail.dto';
 import { SearchPostDto } from './dto/request/search-post.dto';
 
 
@@ -73,6 +74,8 @@ export class PostsService {
     const { cate_ids, video_url, thumbnail_url, ...createPostData } =
       createPostDto;
 
+      console.log(createPostDto.thumbnail_crop_meta)
+
     const imageUploads: FileUploadResponse[] =
       await this.storageService.uploadFiles(images, 'posts');
 
@@ -95,6 +98,7 @@ export class PostsService {
         categories: {
           connect: (cate_ids || []).map((cate_id) => ({ id: cate_id })),
         },
+        thumbnail_crop_meta: JSON.parse(createPostDto.thumbnail_crop_meta),
       },
       include: { medias: true, user: true, categories: true },
     });
@@ -205,6 +209,7 @@ export class PostsService {
       where: { id: postId },
       data: {
         ...postUpdateData,
+        thumbnail_crop_meta: JSON.parse(updatePostDto.thumbnail_crop_meta),
         thumbnail_url: thumbnail_url,
         categories: {
           set: (cate_ids || []).map((id) => ({ id })),
@@ -566,4 +571,24 @@ export class PostsService {
 
     return plainToInstance(PostListItemResponseDto, posts);
   }
+
+  async updateThumbnailCropMeta(
+    postId: number,
+    dto: PatchThumbnailDto,
+    userId: string,
+  ) {
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+
+    if (!post || post.user_id !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    return this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        thumbnail_crop_meta:  { ...dto }, // assuming JSON column
+      },
+    });
+  }
+
 }
