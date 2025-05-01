@@ -1,23 +1,21 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/index.ts", "use": "@vercel/node" }
+    {
+      "src": "dist/main.js",
+      "use": "@vercel/node"
+    }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "api/index.ts",
-      "methods": ["GET","POST","PUT","DELETE","PATCH","OPTIONS"],
+      "dest": "dist/main.js",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       "headers": {
-        "Access-Control-Allow-Origin": "*",         
+        "Access-Control-Allow-Origin": "https://web-advanced-frontend.vercel.app",
         "Access-Control-Allow-Credentials": "true",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS"
       }
     }
-  ],
-  "functions": {
-    "api/index.ts": {
-      "includeFiles": "dist/**"                     
-    }
-  }
+  ]
 }
