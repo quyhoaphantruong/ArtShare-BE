@@ -371,7 +371,6 @@ export class PostsService {
     const pointIds: number[] = searchResponse.points.map((point) =>
       Number(point.id),
     );
-    console.log('Qdrant search response:', pointIds);
 
     const posts: PostDetails[] = await this.prisma.post.findMany({
       where: { id: { in: pointIds } },
