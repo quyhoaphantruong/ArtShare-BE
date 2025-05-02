@@ -4,10 +4,11 @@
   "description": "",
   "author": "",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "license": "UNLICENSED",
   "scripts": {
     "generate:metadata": "npx tsx scripts/generate-metadata.ts",
+    "postinstall": "prisma generate",
     "prebuild": "yarn generate:metadata",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
