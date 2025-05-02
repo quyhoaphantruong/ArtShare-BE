@@ -11,6 +11,7 @@
     "postinstall": "prisma generate",
     "prebuild": "yarn generate:metadata",
     "build": "nest build",
+    "clean": "rimraf dist",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start -b swc --type-check",
     "dev": "nest start --watch -b swc --type-check",
