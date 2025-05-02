@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { Injectable } from '@nestjs/common';
 import { TryCatch } from 'src/common/try-catch.decorator';
+import * as transformers from '@huggingface/transformers';
 
 @Injectable()
 export class EmbeddingService {
@@ -11,40 +13,20 @@ export class EmbeddingService {
   constructor() {
     const modelName = 'Xenova/clip-vit-base-patch16';
 
-    // Use Function constructor to ensure ESM import is not transformed to require()
-    const importTransformers = () =>
-      Function('return import("@xenova/transformers")')();
-
-    this.processorPromise = importTransformers().then(
-      (module: { AutoProcessor: { from_pretrained: (arg0: string) => any } }) =>
-        module.AutoProcessor.from_pretrained(modelName),
-    );
-    this.visionModelPromise = importTransformers().then(
-      (module: {
-        CLIPVisionModelWithProjection: {
-          from_pretrained: (arg0: string) => any;
-        };
-      }) => module.CLIPVisionModelWithProjection.from_pretrained(modelName),
-    );
-    this.tokenizerPromise = importTransformers().then(
-      (module: { AutoTokenizer: { from_pretrained: (arg0: string) => any } }) =>
-        module.AutoTokenizer.from_pretrained(modelName),
-    );
-    this.textModelPromise = importTransformers().then(
-      (module: {
-        CLIPTextModelWithProjection: { from_pretrained: (arg0: string) => any };
-      }) => module.CLIPTextModelWithProjection.from_pretrained(modelName),
-    );
+    this.processorPromise = transformers.AutoProcessor.from_pretrained(modelName, {});
+    this.visionModelPromise = transformers.CLIPVisionModelWithProjection.from_pretrained(modelName);
+    this.tokenizerPromise = transformers.AutoTokenizer.from_pretrained(modelName);
+    this.textModelPromise = transformers.CLIPTextModelWithProjection.from_pretrained(modelName);
   }
 
   async generateEmbeddingFromText(text: string): Promise<number[]> {
     const tokenizer = await this.tokenizerPromise;
     const textModel = await this.textModelPromise;
 
-    const textInputs = tokenizer([text], { padding: true, truncation: true });
+    const textInputs = tokenizer([text], { padding: true, truncation: true, return_tensors: 'pt' });
     const { text_embeds } = await textModel(textInputs);
 
-    return Object.values(text_embeds.data);
+    return text_embeds.detach().cpu().numpy().flat();
   }
 
   async generateEmbeddingFromImageUrl(image_url: string): Promise<number[]> {
@@ -52,14 +34,10 @@ export class EmbeddingService {
     const visionModel = await this.visionModelPromise;
 
     try {
-      const { RawImage } = await Function(
-        'return import("@xenova/transformers")',
-      )();
-      const image = await RawImage.read(image_url);
-      const image_inputs = await processor(image);
-      const { image_embeds } = await visionModel(image_inputs);
+      const image = await processor(image_url, { return_tensors: 'pt' });
+      const { image_embeds } = await visionModel(image);
 
-      return Object.values(image_embeds.data);
+      return image_embeds.detach().cpu().numpy().flat();
     } catch (err) {
       console.error(`Error processing ${image_url}:`, err);
       return [];
@@ -71,12 +49,9 @@ export class EmbeddingService {
     const processor = await this.processorPromise;
     const visionModel = await this.visionModelPromise;
 
-    const { RawImage } = await Function(
-      'return import("@xenova/transformers")',
-    )();
-    const image_inputs = await processor(await RawImage.fromBlob(imageBlob));
-    const { image_embeds } = await visionModel(image_inputs);
+    const image = await processor(imageBlob, { return_tensors: 'pt' });
+    const { image_embeds } = await visionModel(image);
 
-    return Object.values(image_embeds.data);
+    return image_embeds.detach().cpu().numpy().flat();
   }
 }
