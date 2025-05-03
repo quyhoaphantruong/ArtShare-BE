@@ -174,30 +174,24 @@ import { UpdateCommentDto } from './dto/update-comment.dto';
         where: { id: commentId },
         select: { id: true, user_id: true },
       });
-      if (!existing) {
-        throw new NotFoundException(`Comment with ID ${commentId} not found.`);
-      }
-      if (existing.user_id !== userId) {
-        throw new ForbiddenException(`You cannot delete someone else's comment.`);
-      }
-  
-      // 2) Perform the deletion
+      if (!existing) throw new NotFoundException(`Comment ${commentId} not found.`);
+      if (existing.user_id !== userId) throw new ForbiddenException(`Not your comment.`);
+    
+      // 2) Delete (or detach) any replies first
+      await this.prisma.comment.deleteMany({
+        where: { parent_comment_id: commentId },
+      });
+      // 3) Now delete the comment itself
       try {
-        await this.prisma.comment.delete({
-          where: { id: commentId },
-        });
+        await this.prisma.comment.delete({ where: { id: commentId } });
       } catch (err: any) {
-        if (
-          err instanceof PrismaClientKnownRequestError &&
-          err.code === 'P2025'
-        ) {
-          throw new NotFoundException(`Comment with ID ${commentId} not found.`);
+        if (err.code === 'P2025') {
+          throw new NotFoundException(`Comment ${commentId} no longer exists.`);
         }
         console.error('Error deleting comment', { commentId, err });
-        throw new InternalServerErrorException(
-          'Could not delete the comment.',
-        );
+        throw new InternalServerErrorException('Could not delete the comment.');
       }
     }
+    
   }
   
