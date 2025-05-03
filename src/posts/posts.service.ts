@@ -14,7 +14,7 @@ import { FileUploadResponse } from 'src/storage/dto/response.dto';
 
 class VectorParams {
   titleEmbedding?: number[];
-  descriptionEmbdding?: number[];
+  descriptionEmbedding?: number[];
   imagesEmbedding?: number[][];
 }
 
@@ -37,6 +37,27 @@ export class PostsService {
     private readonly storageService: StorageService,
     private readonly embeddingService: EmbeddingService,
   ) {}
+
+  private async ensureQdrantCollectionExists() {
+    const collections = await this.qdrantClient.getCollections();
+    const exists = collections.collections.some(
+      (col) => col.name === this.qdrantCollectionName,
+    );
+
+    if (!exists) {
+      await this.qdrantClient.createCollection(this.qdrantCollectionName, {
+        vectors: {
+          title: { size: 512, distance: 'Cosine' },
+          description: { size: 512, distance: 'Cosine' },
+          images: { size: 512, distance: 'Cosine' },
+        },
+      });
+
+      console.log(
+        `Created Qdrant collection '${this.qdrantCollectionName}' with named vectors`,
+      );
+    }
+  }
 
   @TryCatch()
   async createPost(
@@ -73,6 +94,8 @@ export class PostsService {
       include: { medias: true, user: true, categories: true },
     });
 
+    await this.ensureQdrantCollectionExists();
+
     await this.savePostEmbedding(
       post.id,
       createPostData.title,
@@ -99,36 +122,74 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
 
-    const { cate_ids, video_url, ...postUpdateData } = updatePostDto;
+    const {
+      cate_ids,
+      video_url,
+      existing_image_urls = [],
+      thumbnail_url,
+      ...postUpdateData
+    } = updatePostDto;
 
+    const existingImageUrlsSet = new Set(existing_image_urls);
+
+    /** ────────────── HANDLE IMAGE DELETION ────────────── */
+    const existingImages = existingPost.medias.filter(
+      (m) => m.media_type === MediaType.image,
+    );
+
+    const imagesToDelete = existingImages.filter(
+      (m) => !existingImageUrlsSet.has(m.url),
+    );
+
+    // 1️⃣ Delete the old thumbnail if it’s been replaced
+    const oldThumb = existingPost.thumbnail_url;
+    if (thumbnail_url && oldThumb && thumbnail_url !== oldThumb) {
+      await this.storageService.deleteFiles([oldThumb]);
+    }
+
+    if (imagesToDelete.length > 0) {
+      await Promise.all([
+        this.prisma.media.deleteMany({
+          where: {
+            id: { in: imagesToDelete.map((m) => m.id) },
+          },
+        }),
+        this.storageService.deleteFiles(imagesToDelete.map((m) => m.url)),
+      ]);
+    }
+
+    /** ────────────── HANDLE NEW IMAGE UPLOADS ────────────── */
     let newImageUploads: FileUploadResponse[] = [];
     if (images && images.length > 0) {
-      // do this to delete in db and s3 at the same time
-      const deleteImagePromises = [
-        this.prisma.media.deleteMany({ where: { post_id: postId } }),
-        this.storageService.deleteFiles(
-          existingPost.medias.map((media) => media.url),
-        ),
-      ];
-      await Promise.all(deleteImagePromises);
       newImageUploads = await this.storageService.uploadFiles(images, 'posts');
     }
 
-    if (video_url) {
-      const existingVideo = existingPost.medias.find(
-        (media) => media.media_type === MediaType.video,
-      );
-      if (existingVideo) {
-        const deleteVideoPromise = [
-          this.prisma.media.delete({ where: { id: existingVideo.id } }),
-          this.storageService.deleteFiles([existingVideo.url]),
-        ];
-        await Promise.all(deleteVideoPromise);
-      }
+    /** ────────────── HANDLE VIDEO UPDATE ────────────── */
+    /* 1️⃣ normalise the raw value coming from the DTO */
+    const videoUrl = (video_url ?? '').trim(); // '' when user deletes
+    const existingVideo = existingPost.medias.find(
+      (m) => m.media_type === MediaType.video,
+    );
+
+    /* 2️⃣ decide what the user wants to do */
+    const wantsDeletion = existingVideo && videoUrl === '';
+    const wantsReplace =
+      existingVideo && videoUrl && videoUrl !== existingVideo.url;
+    const wantsNewUpload = !existingVideo && videoUrl; // first‑time video
+
+    /* 3️⃣ delete the old video row + file only when needed */
+    if (wantsDeletion || wantsReplace) {
+      await Promise.all([
+        this.prisma.media.delete({ where: { id: existingVideo.id } }),
+        this.storageService.deleteFiles([existingVideo.url]),
+      ]);
     }
 
+    /** ────────────── COMBINE NEW MEDIA ────────────── */
     const mediasData: MediaData[] = [
-      ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
+      ...(wantsReplace || wantsNewUpload
+        ? [{ url: videoUrl, media_type: MediaType.video }]
+        : []),
       ...newImageUploads.map(({ url }) => ({
         url,
         media_type: MediaType.image,
@@ -139,8 +200,9 @@ export class PostsService {
       where: { id: postId },
       data: {
         ...postUpdateData,
+        thumbnail_url: thumbnail_url,
         categories: {
-          set: (cate_ids || []).map((cate_id) => ({ id: cate_id })),
+          set: (cate_ids || []).map((id) => ({ id })),
         },
         ...(mediasData.length > 0 && {
           medias: {
@@ -232,9 +294,10 @@ export class PostsService {
 
     const whereClause = {
       user_id: { in: followingIds },
-      ...(filter && filter.length > 0 && {
-        categories: { some: { name: { in: filter } } },
-      }),
+      ...(filter &&
+        filter.length > 0 && {
+          categories: { some: { name: { in: filter } } },
+        }),
     };
 
     const posts = await this.prisma.post.findMany({
@@ -264,6 +327,12 @@ export class PostsService {
     if (!post) {
       throw new NotFoundException('Post not found');
     }
+
+    // update the view count
+    await this.prisma.post.update({
+      where: { id: postId },
+      data: { view_count: { increment: 1 } },
+    });
     return plainToInstance(PostDetailsResponseDto, post);
   }
 
@@ -343,9 +412,21 @@ export class PostsService {
 
     return {
       titleEmbedding: titleEmbedding,
-      descriptionEmbdding: descriptionEmbedding,
+      descriptionEmbedding: descriptionEmbedding,
       imagesEmbedding: imageEmbeddings,
     };
+  }
+
+  private averageEmbeddings(embeddings: number[][]): number[] {
+    if (!embeddings || embeddings.length === 0) return []; // handle empty case safely
+    const length = embeddings[0].length;
+    const sum = new Array(length).fill(0);
+    embeddings.forEach((vec) => {
+      for (let i = 0; i < length; i++) {
+        sum[i] += vec[i];
+      }
+    });
+    return sum.map((val) => val / embeddings.length);
   }
 
   @TryCatch()
@@ -355,24 +436,35 @@ export class PostsService {
     description: string | undefined,
     imageFiles: Express.Multer.File[],
   ): Promise<void> {
-    const { titleEmbedding, descriptionEmbdding, imagesEmbedding } =
+    const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
       await this.getVectorParams(title, description, imageFiles);
+
+    // 🔥 Ensure no undefined is passed!
+    if (!titleEmbedding) {
+      throw new Error('titleEmbedding is required but missing!');
+    }
+    const averageImagesEmbedding =
+      imagesEmbedding && imagesEmbedding.length > 0
+        ? this.averageEmbeddings(imagesEmbedding)
+        : new Array(512).fill(0); // 512 = your images vector size
+    const safeDescriptionEmbedding =
+      descriptionEmbedding ?? new Array(512).fill(0); // 768 = your description vector size
+    const pointsVector = [
+      {
+        id: postId,
+        vector: {
+          title: titleEmbedding,
+          description: safeDescriptionEmbedding,
+          images: averageImagesEmbedding,
+        } as Record<string, number[]>,
+      },
+    ];
 
     const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
       {
         wait: true,
-        points: [
-          {
-            id: postId,
-            vector: {
-              title: titleEmbedding,
-              description: descriptionEmbdding,
-              images: imagesEmbedding,
-            },
-            payload: { postId: postId },
-          },
-        ],
+        points: pointsVector,
       },
     );
 
@@ -388,7 +480,7 @@ export class PostsService {
   ): Promise<void> {
     const {
       titleEmbedding,
-      descriptionEmbdding,
+      descriptionEmbedding,
       imagesEmbedding,
     }: VectorParams = await this.getVectorParams(
       title,
@@ -396,25 +488,38 @@ export class PostsService {
       imageFiles,
     );
 
+    if (!titleEmbedding) {
+      throw new Error('titleEmbedding is required but missing!');
+    }
+
+    const safeDescriptionEmbedding =
+      descriptionEmbedding ?? new Array(512).fill(0);
+
+    const averageImagesEmbedding =
+      imagesEmbedding && imagesEmbedding.length > 0
+        ? this.averageEmbeddings(imagesEmbedding)
+        : new Array(512).fill(0);
+
+    const pointVector = [
+      {
+        id: postId,
+        vector: {
+          title: titleEmbedding,
+          description: safeDescriptionEmbedding,
+          images: averageImagesEmbedding,
+        } as Record<string, number[]>,
+      },
+    ];
+
     const operationInfo = await this.qdrantClient.updateVectors(
       this.qdrantCollectionName,
       {
-        points: [
-          {
-            id: postId,
-            vector: {
-              title: titleEmbedding,
-              description: descriptionEmbdding,
-              images: imagesEmbedding,
-            },
-          },
-        ],
+        points: pointVector,
       },
     );
 
     console.log('Update operation info:', operationInfo);
   }
-
 
   @TryCatch()
   async findPostsByUsername(

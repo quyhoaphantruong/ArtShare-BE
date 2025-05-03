@@ -9,6 +9,7 @@ export const blogListItemSelect = {
   like_count: true,
   comment_count: true,
   share_count: true,
+  view_count: true,
   is_published: true,
   user: {
     select: {
@@ -50,8 +51,9 @@ export const mapBlogToDetailsDto = (
     like_count: blog.like_count,
     comment_count: blog.comment_count,
     share_count: blog.share_count,
+    view_count: blog.view_count,
     pictures: blog.pictures,
-    embeddedVideos: blog.embeddedVideos,
+    embeddedVideos: blog.embedded_videos,
     user: {
       id: blog.user.id,
       username: blog.user.username,
@@ -80,6 +82,7 @@ export const mapBlogToListItemDto = (
     like_count: blog.like_count,
     comment_count: blog.comment_count,
     share_count: blog.share_count,
+    view_count: blog.view_count,
     is_published: blog.is_published,
     user: {
       id: blog.user.id,

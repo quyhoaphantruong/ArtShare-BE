@@ -4,10 +4,6 @@ CREATE TYPE "ReportTargetType" AS ENUM ('POST', 'BLOG', 'COMMENT');
 -- CreateEnum
 CREATE TYPE "ReportStatus" AS ENUM ('PENDING', 'REVIEWED', 'RESOLVED');
 
--- AlterTable
-ALTER TABLE "user" ADD COLUMN     "followers_count" INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN     "followings_count" INTEGER NOT NULL DEFAULT 0;
-
 -- CreateTable
 CREATE TABLE "report" (
     "id" SERIAL NOT NULL,
