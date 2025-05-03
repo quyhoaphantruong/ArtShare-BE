@@ -162,17 +162,18 @@ model Like {
 }
 
 model Comment {
-  id                Int       @id @default(autoincrement())
+  id                Int        @id @default(autoincrement())
   user_id           String
   parent_comment_id Int?
+  target_id         Int
+  target_type       TargetType
   content           String
-  created_at        DateTime  @default(now())
-  updated_at        DateTime? @updatedAt
-
+  created_at        DateTime   @default(now())
+  updated_at        DateTime?  @updatedAt
   parent_comment Comment?  @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
   replies        Comment[] @relation("CommentReplies")
   user           User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
+  @@index([target_id, target_type])
   @@index([parent_comment_id])
   @@map("comment")
 }
