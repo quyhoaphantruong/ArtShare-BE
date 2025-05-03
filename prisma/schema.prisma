@@ -28,28 +28,31 @@ model UserRole {
 }
 
 model User {
-  id                  String       @id
-  username            String       @unique
-  email               String       @unique
+  id                  String    @id
+  username            String    @unique
+  email               String    @unique
   full_name           String?
   profile_picture_url String?
   bio                 String?
-  created_at          DateTime     @default(now())
-  updated_at          DateTime?    @updatedAt
+  birthday            DateTime? @db.Date
+  created_at          DateTime  @default(now())
+  updated_at          DateTime? @updatedAt
   refresh_token       String?
-  followers_count     Int          @default(0)
-  followings_count    Int          @default(0)
-  collections         Collection[]
-  blogs               Blog[]
-  bookmarks           Bookmark[]
-  comments            Comment[]
-  followers           Follow[]     @relation("Follower")
-  followings          Follow[]     @relation("Following")
-  likes               Like[]
-  posts               Post[]
-  ratings             Rating[]
-  shares              Share[]
-  roles               UserRole[]
+  followers_count     Int       @default(0)
+  followings_count    Int       @default(0)
+
+  collections Collection[]
+  blogs       Blog[]
+  bookmarks   Bookmark[]
+  comments    Comment[]
+  followers   Follow[]     @relation("Follower")
+  followings  Follow[]     @relation("Following")
+  likes       Like[]
+  posts       Post[]
+  ratings     Rating[]
+  shares      Share[]
+  roles       UserRole[]
+  Report      Report[]     @relation("UserReports")
 
   @@map("user")
 }
@@ -72,7 +75,6 @@ model Post {
   is_mature     Boolean   @default(false)
   ai_created    Boolean   @default(false)
 
-  comment     Comment[]
   likes       Like[]
   medias      Media[]
   collections Collection[]
@@ -104,7 +106,6 @@ model Blog {
   pictures   String[]
   user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
   bookmarks  Bookmark[]
-  comment    Comment[]
   likes      Like[]
   ratings    Rating[]
   shares     Share[]
@@ -161,23 +162,20 @@ model Like {
 }
 
 model Comment {
-  id                Int       @id @default(autoincrement())
+  id                Int        @id @default(autoincrement())
   user_id           String
   parent_comment_id Int?
+  target_id         Int
+  target_type       TargetType
   content           String
-  created_at        DateTime  @default(now())
-  updated_at        DateTime? @updatedAt
-  blog_id           Int?
-  post_id           Int?
-  blog              Blog?     @relation(fields: [blog_id], references: [id], onDelete: Cascade)
-  parent_comment    Comment?  @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
-  replies           Comment[] @relation("CommentReplies")
-  post              Post?     @relation(fields: [post_id], references: [id], onDelete: Cascade)
-  user              User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at        DateTime   @default(now())
+  updated_at        DateTime?  @updatedAt
+  parent_comment    Comment?   @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
+  replies           Comment[]  @relation("CommentReplies")
+  user              User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@index([target_id, target_type])
   @@index([parent_comment_id])
-  @@index([blog_id])
-  @@index([post_id])
   @@map("comment")
 }
 
@@ -190,9 +188,9 @@ model Share {
   created_at     DateTime      @default(now())
 
   /// Relations
-  post           Post?  @relation(fields: [post_id], references: [id], onDelete: Cascade)
-  blog           Blog?  @relation(fields: [blog_id], references: [id], onDelete: Cascade)
-  user           User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post Post? @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  blog Blog? @relation(fields: [blog_id], references: [id], onDelete: Cascade)
+  user User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, post_id], map: "unique_user_post_share")
   @@unique([user_id, blog_id], map: "unique_user_blog_share")
@@ -254,6 +252,27 @@ model Collection {
   @@index([user_id])
 }
 
+model Report {
+  id Int @id @default(autoincrement())
+
+  reporter_id String
+  target_id   Int
+  target_type ReportTargetType
+
+  reason String       @db.Text
+  status ReportStatus @default(PENDING)
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  reporter User @relation("UserReports", fields: [reporter_id], references: [id], onDelete: Cascade)
+
+  // --- Indexes ---
+  @@index([reporter_id])
+  @@index([status])
+  @@index([target_id, target_type])
+  @@map("report")
+}
+
 enum MediaType {
   image
   video
@@ -272,4 +291,16 @@ enum SharePlatform {
 enum CategoryType {
   MEDIUM
   ATTRIBUTE
+}
+
+enum ReportTargetType {
+  POST
+  BLOG
+  COMMENT
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
 }
