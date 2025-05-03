@@ -170,9 +170,10 @@ model Comment {
   content           String
   created_at        DateTime   @default(now())
   updated_at        DateTime?  @updatedAt
-  parent_comment Comment?  @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
-  replies        Comment[] @relation("CommentReplies")
-  user           User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  parent_comment    Comment?   @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
+  replies           Comment[]  @relation("CommentReplies")
+  user              User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   @@index([target_id, target_type])
   @@index([parent_comment_id])
   @@map("comment")
