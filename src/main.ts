@@ -1,11 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import metadata from './metadata';
+import express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  const logger = new Logger('Bootstrap');
 
   // Enable CORS
   app.enableCors({
@@ -34,6 +37,21 @@ async function bootstrap() {
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   await SwaggerModule.loadPluginMetadata(metadata);
   SwaggerModule.setup('api', app, documentFactory);
+
+  const webhookRawBodyMiddleware = express.raw({ type: 'application/json' });
+  app.use(
+    '/api/stripe/webhook',
+    (
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      logger.log(`Webhook request received for path: ${req.originalUrl}`);
+      webhookRawBodyMiddleware(req, res, next);
+    },
+  );
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   await app.listen(process.env.PORT ?? 3000);
 }
