@@ -28,83 +28,88 @@ model UserRole {
 }
 
 model User {
-  id                  String       @id
-  username            String       @unique
-  email               String       @unique
+  id                  String    @id
+  username            String    @unique
+  email               String    @unique
   full_name           String?
   profile_picture_url String?
   bio                 String?
-  created_at          DateTime     @default(now())
-  updated_at          DateTime?    @updatedAt
+  birthday            DateTime? @db.Date
+  created_at          DateTime  @default(now())
+  updated_at          DateTime? @updatedAt
   refresh_token       String?
-  followers_count     Int          @default(0)
-  followings_count    Int          @default(0)
-  collections         Collection[]
-  blogs               Blog[]
-  bookmarks           Bookmark[]
-  comments            Comment[]
-  followers           Follow[]     @relation("Follower")
-  followings          Follow[]     @relation("Following")
-  likes               Like[]
-  posts               Post[]
-  ratings             Rating[]
-  shares              Share[]
-  roles               UserRole[]
+  followers_count     Int       @default(0)
+  followings_count    Int       @default(0)
+
+  collections Collection[]
+  blogs       Blog[]
+  bookmarks   Bookmark[]
+  comments    Comment[]
+  followers   Follow[]     @relation("Follower")
+  followings  Follow[]     @relation("Following")
+  likes       Like[]
+  posts       Post[]
+  ratings     Rating[]
+  shares      Share[]
+  roles       UserRole[]
+  Report      Report[]     @relation("UserReports")
 
   @@map("user")
 }
 
 model Post {
-  id            Int          @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   user_id       String
   title         String
   description   String?
-  created_at    DateTime     @default(now())
-  is_published  Boolean      @default(false)
-  is_private    Boolean      @default(false)
+  created_at    DateTime  @default(now())
+  is_published  Boolean   @default(false)
+  is_private    Boolean   @default(false)
   group_id      Int?
-  share_count   Int          @default(0)
-  comment_count Int          @default(0)
-  like_count    Int          @default(0)
+  share_count   Int       @default(0)
+  comment_count Int       @default(0)
+  view_count    Int       @default(0)
+  like_count    Int       @default(0)
   thumbnail_url String
-  updated_at    DateTime?    @updatedAt
-  is_mature     Boolean      @default(false)
-  ai_created    Boolean      @default(false)
-  comment       Comment[]
-  likes         Like[]
-  medias        Media[]
-  collections   Collection[]
-  user          User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  shares        Share[]
-  categories    Category[]   @relation("CategoryToPost")
+  updated_at    DateTime? @updatedAt
+  is_mature     Boolean   @default(false)
+  ai_created    Boolean   @default(false)
+
+  likes       Like[]
+  medias      Media[]
+  collections Collection[]
+  user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shares      Share[]
+  categories  Category[]   @relation("CategoryToPost")
 
   @@index([user_id])
   @@map("post")
 }
 
 model Blog {
-  id             Int        @id @default(autoincrement())
-  user_id        String
-  title          String
-  content        String
-  created_at     DateTime   @default(now())
-  is_published   Boolean    @default(false)
-  like_count     Int        @default(0)
-  comment_count  Int        @default(0)
-  share_count    Int        @default(0)
-  updated_at     DateTime?  @updatedAt
-  average_rating Float      @default(0)
-  is_protected   Boolean    @default(false)
-  rating_count   Int        @default(0)
+  id              Int       @id @default(autoincrement())
+  user_id         String
+  title           String
+  content         String
+  created_at      DateTime  @default(now())
+  is_published    Boolean   @default(false)
+  like_count      Int       @default(0)
+  comment_count   Int       @default(0)
+  share_count     Int       @default(0)
+  view_count      Int       @default(0)
+  updated_at      DateTime? @updatedAt
+  average_rating  Float     @default(0)
+  is_protected    Boolean   @default(false)
+  rating_count    Int       @default(0)
   embedded_videos String[]
-  pictures       String[]
-  user           User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  bookmarks      Bookmark[]
-  comment        Comment[]
-  likes          Like[]
-  ratings        Rating[]
-  shares         Share[]
-  categories     Category[] @relation("CategoryToBlog")
+
+  pictures   String[]
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  bookmarks  Bookmark[]
+  likes      Like[]
+  ratings    Rating[]
+  shares     Share[]
+  categories Category[] @relation("CategoryToBlog")
 
   @@index([user_id])
   @@index([created_at])
@@ -157,38 +162,38 @@ model Like {
 }
 
 model Comment {
-  id                Int       @id @default(autoincrement())
+  id                Int        @id @default(autoincrement())
   user_id           String
   parent_comment_id Int?
+  target_id         Int
+  target_type       TargetType
   content           String
-  created_at        DateTime  @default(now())
-  updated_at        DateTime? @updatedAt
-  blog_id           Int?
-  post_id           Int?
-  blog              Blog?     @relation(fields: [blog_id], references: [id], onDelete: Cascade)
-  parent_comment    Comment?  @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
-  replies           Comment[] @relation("CommentReplies")
-  post              Post?     @relation(fields: [post_id], references: [id], onDelete: Cascade)
-  user              User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at        DateTime   @default(now())
+  updated_at        DateTime?  @updatedAt
+  parent_comment    Comment?   @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
+  replies           Comment[]  @relation("CommentReplies")
+  user              User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@index([target_id, target_type])
   @@index([parent_comment_id])
-  @@index([blog_id])
-  @@index([post_id])
   @@map("comment")
 }
 
 model Share {
   id             Int           @id @default(autoincrement())
   user_id        String
-  target_id      Int
-  target_type    TargetType
+  post_id        Int?
+  blog_id        Int?
   share_platform SharePlatform
   created_at     DateTime      @default(now())
-  blog           Blog?         @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "share_blog_fkey")
-  post           Post?         @relation(fields: [target_id], references: [id], onDelete: Cascade, map: "share_post_fkey")
-  user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([target_id, target_type])
+  /// Relations
+  post Post? @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  blog Blog? @relation(fields: [blog_id], references: [id], onDelete: Cascade)
+  user User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, post_id], map: "unique_user_post_share")
+  @@unique([user_id, blog_id], map: "unique_user_blog_share")
   @@map("share")
 }
 
@@ -242,9 +247,30 @@ model Collection {
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
   user          User     @relation(fields: [user_id], references: [id])
-  posts          Post[]
+  posts         Post[]
 
   @@index([user_id])
+}
+
+model Report {
+  id Int @id @default(autoincrement())
+
+  reporter_id String
+  target_id   Int
+  target_type ReportTargetType
+
+  reason String       @db.Text
+  status ReportStatus @default(PENDING)
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  reporter User @relation("UserReports", fields: [reporter_id], references: [id], onDelete: Cascade)
+
+  // --- Indexes ---
+  @@index([reporter_id])
+  @@index([status])
+  @@index([target_id, target_type])
+  @@map("report")
 }
 
 enum MediaType {
@@ -259,11 +285,45 @@ enum TargetType {
 
 enum SharePlatform {
   FACEBOOK
-  TWITTER
-  LINKEDIN
+  GOOGLE
 }
 
 enum CategoryType {
   MEDIUM
   ATTRIBUTE
+}
+
+enum ReportTargetType {
+  POST
+  BLOG
+  COMMENT
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+}
+
+model ArtGeneration {
+  id                         Int         @id @default(autoincrement())
+  user_id                    String
+  user_prompt                String
+  final_prompt               String
+  model_key                  String
+  number_of_images_generated Int
+  image_urls                 String[]
+  aspect_ratio               AspectRatio
+  style                      String?
+  lighting                   String?
+  camera                     String?
+  created_at                 DateTime    @default(now())
+
+  @@map("art_generation")
+}
+
+enum AspectRatio {
+  SQUARE
+  LANDSCAPE
+  PORTRAIT
 }

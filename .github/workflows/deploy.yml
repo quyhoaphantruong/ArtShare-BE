@@ -1,0 +1,7 @@
+ssh ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} << 'EOF'
+  cd ${{ secrets.DEPLOY_PATH }}
+  git pull origin main
+  yarn install --frozen-lockfile
+  yarn build
+  pm2 reload artshare-be || pm2 start dist/main.js --name artshare-be
+EOF

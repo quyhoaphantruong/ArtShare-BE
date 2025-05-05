@@ -19,6 +19,7 @@ import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { Roles } from 'src/auth/decorators/roles.decorators';
 import { Role } from 'src/auth/enums/role.enum';
 import { ApiResponse } from 'src/common/api-response';
+import { ApiOperation } from '@nestjs/swagger';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -39,6 +40,7 @@ export class UserController {
   }
 
   @Patch('profile')
+  @ApiOperation({ summary: 'Cập nhật thông tin cá nhân của người dùng hiện tại' })
   async updateProfile(
     @CurrentUser() currentUser: CurrentUserType,
     @Body() updateUserDto: UpdateUserDTO,
