@@ -28,6 +28,7 @@ import { RatingResponseDto } from './dto/response/rating-response.dto';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { PaginationDto } from './dto/request/pagination.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('blogs')
@@ -201,5 +202,21 @@ export class BlogController {
     @CurrentUser() user: CurrentUserType,
   ): Promise<RatingResponseDto> {
     return this.blogService.rateBlog(id, user.id, rateBlogDto.rating);
+  }
+
+  /**
+   * GET /blogs/user/:username - Get blogs by username
+   */
+  @Get('user/:username')
+  async getBlogsByUsername(
+    @Param('username') username: string,
+    @Query() paging: PaginationDto
+  ): Promise<BlogListItemResponseDto[]> {
+    const { take, skip } = paging;
+    return this.blogService.getBlogsByUsername(
+      username,
+      take,
+      skip,
+    );
   }
 }
