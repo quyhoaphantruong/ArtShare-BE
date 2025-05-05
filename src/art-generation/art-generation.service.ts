@@ -1,10 +1,8 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { ImageGenerationResult, ImageGeneratorStrategy, ModelKey } from './image-generator.interface';
-import { AspectRatio } from './enum/aspect-ratio';
 import { nanoid } from 'nanoid';
 import { StorageService } from 'src/storage/storage.service';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
-import { Readable } from 'stream';
 import { ImageGenerationDto } from './dto/request/image-generation.dto';
 import { ImageGenerationResponseDto } from './dto/response/image-generation.dto';
 import { PrismaService } from 'src/prisma.service';
