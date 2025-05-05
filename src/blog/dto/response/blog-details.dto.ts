@@ -10,6 +10,7 @@ export class BlogDetailsResponseDto {
   like_count: number;
   comment_count: number;
   share_count: number;
+  view_count: number;
   user: BlogUserInfoResponseDto;
   pictures: string[];
   embeddedVideos: string[];

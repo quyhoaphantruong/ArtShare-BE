@@ -10,13 +10,18 @@ import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { BlogModule } from './blog/blog.module';
 import { PrismaModule } from './prisma.module';
+import { ConfigModule } from '@nestjs/config';
 import { CategoriesModule } from './categories/categories.module';
 import { CollectionModule } from './collection/collection.module';
+import { ReportModule } from './report/report.module';
 import { StripeModule } from './stripe/stripe.module';
-import { ConfigModule } from '@nestjs/config';
+import { CommentModule } from './comment/comment.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true, // <-- Makes ConfigService available globally
+    }),
     UserModule,
     AuthModule,
     PostsModule,
@@ -28,6 +33,8 @@ import { ConfigModule } from '@nestjs/config';
     BlogModule,
     CategoriesModule,
     CollectionModule,
+    ReportModule,
+    CommentModule,
     StripeModule,
     ConfigModule.forRoot({
       isGlobal: true, // ✅ optional but useful
