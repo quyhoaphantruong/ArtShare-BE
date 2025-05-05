@@ -83,17 +83,17 @@ export class ArtGenerationService {
   }
 
   private getFinalPrompt(prompt: string, style?: string, lighting?: string, camera?: string): string {
-    let finalPrompt = prompt;
+    const parts: string[] = [prompt];
     if (style) {
-      finalPrompt += `, in the style of ${style}`;
+      parts.push(`in the style of ${style}`);
     }
     if (lighting) {
-      finalPrompt += `, with ${lighting} lighting`;
+      parts.push(`with ${lighting} lighting`);
     }
     // camera meaning camera angle
     if (camera) {
-      finalPrompt += `, taken from a ${camera} angle`;
+      parts.push(`taken from a ${camera} angle`);
     }
-    return finalPrompt;
+    return parts.join(', ');
   }
 }
