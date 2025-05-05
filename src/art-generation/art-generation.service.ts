@@ -7,6 +7,7 @@ import { FileUploadResponse } from 'src/storage/dto/response.dto';
 import { Readable } from 'stream';
 import { ImageGenerationDto } from './dto/request/image-generation.dto';
 import { ImageGenerationResponseDto } from './dto/response/image-generation.dto';
+import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class ArtGenerationService {
@@ -16,13 +17,17 @@ export class ArtGenerationService {
     @Inject('IMAGE_GENERATORS')
     private readonly generators: ImageGeneratorStrategy[],
     private readonly storageService: StorageService,
+    private readonly prismaService: PrismaService,
   ) {
     this.strategies = Object.fromEntries(
       this.generators.map(g => [g.modelKey, g] as [ModelKey, ImageGeneratorStrategy])
     ) as Record<ModelKey, ImageGeneratorStrategy>;
   }
 
-  async generateImages(dto: ImageGenerationDto): Promise<ImageGenerationResponseDto> {
+  async generateImages(
+    dto: ImageGenerationDto,
+    userId: string,
+  ): Promise<ImageGenerationResponseDto> {
     const { modelKey, prompt, n, aspectRatio } = dto;
 
     // get the model based on the modelKey
@@ -56,6 +61,22 @@ export class ArtGenerationService {
     const uploads: FileUploadResponse[] = await this.storageService.uploadFiles(files, 'generated-images');
 
     const urls = uploads.map(upload => upload.url);
+
+    // save info to the database
+    await this.prismaService.artGeneration.create({
+      data: {
+        user_id: userId,
+        user_prompt: prompt,
+        final_prompt: finalPrompt,
+        model_key: modelKey,
+        number_of_images_generated: n,
+        image_urls: urls,
+        aspect_ratio: aspectRatio,
+        style: dto.style,
+        lighting: dto.lighting,
+        camera: dto.camera,
+      },
+    });
 
     return {
       prompt: prompt,
