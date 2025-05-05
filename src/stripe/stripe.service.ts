@@ -95,7 +95,42 @@ export class StripeService {
       simulatedSubscriptionStatus || null;
 
     try {
-      if (!isSimulated) {
+      let user = await this.prisma.user.findUnique({
+        where: { stripe_customer_id: customerId },
+      });
+
+      if (!user && userIdToFind) {
+        this.logger.warn(
+          `Could not find user by stripe_customer_id ${customerId}, attempting lookup by UserRef: ${userIdToFind}`,
+        );
+
+        user = await this.prisma.user.findUnique({
+          where: { id: userIdToFind },
+        });
+      }
+
+      if (!user) {
+        this.logger.error(
+          `Cannot activate subscription: User not found for Customer ${customerId} or UserRef ${userIdToFind}`,
+        );
+
+        return;
+      }
+
+      if (
+        customerId &&
+        (!user.stripe_customer_id || user.stripe_customer_id !== customerId)
+      ) {
+        this.logger.warn(
+          `Updating stripe_customer_id for user ${user.id} from ${user.stripe_customer_id} to ${customerId}`,
+        );
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { stripe_customer_id: customerId },
+        });
+      }
+
+      if (!isSimulated && subscriptionId) {
         try {
           stripeSubscription = await this.stripe.subscriptions.retrieve(
             subscriptionId!,
@@ -105,13 +140,11 @@ export class StripeService {
           );
           determinedStatus = stripeSubscription.status;
 
-          const periodEndDirect = (stripeSubscription as any)
+          const periodEndFromSub = (stripeSubscription as any)
             .current_period_end;
-          if (typeof periodEndDirect === 'number') {
-            periodEndTimestamp = periodEndDirect;
-          }
-
-          if (
+          if (typeof periodEndFromSub === 'number') {
+            periodEndTimestamp = periodEndFromSub;
+          } else if (
             stripeSubscription.latest_invoice &&
             typeof stripeSubscription.latest_invoice === 'object'
           ) {
@@ -157,36 +190,7 @@ export class StripeService {
             `Failed to retrieve subscription details from Stripe.`,
           );
         }
-
-        if (!['active', 'trialing'].includes(stripeSubscription.status)) {
-          this.logger.warn(
-            `Subscription ${subscriptionId} retrieved but status is '${stripeSubscription.status}'. Not activating access.`,
-          );
-
-          if (
-            ['canceled', 'unpaid', 'incomplete_expired'].includes(
-              stripeSubscription.status,
-            )
-          ) {
-            try {
-              await this.prisma.userAccess.delete({
-                where: { stripeSubscriptionId: subscriptionId },
-              });
-              this.logger.log(
-                `Removed potentially stale access record for canceled/ended sub ${subscriptionId}`,
-              );
-            } catch (deleteError) {
-              if ((deleteError as any).code !== 'P2025') {
-                this.logger.error(
-                  `Error removing access record for non-active sub ${subscriptionId}:`,
-                  deleteError,
-                );
-              }
-            }
-          }
-          return;
-        }
-      } else {
+      } else if (isSimulated) {
         if (!determinedPriceId) {
           this.logger.error(
             `DEV SIM Error for Sub ${subscriptionId}: Missing simulatedPriceId.`,
@@ -227,108 +231,100 @@ export class StripeService {
         if (!determinedStatus) determinedStatus = 'active';
       }
 
-      if (
-        !determinedProductId ||
-        periodEndTimestamp === null ||
-        !determinedPriceId
-      ) {
-        throw new InternalServerErrorException(
-          'Could not determine required subscription details.',
+      if (determinedStatus === 'active' || determinedStatus === 'trialing') {
+        this.logger.log(
+          `Status is ${determinedStatus}. Processing Upsert for Sub ${subscriptionId}...`,
         );
-      }
+        if (
+          !determinedProductId ||
+          periodEndTimestamp === null ||
+          !determinedPriceId
+        ) {
+          throw new InternalServerErrorException(
+            'Could not determine required subscription details for activation.',
+          );
+        }
 
-      let user = await this.prisma.user.findUnique({
-        where: { stripe_customer_id: customerId },
-      });
+        let accessLevel: PaidAccessLevel;
 
-      if (!user && userIdToFind) {
-        this.logger.warn(
-          `Could not find user by stripe_customer_id ${customerId}, attempting lookup by UserRef: ${userIdToFind}`,
-        );
+        if (
+          determinedProductId === process.env.ARTISTS_PRODUCT_ID ||
+          determinedProductId === 'prod_YOUR_ARTIST_PRO_ID'
+        ) {
+          accessLevel = PaidAccessLevel.PRO_ARTISTS;
+        } else if (
+          determinedProductId === process.env.STUDIOS_PRODUCT_ID ||
+          determinedProductId === 'prod_YOUR_STUDIO_ID'
+        ) {
+          accessLevel = PaidAccessLevel.STUDIOS;
+        } else {
+          throw new InternalServerErrorException(
+            `Cannot map Stripe product ${determinedProductId} to internal access level.`,
+          );
+        }
 
-        user = await this.prisma.user.findUnique({
-          where: { id: userIdToFind },
-        });
-      }
-
-      if (!user) {
-        this.logger.error(
-          `Cannot activate subscription: User not found for Customer ${customerId} or UserRef ${userIdToFind}`,
-        );
-
-        return;
-      }
-
-      if (!user.stripe_customer_id || user.stripe_customer_id !== customerId) {
-        this.logger.warn(
-          `Updating stripe_customer_id for user ${user.id} from ${user.stripe_customer_id} to ${customerId}`,
-        );
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { stripe_customer_id: customerId },
-        });
-      }
-
-      if (!determinedProductId) {
-        throw new InternalServerErrorException(
-          'Could not determine product ID.',
-        );
-      }
-
-      let accessLevel: PaidAccessLevel;
-      if (determinedProductId === process.env.ARTISTS_PRODUCT_ID) {
-        accessLevel = PaidAccessLevel.PRO_ARTISTS;
-      } else if (determinedProductId === process.env.STUDIOS_PRODUCT_ID) {
-        accessLevel = PaidAccessLevel.STUDIOS;
-      } else {
-        this.logger.error(
-          `Unknown Stripe Product ID ${determinedProductId} for subscription ${subscriptionId}`,
-        );
-        throw new InternalServerErrorException(
-          'Cannot map Stripe product to internal access level.',
-        );
-      }
-
-      if (periodEndTimestamp === null) {
-        throw new InternalServerErrorException(
-          'Could not determine period end.',
-        );
-      }
-
-      const expiresAt = new Date(periodEndTimestamp * 1000);
-
-      const upsertData = {
-        userId: user.id,
-        accessLevel,
-        expiresAt,
-        stripeSubscriptionId: subscriptionId!,
-        stripePriceId: determinedPriceId,
-      };
-      await this.prisma.userAccess.upsert({
-        where: { userId: user.id },
-        update: {
+        const expiresAt = new Date(periodEndTimestamp * 1000);
+        const upsertData = {
+          userId: user.id,
           accessLevel,
           expiresAt,
           stripeSubscriptionId: subscriptionId!,
           stripePriceId: determinedPriceId,
-        },
-        create: upsertData,
-      });
-      this.logger.log(
-        `Successfully upserted UserAccess for user ${user.id}. Sub: ${subscriptionId}, Level: ${accessLevel}, Expires: ${expiresAt.toISOString()}`,
-      );
+        };
+        await this.prisma.userAccess.upsert({
+          where: { userId: user.id },
+          update: {
+            accessLevel,
+            expiresAt,
+            stripeSubscriptionId: subscriptionId!,
+            stripePriceId: determinedPriceId,
+          },
+          create: upsertData,
+        });
+        this.logger.log(
+          `Successfully upserted UserAccess for user ${user.id}. Sub: ${subscriptionId}, Level: ${accessLevel}, Expires: ${expiresAt.toISOString()}`,
+        );
+      } else if (
+        ['canceled', 'unpaid', 'incomplete_expired', 'past_due'].includes(
+          determinedStatus!,
+        ) ||
+        determinedStatus === null
+      ) {
+        this.logger.log(
+          `Status is ${determinedStatus ?? 'ended/deleted'}. Processing Delete for UserAccess related to Sub ${subscriptionId}...`,
+        );
+        try {
+          const deleted = await this.prisma.userAccess.delete({
+            where: { userId: user.id },
+          });
+          if (deleted) {
+            this.logger.log(
+              `Successfully removed UserAccess for user ${user.id} due to subscription ${subscriptionId} status ${determinedStatus}.`,
+            );
+          }
+        } catch (deleteError) {
+          if ((deleteError as any).code === 'P2025') {
+            this.logger.warn(
+              `No UserAccess record found for user ${user.id} / sub ${subscriptionId} to delete (Status: ${determinedStatus}). May have already been removed.`,
+            );
+          } else {
+            this.logger.error(
+              `Error removing UserAccess for user ${user.id} / sub ${subscriptionId}:`,
+              deleteError,
+            );
+          }
+        }
+      } else {
+        this.logger.warn(
+          `Unhandled subscription status '${determinedStatus}' for Sub ${subscriptionId}. No action taken.`,
+        );
+      }
     } catch (error) {
       this.logger.error(
-        `Error during subscription activation processing for Sub ${subscriptionId}:`,
+        `Error during subscription activation/deactivation processing for Sub ${subIdLabel}:`,
         error,
       );
 
-      if (
-        error instanceof Error &&
-        error.message.startsWith('Missing current_period_end')
-      ) {
-        throw new InternalServerErrorException(error.message);
-      }
       if (
         error instanceof InternalServerErrorException ||
         error instanceof BadRequestException
@@ -336,7 +332,7 @@ export class StripeService {
         throw error;
       }
       throw new InternalServerErrorException(
-        'Failed to process subscription activation.',
+        'Failed to process subscription event.',
       );
     }
   }

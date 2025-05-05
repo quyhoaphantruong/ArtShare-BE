@@ -201,8 +201,15 @@ export class StripeController {
           `Webhook: Processing customer.subscription.deleted ${deletedSub.id}.`,
         );
 
-        await this.stripeService.handleSubscriptionCancellation(deletedSub.id);
-
+        await this.stripeService.processSubscriptionActivation(
+          deletedSub.customer as string | null,
+          deletedSub.id,
+          null,
+          deletedSub.metadata?.userId,
+          false,
+          null,
+          'canceled',
+        );
         break;
 
       default:
