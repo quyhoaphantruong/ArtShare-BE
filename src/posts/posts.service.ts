@@ -380,9 +380,9 @@ export class PostsService {
     });
 
     // Sort posts in the same order as returned by Qdrant
-    const sortedPosts = pointIds.map((id) =>
-      posts.find((post) => post.id === id),
-    );
+    const sortedPosts: Post[] = pointIds
+      .map((id) => posts.find((post) => post.id === id))
+      .filter((post) => post !== undefined);
     return plainToInstance(PostListItemResponseDto, sortedPosts);
   }
 
