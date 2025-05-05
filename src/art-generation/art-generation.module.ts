@@ -5,8 +5,11 @@ import { GptImageStrategy } from './image-strategies/gpt-image.strategy';
 import { ImageGeneratorStrategy } from './image-generator.interface';
 import { StorageService } from 'src/storage/storage.service';
 import { S3StorageProvider } from 'src/storage/providers/s3-storage.provider';
+import { PromptService } from './prompt.service';
+import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
+  imports: [AuthModule],
   controllers: [ArtGenerationController],
   providers: [
     ArtGenerationService,
@@ -20,6 +23,7 @@ import { S3StorageProvider } from 'src/storage/providers/s3-storage.provider';
     },
     StorageService,
     S3StorageProvider,
+    PromptService,
   ]
 })
 export class ArtGenerationModule {}
