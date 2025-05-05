@@ -304,3 +304,26 @@ enum ReportStatus {
   REVIEWED
   RESOLVED
 }
+
+model ArtGeneration {
+  id                         Int         @id @default(autoincrement())
+  user_id                    String
+  user_prompt                String
+  final_prompt               String
+  model_key                  String
+  number_of_images_generated Int
+  image_urls                 String[]
+  aspect_ratio               AspectRatio
+  style                      String?
+  lighting                   String?
+  camera                     String?
+  created_at                 DateTime    @default(now())
+
+  @@map("art_generation")
+}
+
+enum AspectRatio {
+  SQUARE
+  LANDSCAPE
+  PORTRAIT
+}

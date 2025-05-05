@@ -15,6 +15,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { CollectionModule } from './collection/collection.module';
 import { ReportModule } from './report/report.module';
 import { CommentModule } from './comment/comment.module';
+import { ArtGenerationModule } from './art-generation/art-generation.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { CommentModule } from './comment/comment.module';
     ConfigModule.forRoot({
       isGlobal: true, // ✅ optional but useful
     }),
+    ArtGenerationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
