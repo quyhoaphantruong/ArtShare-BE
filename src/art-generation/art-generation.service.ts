@@ -1,0 +1,99 @@
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { ImageGenerationResult, ImageGeneratorStrategy, ModelKey } from './image-generator.interface';
+import { nanoid } from 'nanoid';
+import { StorageService } from 'src/storage/storage.service';
+import { FileUploadResponse } from 'src/storage/dto/response.dto';
+import { ImageGenerationDto } from './dto/request/image-generation.dto';
+import { ImageGenerationResponseDto } from './dto/response/image-generation.dto';
+import { PrismaService } from 'src/prisma.service';
+
+@Injectable()
+export class ArtGenerationService {
+  private readonly strategies: Record<ModelKey, ImageGeneratorStrategy>;
+
+  constructor(
+    @Inject('IMAGE_GENERATORS')
+    private readonly generators: ImageGeneratorStrategy[],
+    private readonly storageService: StorageService,
+    private readonly prismaService: PrismaService,
+  ) {
+    this.strategies = Object.fromEntries(
+      this.generators.map(g => [g.modelKey, g] as [ModelKey, ImageGeneratorStrategy])
+    ) as Record<ModelKey, ImageGeneratorStrategy>;
+  }
+
+  async generateImages(
+    dto: ImageGenerationDto,
+    userId: string,
+  ): Promise<ImageGenerationResponseDto> {
+    const { modelKey, prompt, n, aspectRatio } = dto;
+
+    // get the model based on the modelKey
+    const strat = this.strategies[modelKey];
+    if (!strat) {
+      throw new BadRequestException(
+        `Unknown model "${modelKey}". Supported: ${Object.values(ModelKey).join(', ')}`,
+      );
+    }
+    // generate the image
+    const finalPrompt: string = this.getFinalPrompt(prompt, dto.style, dto.lighting, dto.camera);
+    const imageGenerationResult: ImageGenerationResult = await strat.generate({ prompt: finalPrompt, n, aspectRatio });
+    
+    if (!imageGenerationResult || !imageGenerationResult.b64EncodedImages) {
+      throw new BadRequestException('Image generation failed');
+    }
+    const { b64EncodedImages } = imageGenerationResult;
+
+    // save the images to storage
+    const files: Express.Multer.File[] = b64EncodedImages.map(b64 => {
+      const buffer = Buffer.from(b64, 'base64');
+      return {
+        fieldname: 'file',
+        originalname: `${nanoid()}.png`,
+        encoding: '7bit',
+        mimetype: 'image/png',
+        buffer,
+        size: buffer.length,
+      } as Express.Multer.File;
+    });
+    const uploads: FileUploadResponse[] = await this.storageService.uploadFiles(files, 'generated-images');
+
+    const urls = uploads.map(upload => upload.url);
+
+    // save info to the database
+    await this.prismaService.artGeneration.create({
+      data: {
+        user_id: userId,
+        user_prompt: prompt,
+        final_prompt: finalPrompt,
+        model_key: modelKey,
+        number_of_images_generated: n,
+        image_urls: urls,
+        aspect_ratio: aspectRatio,
+        style: dto.style,
+        lighting: dto.lighting,
+        camera: dto.camera,
+      },
+    });
+
+    return {
+      prompt: prompt,
+      urls,
+    };
+  }
+
+  private getFinalPrompt(prompt: string, style?: string, lighting?: string, camera?: string): string {
+    const parts: string[] = [prompt];
+    if (style) {
+      parts.push(`in the style of ${style}`);
+    }
+    if (lighting) {
+      parts.push(`with ${lighting} lighting`);
+    }
+    // camera meaning camera angle
+    if (camera) {
+      parts.push(`taken from a ${camera} angle`);
+    }
+    return parts.join(', ');
+  }
+}
