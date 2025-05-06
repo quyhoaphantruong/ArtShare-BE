@@ -8,7 +8,6 @@ import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session';
 import { PrismaService } from 'src/prisma.service';
-import { PaidAccessLevel } from '@prisma/client';
 
 @Injectable()
 export class StripeService {
@@ -245,44 +244,46 @@ export class StripeService {
           );
         }
 
-        let accessLevel: PaidAccessLevel;
+        const plan = await this.prisma.plan.findUnique({
+          where: { stripeProductId: determinedProductId },
+        });
 
-        if (
-          determinedProductId === process.env.ARTISTS_PRODUCT_ID ||
-          determinedProductId === 'prod_YOUR_ARTIST_PRO_ID'
-        ) {
-          accessLevel = PaidAccessLevel.PRO_ARTISTS;
-        } else if (
-          determinedProductId === process.env.STUDIOS_PRODUCT_ID ||
-          determinedProductId === 'prod_YOUR_STUDIO_ID'
-        ) {
-          accessLevel = PaidAccessLevel.STUDIOS;
-        } else {
+        if (!plan) {
+          this.logger.error(
+            `Cannot activate: No Plan found in DB matching Stripe Product ID ${determinedProductId} for subscription ${subscriptionId}`,
+          );
+
           throw new InternalServerErrorException(
-            `Cannot map Stripe product ${determinedProductId} to internal access level.`,
+            `Configuration error: Plan not found for product ${determinedProductId}.`,
           );
         }
+        this.logger.log(
+          `Mapped Product ${determinedProductId} to Plan ${plan.id} (${plan.name})`,
+        );
 
         const expiresAt = new Date(periodEndTimestamp * 1000);
         const upsertData = {
           userId: user.id,
-          accessLevel,
-          expiresAt,
+          planId: plan.id,
+          expiresAt: expiresAt,
           stripeSubscriptionId: subscriptionId!,
           stripePriceId: determinedPriceId,
+          stripeCustomerId: customerId!,
         };
+
         await this.prisma.userAccess.upsert({
           where: { userId: user.id },
           update: {
-            accessLevel,
-            expiresAt,
+            planId: plan.id,
+            expiresAt: expiresAt,
             stripeSubscriptionId: subscriptionId!,
             stripePriceId: determinedPriceId,
+            stripeCustomerId: customerId!,
           },
           create: upsertData,
         });
         this.logger.log(
-          `Successfully upserted UserAccess for user ${user.id}. Sub: ${subscriptionId}, Level: ${accessLevel}, Expires: ${expiresAt.toISOString()}`,
+          `Successfully upserted UserAccess for user ${user.id}. Plan: ${plan.id}, Expires: ${expiresAt.toISOString()}`,
         );
       } else if (
         ['canceled', 'unpaid', 'incomplete_expired', 'past_due'].includes(
@@ -299,7 +300,7 @@ export class StripeService {
           });
           if (deleted) {
             this.logger.log(
-              `Successfully removed UserAccess for user ${user.id} due to subscription ${subscriptionId} status ${determinedStatus}.`,
+              `Successfully removed UserAccess for user ${user.id}.`,
             );
           }
         } catch (deleteError) {
@@ -424,10 +425,6 @@ export class StripeService {
             `DEV SIM: Running simulated activation for Session ${sessionId}`,
           );
           try {
-            this.logger.debug(
-              `DEV SIM: Assuming payment success for session ${sessionId}.`,
-            );
-
             const simulatedSubscriptionId = `sub_sim_${Date.now()}`;
             this.logger.log(
               `DEV SIM: Using simulated Subscription ID: ${simulatedSubscriptionId}`,
