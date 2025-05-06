@@ -133,4 +133,17 @@ export class PostsController {
       Number(pageSize),
     );
   }
+
+  @Get(':post_id/relevant')
+  async getRelevantPosts(
+    @Param('post_id') postId: number,
+    @Query('page') page: string = '1',
+    @Query('page_size') pageSize: string = '25',
+  ): Promise<PostListItemResponseDto[]> {
+    return this.postsExploreService.getRelevantPosts(
+      Number(postId),
+      Number(page),
+      Number(pageSize),
+    );
+  }
 }

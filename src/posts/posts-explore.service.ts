@@ -14,8 +14,8 @@ export class PostsExploreService {
     private readonly prisma: PrismaService,
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
-  ) { }
-  
+  ) {}
+
   private readonly qdrantCollectionName = 'posts';
 
   @TryCatch()
@@ -187,6 +187,65 @@ export class PostsExploreService {
     const sortedPosts: Post[] = pointIds
       .map((id) => posts.find((post) => post.id === id))
       .filter((post) => post !== undefined);
+    return plainToInstance(PostListItemResponseDto, sortedPosts);
+  }
+
+  @TryCatch()
+  async getRelevantPosts(
+    postId: number,
+    page: number,
+    page_size: number,
+  ): Promise<PostListItemResponseDto[]> {
+    const post: Post | null = await this.prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const relevantQueryText = post.title + ' ' + post.description;
+    const queryEmbedding =
+      await this.embeddingService.generateEmbeddingFromText(relevantQueryText);
+
+    const searchResponse = await this.qdrantClient.query(
+      this.qdrantCollectionName,
+      {
+        prefetch: [
+          {
+            query: queryEmbedding,
+            using: 'images',
+          },
+          {
+            query: queryEmbedding,
+            using: 'description',
+          },
+          {
+            query: queryEmbedding,
+            using: 'title',
+          },
+        ],
+        query: {
+          fusion: 'dbsf',
+        },
+        offset: (page - 1) * page_size,
+        limit: page_size,
+      },
+    );
+
+    const pointIds: number[] = searchResponse.points
+      .map((point) => Number(point.id))
+      .filter((pointId) => !isNaN(pointId))
+      .filter((pointId) => pointId !== postId);
+
+    const posts: Post[] = await this.prisma.post.findMany({
+      where: { id: { in: pointIds } },
+    });
+
+    const sortedPosts = pointIds
+      .map((id) => posts.find((post) => post.id === id))
+      .filter((post) => post !== undefined);
+    
     return plainToInstance(PostListItemResponseDto, sortedPosts);
   }
 }
