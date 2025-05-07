@@ -21,6 +21,7 @@ import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { SearchPostDto } from './dto/request/search-post.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
@@ -58,17 +59,11 @@ export class PostsController {
     return this.postsService.deletePost(Number(postId));
   }
 
-  @Get('search')
+  @Post('search')
   async searchPosts(
-    @Query('q') query: string,
-    @Query('page') page: string = '1', // using string here because somehow default value is not working with number
-    @Query('page_size') page_size: string = '25',
+    @Body() body: SearchPostDto,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsService.searchPosts(
-      query,
-      Number(page),
-      Number(page_size),
-    );
+    return this.postsService.searchPosts(body);
   }
 
   @Post('for-you')
