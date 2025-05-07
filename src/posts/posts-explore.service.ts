@@ -3,10 +3,15 @@ import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { plainToInstance } from 'class-transformer';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { PrismaService } from 'src/prisma.service';
-import { Post } from '@prisma/client';
+import { Post, Prisma } from '@prisma/client';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
+import { SearchPostDto } from './dto/request/search-post.dto';
+
+type PostDetails = Prisma.PostGetPayload<{
+  include: { categories: true; user: true; medias: true };
+}>;
 
 @Injectable()
 export class PostsExploreService {
@@ -141,13 +146,11 @@ export class PostsExploreService {
   }
 
   @TryCatch()
-  async searchPosts(
-    query: string,
-    page: number,
-    page_size: number,
-  ): Promise<PostListItemResponseDto[]> {
+  async searchPosts(body: SearchPostDto): Promise<PostListItemResponseDto[]> {
+    const { q, page = 1, page_size = 25, filter } = body;
+
     const queryEmbedding =
-      await this.embeddingService.generateEmbeddingFromText(query);
+      await this.embeddingService.generateEmbeddingFromText(q);
     const searchResponse = await this.qdrantClient.query(
       this.qdrantCollectionName,
       {
@@ -178,15 +181,21 @@ export class PostsExploreService {
       Number(point.id),
     );
 
-    const posts = await this.prisma.post.findMany({
+    const posts: PostDetails[] = await this.prisma.post.findMany({
       where: { id: { in: pointIds } },
       include: { medias: true, user: true, categories: true },
     });
 
     // Sort posts in the same order as returned by Qdrant
-    const sortedPosts: Post[] = pointIds
-      .map((id) => posts.find((post) => post.id === id))
-      .filter((post) => post !== undefined);
+    let sortedPosts: PostDetails[] = pointIds
+      .map((id) => posts.find((post: PostDetails) => post.id === id))
+      .filter((post): post is PostDetails => post !== undefined);
+
+    if (filter && filter.length > 0) {
+      sortedPosts = sortedPosts.filter((post) =>
+        post.categories.some((category) => filter.includes(category.name)),
+      );
+    }
     return plainToInstance(PostListItemResponseDto, sortedPosts);
   }
 
@@ -245,7 +254,7 @@ export class PostsExploreService {
     const sortedPosts = pointIds
       .map((id) => posts.find((post) => post.id === id))
       .filter((post) => post !== undefined);
-    
+
     return plainToInstance(PostListItemResponseDto, sortedPosts);
   }
 }
