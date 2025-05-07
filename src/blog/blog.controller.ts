@@ -28,6 +28,7 @@ import { RatingResponseDto } from './dto/response/rating-response.dto';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { PaginationDto } from './dto/request/pagination.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('blogs')
@@ -70,6 +71,7 @@ export class BlogController {
   /**
    * GET /blogs/following - Get blogs from followed users, optionally filtered by categories
    */
+  @UseGuards(JwtAuthGuard)
   @Get('following')
   async getFollowingBlogs(
     @Query() query: GetBlogsQueryDto,
@@ -105,6 +107,7 @@ export class BlogController {
   /**
    * GET /blogs/me - Get blogs created by the current user
    */
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   async findMyBlogs(
     @CurrentUser() user: CurrentUserType,
@@ -132,6 +135,7 @@ export class BlogController {
   /**
    * POST /blogs - Create a new blog post (Standard REST, replaces /blogs/create)
    */
+  @UseGuards(JwtAuthGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createBlog(
@@ -144,6 +148,7 @@ export class BlogController {
   /**
    * PATCH /blogs/{id} - Update an existing blog post
    */
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateBlog(
     @Param('id', ParseIntPipe) id: number,
@@ -156,6 +161,7 @@ export class BlogController {
   /**
    * DELETE /blogs/{id} - Delete a blog post
    */
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteBlog(
@@ -169,6 +175,7 @@ export class BlogController {
   /**
    * POST /blogs/{id}/bookmark - Toggle bookmark status for a blog
    */
+  @UseGuards(JwtAuthGuard)
   @Post(':id/bookmark')
   @HttpCode(HttpStatus.OK)
   async toggleBookmark(
@@ -181,6 +188,7 @@ export class BlogController {
   /**
    * POST /blogs/{id}/protect - Apply protection (details TBD)
    */
+  @UseGuards(JwtAuthGuard)
   @Post(':id/protect')
   @HttpCode(HttpStatus.OK)
   async protectBlog(
@@ -193,6 +201,7 @@ export class BlogController {
   /**
    * POST /blogs/{id}/rate - Rate a blog
    */
+  @UseGuards(JwtAuthGuard)
   @Post(':id/rate')
   @HttpCode(HttpStatus.OK)
   async rateBlog(
@@ -201,5 +210,21 @@ export class BlogController {
     @CurrentUser() user: CurrentUserType,
   ): Promise<RatingResponseDto> {
     return this.blogService.rateBlog(id, user.id, rateBlogDto.rating);
+  }
+
+  /**
+   * GET /blogs/user/:username - Get blogs by username
+   */
+  @Get('user/:username')
+  async getBlogsByUsername(
+    @Param('username') username: string,
+    @Query() paging: PaginationDto
+  ): Promise<BlogListItemResponseDto[]> {
+    const { take, skip } = paging;
+    return this.blogService.getBlogsByUsername(
+      username,
+      take,
+      skip,
+    );
   }
 }

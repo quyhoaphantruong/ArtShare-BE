@@ -332,6 +332,12 @@ export class PostsService {
     if (!post) {
       throw new NotFoundException('Post not found');
     }
+
+    // update the view count
+    await this.prisma.post.update({
+      where: { id: postId },
+      data: { view_count: { increment: 1 } },
+    });
     return plainToInstance(PostDetailsResponseDto, post);
   }
 
