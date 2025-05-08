@@ -177,9 +177,9 @@ export class PostsExploreService {
       },
     );
 
-    const pointIds: number[] = searchResponse.points.map((point) =>
-      Number(point.id),
-    );
+    const pointIds: number[] = searchResponse.points
+      .map((point) => Number(point.id))
+      .filter((pointId) => !isNaN(pointId))
 
     const posts: PostDetails[] = await this.prisma.post.findMany({
       where: { id: { in: pointIds } },

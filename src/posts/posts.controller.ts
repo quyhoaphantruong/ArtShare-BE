@@ -141,4 +141,9 @@ export class PostsController {
       Number(pageSize),
     );
   }
+
+  @Post('reinsert-embeddings')
+  async reinsertEmbeddings() {
+    return this.postsManagementService.reinsertPostEmbeddings();
+  }
 }

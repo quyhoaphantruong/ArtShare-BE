@@ -10,6 +10,9 @@ import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
+import axios from 'axios';   
+import { nanoid } from 'nanoid';
+import { Readable } from 'stream';
 
 class VectorParams {
   titleEmbedding?: number[];
@@ -380,5 +383,76 @@ export class PostsManagementService {
     );
 
     console.log('Update operation info:', operationInfo);
+  }
+
+  @TryCatch()
+  async reinsertPostEmbeddings(): Promise<void> {
+    const posts = await this.prisma.post.findMany({
+      include: { medias: true },
+    });
+
+    // find which posts are missing in Qdrant
+    const embeddingIds = await this.getAllPostsEmbeddingsId(
+      posts.map((p) => p.id),
+    );
+    const missing = posts.filter((p) => !embeddingIds.includes(p.id));
+
+    console.log(
+      `Found ${missing.length} posts missing in Qdrant. Re-inserting...`,
+    );
+
+    // for each missing post, build Multer.Files from its image URLs
+    for (const post of missing) {
+      const imageMedias = post.medias.filter(
+        (m) => m.media_type === MediaType.image,
+      );
+
+      const imageFiles: Express.Multer.File[] = await Promise.all(
+        imageMedias.map(async (m) => {
+          const res = await axios.get<ArrayBuffer>(m.url, {
+            responseType: 'arraybuffer',
+          });
+          const buffer = Buffer.from(res.data);
+          const ext = m.url.split('.').pop() || 'png';
+
+          return {
+            fieldname: 'file',
+            originalname: `${nanoid()}.${ext}`,
+            encoding: '7bit',
+            mimetype: `image/${ext}`,
+            buffer,
+            size: buffer.length,
+            destination: '',
+            filename: '',
+            path: '',
+            stream: Readable.from(buffer),
+          } as Express.Multer.File;
+        }),
+      );
+
+      // 4) hand off to your existing savePostEmbedding
+      await this.savePostEmbedding(
+        post.id,
+        post.title,
+        post.description ?? undefined,
+        imageFiles,
+      );
+    }
+  }
+
+  @TryCatch()
+  async getAllPostsEmbeddingsId(postIds: number[]): Promise<number[]> {
+    if (postIds.length === 0) {
+      return [];
+    }
+    const response = await this.qdrantClient.retrieve(
+      this.qdrantCollectionName,
+      {
+        ids: postIds,
+      },
+    );
+
+    // embeddingIds are saved as postIds
+    return response.map((point) => Number(point.id));
   }
 }
