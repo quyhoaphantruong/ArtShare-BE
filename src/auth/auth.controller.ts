@@ -31,6 +31,11 @@ export class AuthController {
     return this.authService.login(body.token);
   }
 
+  @Post('admin-login')
+  async loginAdmin(@Body() { token }: { token: string }) {
+    return this.authService.loginAdmin(token);
+  }
+
   // Route đăng xuất người dùng
   @Post('signout')
   async signout(@Body() body: { uid: string }) {
