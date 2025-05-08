@@ -6,7 +6,7 @@ on:
       - main  # or 'master' depending on your repo
 
 env:
-  REGISTRY: registry.digitalocean.com/YOUR_REGISTRY_NAME
+  REGISTRY: registry.digitalocean.com/art-share
   IMAGE_NAME: artshare-backend
   CONTAINER_NAME: artshare-app
   DROPLET_PORT: 3000  # change if your app runs on a different port
