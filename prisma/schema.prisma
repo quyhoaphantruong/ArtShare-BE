@@ -74,7 +74,7 @@ model Post {
   updated_at    DateTime?    @updatedAt
   is_mature     Boolean      @default(false)
   ai_created    Boolean      @default(false)
-  comment       Comment[]
+
   likes         Like[]
   medias        Media[]
   collections   Collection[]
