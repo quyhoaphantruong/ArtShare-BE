@@ -3,11 +3,13 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session';
 import { PrismaService } from 'src/prisma.service';
+import { Plan, User } from '@prisma/client';
 
 @Injectable()
 export class StripeService {
@@ -62,7 +64,6 @@ export class StripeService {
       `Stripe Service Initialized. Production: ${this.isProduction}. Run Simulation: ${this.runSimulation}`,
     );
   }
-
   async processSubscriptionActivation(
     customerId: string | null | undefined,
     subscriptionId: string | null | undefined,
@@ -71,134 +72,126 @@ export class StripeService {
     isSimulated: boolean = false,
     simulatedPriceId?: string | null,
     simulatedSubscriptionStatus?: Stripe.Subscription.Status,
-  ): Promise<void> {
+    eventType?: string, 
+  ): Promise<{
+    user?: User;
+    plan?: Plan;
+    subscription?: Stripe.Subscription | null;
+    accessRecordUpdated: boolean;
+  }> {
     const userIdToFind = clientReferenceId || metadataUserId;
     const subIdLabel = subscriptionId || '(missing)';
     this.logger.log(
-      `Processing subscription activation. Cust: ${customerId}, Sub: ${subIdLabel}, UserRef: ${userIdToFind}, Simulated: ${isSimulated}`,
+      `Processing subscription event. Cust: ${customerId}, Sub: ${subIdLabel}, UserRef: ${userIdToFind}, Simulated: ${isSimulated}, EventType: ${eventType}`,
     );
 
-    if (!customerId || !subscriptionId) {
-      this.logger.error(
-        `Cannot activate subscription: Missing customerId (${customerId}) or subscriptionId (${subscriptionId})`,
-      );
-
-      return;
+    if (!customerId && !userIdToFind) {
+      this.logger.error(`No customerId or UserRef.`);
+      return { accessRecordUpdated: false };
+    }
+    if (!subscriptionId && !isSimulated) {
+      this.logger.error(`Non-simulated: Missing subscriptionId.`);
+      return { accessRecordUpdated: false };
     }
 
     let stripeSubscription: Stripe.Subscription | null = null;
     let determinedPriceId: string | null = simulatedPriceId || null;
     let determinedProductId: string | null = null;
+    let periodStartTimestamp: number | null = null;
     let periodEndTimestamp: number | null = null;
-    let determinedStatus: Stripe.Subscription.Status | null =
-      simulatedSubscriptionStatus || null;
+    let determinedStatus: Stripe.Subscription.Status | null | undefined =
+      isSimulated ? simulatedSubscriptionStatus : null;
+    let cancelAtPeriodEndFlag: boolean = false;
+
+    let user: User | null = null;
+    let plan: Plan | null = null;
 
     try {
-      let user = await this.prisma.user.findUnique({
-        where: { stripe_customer_id: customerId },
-      });
-
-      if (!user && userIdToFind) {
-        this.logger.warn(
-          `Could not find user by stripe_customer_id ${customerId}, attempting lookup by UserRef: ${userIdToFind}`,
-        );
-
-        user = await this.prisma.user.findUnique({
-          where: { id: userIdToFind },
-        });
-      }
-
+      user = await this.findUserByStripeData(customerId, userIdToFind);
       if (!user) {
         this.logger.error(
-          `Cannot activate subscription: User not found for Customer ${customerId} or UserRef ${userIdToFind}`,
+          `User not found. Cannot proceed for Sub ${subIdLabel}.`,
         );
-
-        return;
+        return { accessRecordUpdated: false };
       }
 
       if (
         customerId &&
         (!user.stripe_customer_id || user.stripe_customer_id !== customerId)
       ) {
-        this.logger.warn(
-          `Updating stripe_customer_id for user ${user.id} from ${user.stripe_customer_id} to ${customerId}`,
-        );
         await this.prisma.user.update({
           where: { id: user.id },
           data: { stripe_customer_id: customerId },
         });
+        this.logger.warn(
+          `Updated stripe_customer_id for user ${user.id} to ${customerId}`,
+        );
       }
 
       if (!isSimulated && subscriptionId) {
         try {
           stripeSubscription = await this.stripe.subscriptions.retrieve(
-            subscriptionId!,
+            subscriptionId,
             {
               expand: ['latest_invoice.lines.data', 'items.data.price.product'],
             },
           );
           determinedStatus = stripeSubscription.status;
+          cancelAtPeriodEndFlag = stripeSubscription.cancel_at_period_end;
 
-          const periodEndFromSub = (stripeSubscription as any)
+          const directPeriodStart = (stripeSubscription as any)
+            .current_period_start;
+          const directPeriodEnd = (stripeSubscription as any)
             .current_period_end;
-          if (typeof periodEndFromSub === 'number') {
-            periodEndTimestamp = periodEndFromSub;
-          } else if (
+          if (typeof directPeriodStart === 'number')
+            periodStartTimestamp = directPeriodStart;
+          if (typeof directPeriodEnd === 'number')
+            periodEndTimestamp = directPeriodEnd;
+
+          if (
+            (periodStartTimestamp === null || periodEndTimestamp === null) &&
             stripeSubscription.latest_invoice &&
             typeof stripeSubscription.latest_invoice === 'object'
           ) {
-            const latestInvoice = stripeSubscription.latest_invoice;
-            const firstLineItem = latestInvoice.lines?.data[0];
-            if (
-              firstLineItem?.period &&
-              typeof firstLineItem.period.end === 'number'
-            ) {
-              periodEndTimestamp = firstLineItem.period.end;
+            const firstLineItem =
+              stripeSubscription.latest_invoice.lines?.data[0];
+            if (firstLineItem?.period) {
+              if (
+                periodStartTimestamp === null &&
+                typeof firstLineItem.period.start === 'number'
+              )
+                periodStartTimestamp = firstLineItem.period.start;
+              if (
+                periodEndTimestamp === null &&
+                typeof firstLineItem.period.end === 'number'
+              )
+                periodEndTimestamp = firstLineItem.period.end;
             }
           }
 
-          if (periodEndTimestamp === null) {
-            this.logger.error(
-              `Subscription ${subscriptionId} lacks valid period end timestamp on latest_invoice line item. Invoice Object: ${JSON.stringify(stripeSubscription.latest_invoice, null, 2)}`,
-            );
-            throw new Error(
-              'Missing period end from subscription invoice details.',
-            );
-          }
+          if (periodStartTimestamp === null || periodEndTimestamp === null)
+            throw new Error('Missing period start/end from subscription.');
 
           const firstItem = stripeSubscription.items?.data[0];
-          const price = firstItem?.price as Stripe.Price | null | undefined;
-          const product = price?.product as
+          const priceObj = firstItem?.price as Stripe.Price | undefined;
+          const productObj = priceObj?.product as
             | Stripe.Product
             | string
-            | null
             | undefined;
-          determinedPriceId = price?.id || null;
-          determinedProductId = product
-            ? typeof product === 'string'
-              ? product
-              : product.id
+          determinedPriceId = priceObj?.id || null;
+          determinedProductId = productObj
+            ? typeof productObj === 'string'
+              ? productObj
+              : productObj.id
             : null;
         } catch (retrieveError) {
-          this.logger.error(
-            `Failed to retrieve Stripe Subscription ${subscriptionId} during activation:`,
-            retrieveError,
-          );
-
           throw new InternalServerErrorException(
-            `Failed to retrieve subscription details from Stripe.`,
+            `Stripe retrieve failed: ${(retrieveError as Error).message}`,
           );
         }
       } else if (isSimulated) {
-        if (!determinedPriceId) {
-          this.logger.error(
-            `DEV SIM Error for Sub ${subscriptionId}: Missing simulatedPriceId.`,
-          );
-          throw new InternalServerErrorException(
-            'Simulation error: priceId not provided.',
-          );
-        }
-
+        if (!determinedPriceId)
+          throw new BadRequestException('Simulation error: priceId needed.');
         try {
           const price = await this.stripe.prices.retrieve(determinedPriceId, {
             expand: ['product'],
@@ -207,260 +200,490 @@ export class StripeService {
             typeof price.product === 'string'
               ? price.product
               : price.product.id;
-
           const now = new Date();
-          if (price.recurring?.interval === 'year') {
-            now.setFullYear(now.getFullYear() + 1);
-          } else {
-            now.setMonth(now.getMonth() + 1);
-          }
-          periodEndTimestamp = Math.floor(now.getTime() / 1000);
-          this.logger.log(
-            `DEV SIM: Estimated expiry for ${price.recurring?.interval}: ${new Date(periodEndTimestamp * 1000).toISOString()}`,
-          );
+          periodStartTimestamp = Math.floor(now.getTime() / 1000);
+          const endDate = new Date(now);
+          if (price.recurring?.interval === 'year')
+            endDate.setFullYear(endDate.getFullYear() + 1);
+          else endDate.setMonth(endDate.getMonth() + 1);
+          periodEndTimestamp = Math.floor(endDate.getTime() / 1000);
         } catch (priceError) {
-          this.logger.error(
-            `DEV SIM: Failed to retrieve price ${determinedPriceId} for simulation:`,
-            priceError,
-          );
+          this.logger.error(priceError);
           throw new InternalServerErrorException(
-            'Simulation error: failed to get price details.',
+            'Simulation error: price details failed.',
           );
         }
         if (!determinedStatus) determinedStatus = 'active';
+        cancelAtPeriodEndFlag = false;
       }
 
       if (determinedStatus === 'active' || determinedStatus === 'trialing') {
-        this.logger.log(
-          `Status is ${determinedStatus}. Processing Upsert for Sub ${subscriptionId}...`,
-        );
         if (
           !determinedProductId ||
           periodEndTimestamp === null ||
-          !determinedPriceId
+          !determinedPriceId ||
+          periodStartTimestamp === null
         ) {
           throw new InternalServerErrorException(
-            'Could not determine required subscription details for activation.',
+            'Incomplete subscription details for activation.',
           );
         }
-
-        const plan = await this.prisma.plan.findUnique({
+        plan = await this.prisma.plan.findUnique({
           where: { stripeProductId: determinedProductId },
         });
-
-        if (!plan) {
-          this.logger.error(
-            `Cannot activate: No Plan found in DB matching Stripe Product ID ${determinedProductId} for subscription ${subscriptionId}`,
-          );
-
+        if (!plan)
           throw new InternalServerErrorException(
-            `Configuration error: Plan not found for product ${determinedProductId}.`,
+            `Config error: Plan not found for product ${determinedProductId}.`,
           );
-        }
-        this.logger.log(
-          `Mapped Product ${determinedProductId} to Plan ${plan.id} (${plan.name})`,
-        );
 
         const expiresAt = new Date(periodEndTimestamp * 1000);
-        const upsertData = {
-          userId: user.id,
-          planId: plan.id,
-          expiresAt: expiresAt,
-          stripeSubscriptionId: subscriptionId!,
-          stripePriceId: determinedPriceId,
-          stripeCustomerId: customerId!,
-        };
+        const cycleStartedAt = new Date(periodStartTimestamp * 1000); 
+
+        const previousUserAccess = await this.prisma.userAccess.findUnique({
+          where: { userId: user.id },
+        });
 
         await this.prisma.userAccess.upsert({
           where: { userId: user.id },
           update: {
             planId: plan.id,
-            expiresAt: expiresAt,
+            expiresAt,
             stripeSubscriptionId: subscriptionId!,
             stripePriceId: determinedPriceId,
             stripeCustomerId: customerId!,
+            cancelAtPeriodEnd: cancelAtPeriodEndFlag,
           },
-          create: upsertData,
+          create: {
+            userId: user.id,
+            planId: plan.id,
+            expiresAt,
+            stripeSubscriptionId: subscriptionId!,
+            stripePriceId: determinedPriceId,
+            stripeCustomerId: customerId!,
+            cancelAtPeriodEnd: cancelAtPeriodEndFlag,
+          },
         });
         this.logger.log(
-          `Successfully upserted UserAccess for user ${user.id}. Plan: ${plan.id}, Expires: ${expiresAt.toISOString()}`,
+          `Upserted UserAccess for ${user.id}. Plan: ${plan.id}, Expires: ${expiresAt.toISOString()}, CancelAtEnd: ${cancelAtPeriodEndFlag}`,
         );
+
+        
+        let shouldResetUsage = false;
+        if (isSimulated && determinedStatus === 'active') {
+          shouldResetUsage = true;
+        } else if (
+          eventType === 'checkout.session.completed' &&
+          (determinedStatus === 'active' || determinedStatus === 'trialing')
+        ) {
+          shouldResetUsage = true;
+        } else if (
+          eventType === 'invoice.paid' &&
+          (determinedStatus === 'active' || determinedStatus === 'trialing')
+        ) {
+          if (
+            !previousUserAccess ||
+            cycleStartedAt >= new Date(previousUserAccess.expiresAt)
+          ) {
+            
+            shouldResetUsage = true;
+          } else {
+            this.logger.log(
+              `Usage Reset SKIPPED (invoice.paid): Not a new cycle. PrevExp: ${previousUserAccess.expiresAt}, NewCycleStart: ${cycleStartedAt}`,
+            );
+          }
+        } else if (
+          eventType === 'customer.subscription.updated' &&
+          (determinedStatus === 'active' || determinedStatus === 'trialing')
+        ) {
+          
+          if (
+            !previousUserAccess ||
+            previousUserAccess.planId !== plan.id ||
+            cycleStartedAt >= new Date(previousUserAccess.expiresAt)
+          ) {
+            shouldResetUsage = true;
+          } else {
+            this.logger.log(
+              `Usage Reset SKIPPED (sub.updated): Not a new cycle or plan change.`,
+            );
+          }
+        }
+
+        if (shouldResetUsage) {
+          await this.upsertUsageRecordsForCycle(
+            user.id,
+            plan,
+            cycleStartedAt,
+            expiresAt,
+          );
+        }
+
+        return {
+          user,
+          plan,
+          subscription: stripeSubscription,
+          accessRecordUpdated: true,
+        };
       } else if (
         ['canceled', 'unpaid', 'incomplete_expired', 'past_due'].includes(
           determinedStatus!,
         ) ||
         determinedStatus === null
       ) {
-        this.logger.log(
-          `Status is ${determinedStatus ?? 'ended/deleted'}. Processing Delete for UserAccess related to Sub ${subscriptionId}...`,
-        );
-        try {
-          const deleted = await this.prisma.userAccess.delete({
-            where: { userId: user.id },
-          });
-          if (deleted) {
-            this.logger.log(
-              `Successfully removed UserAccess for user ${user.id}.`,
-            );
-          }
-        } catch (deleteError) {
-          if ((deleteError as any).code === 'P2025') {
-            this.logger.warn(
-              `No UserAccess record found for user ${user.id} / sub ${subscriptionId} to delete (Status: ${determinedStatus}). May have already been removed.`,
-            );
-          } else {
-            this.logger.error(
-              `Error removing UserAccess for user ${user.id} / sub ${subscriptionId}:`,
-              deleteError,
-            );
-          }
-        }
+        await this.deleteUserAccessAndUsage(user.id, subscriptionId);
+        return { user, accessRecordUpdated: true };
       } else {
         this.logger.warn(
-          `Unhandled subscription status '${determinedStatus}' for Sub ${subscriptionId}. No action taken.`,
+          `Unhandled subscription status '${determinedStatus}' for Sub ${subscriptionId}.`,
         );
       }
     } catch (error) {
       this.logger.error(
-        `Error during subscription activation/deactivation processing for Sub ${subIdLabel}:`,
+        `Error in processSubscriptionActivation for Sub ${subIdLabel}:`,
         error,
       );
-
       if (
         error instanceof InternalServerErrorException ||
-        error instanceof BadRequestException
-      ) {
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      )
         throw error;
-      }
       throw new InternalServerErrorException(
         'Failed to process subscription event.',
       );
     }
+    return { accessRecordUpdated: false };
+  } 
+
+  
+  private async upsertUsageRecordsForCycle(
+    userId: string,
+    plan: Plan,
+    cycleStartDate: Date,
+    cycleEndDate: Date,
+  ): Promise<void> {
+    this.logger.log(
+      `Upserting usage for user ${userId}, plan ${plan.id}, cycle: ${cycleStartDate.toISOString()} - ${cycleEndDate.toISOString()}`,
+    );
+    if (plan.monthlyQuotaCredits !== null) {
+      await this.prisma.userUsage.upsert({
+        where: {
+          userId_featureKey_cycleStartedAt: {
+            userId,
+            featureKey: 'ai_credits',
+            cycleStartedAt: cycleStartDate,
+          },
+        },
+        update: { usedAmount: 0, cycleEndsAt: cycleEndDate },
+        create: {
+          userId,
+          featureKey: 'ai_credits',
+          usedAmount: 0,
+          cycleStartedAt: cycleStartDate,
+          cycleEndsAt: cycleEndDate,
+        },
+      });
+      this.logger.log(`Upserted 'ai_credits' usage for user ${userId}.`);
+    }
+    if (plan.storageQuotaMB !== null) {
+      await this.prisma.userUsage.upsert({
+        where: {
+          userId_featureKey_cycleStartedAt: {
+            userId,
+            featureKey: 'storage_mb',
+            cycleStartedAt: cycleStartDate,
+          },
+        },
+        update: { usedAmount: 0, cycleEndsAt: cycleEndDate },
+        create: {
+          userId,
+          featureKey: 'storage_mb',
+          usedAmount: 0,
+          cycleStartedAt: cycleStartDate,
+          cycleEndsAt: cycleEndDate,
+        },
+      });
+      this.logger.log(`Upserted 'storage_mb' usage for user ${userId}.`);
+    }
   }
 
-  async createCheckoutSession(
+  async createCheckoutOrPortalSession(
     dto: CreateCheckoutSessionDto,
-  ): Promise<{ url: string | null }> {
+  ): Promise<{ url: string | null; type: 'checkout' | 'portal' }> {
     const { email, userId, priceId } = dto;
+    const userIdentifier = userId || email || 'Guest';
     this.logger.log(
-      `Creating checkout session for Price ID: ${priceId}, user: ${userId || email || 'Guest'}`,
+      `Initiating session for Price ID: ${priceId}, user: ${userIdentifier}`,
     );
 
-    const successUrl = `${this.FRONTEND_URL}`;
-    const cancelUrl = `${this.FRONTEND_URL}`;
+    let userRecord: User | null = null;
+    let customerId: string | undefined | null = undefined;
 
-    let customerId: string | undefined = undefined;
-    let initialSession: Stripe.Checkout.Session;
+    if (userId) {
+      userRecord = await this.prisma.user.findUnique({ where: { id: userId } });
+      customerId = userRecord?.stripe_customer_id;
+    }
+    if (!userRecord && email) {
+      userRecord = await this.prisma.user.findUnique({
+        where: { email: email },
+      });
+      customerId = userRecord?.stripe_customer_id;
+    }
 
-    try {
-      await this.stripe.prices.retrieve(priceId);
-      this.logger.log(`Price ID ${priceId} validated.`);
-    } catch (priceError) {
-      if (
-        priceError instanceof Stripe.errors.StripeInvalidRequestError &&
-        priceError.code === 'resource_missing'
-      ) {
-        this.logger.error(`Invalid Price ID requested: ${priceId}`);
-        throw new BadRequestException(`Invalid subscription plan selected.`);
+    if (userRecord && !customerId && email) {
+      const customers = await this.stripe.customers.list({
+        email: email,
+        limit: 1,
+      });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+        await this.prisma.user.update({
+          where: { id: userRecord.id },
+          data: { stripe_customer_id: customerId },
+        });
       }
-      this.logger.error(`Error validating price ID ${priceId}:`, priceError);
-      throw new InternalServerErrorException(
-        'Error validating plan selection.',
+    }
+
+    if (!customerId && email) {
+      const newCustomer = await this.stripe.customers.create({
+        email: email,
+        name: userRecord?.full_name || undefined,
+        metadata: { userId: userRecord?.id || userId || '' },
+      });
+      customerId = newCustomer.id;
+      if (userRecord) {
+        await this.prisma.user.update({
+          where: { id: userRecord.id },
+          data: { stripe_customer_id: customerId },
+        });
+      }
+    }
+    if (!customerId) {
+      throw new BadRequestException(
+        'Cannot initiate subscription without customer details (email or identified user).',
       );
     }
 
-    try {
-      if (email) {
-        const customers = await this.stripe.customers.list({
-          email: email,
-          limit: 1,
-        });
-        if (customers.data.length > 0) {
-          customerId = customers.data[0].id;
-          this.logger.log(`Found existing customer by email: ${customerId}`);
-        } else {
-          const newCustomer = await this.stripe.customers.create({
-            email: email,
-            metadata: { userId: userId || '' },
-          });
-          customerId = newCustomer.id;
-          this.logger.log(`Created new customer: ${customerId}`);
-        }
+    let hasActiveSubscriptionThatIsNotCanceled = false;
+    if (userRecord) {
+      const activeAccess = await this.prisma.userAccess.findUnique({
+        where: { userId: userRecord.id },
+      });
+      if (
+        activeAccess &&
+        activeAccess.expiresAt > new Date() &&
+        !activeAccess.cancelAtPeriodEnd
+      ) {
+        hasActiveSubscriptionThatIsNotCanceled = true;
+        this.logger.log(
+          `User ${userRecord.id} has an active, non-canceled subscription. Redirecting to Portal.`,
+        );
+      }
+    }
+
+    if (hasActiveSubscriptionThatIsNotCanceled) {
+      const portalSession = await this.createCustomerPortalSession(customerId);
+      return { url: portalSession.url, type: 'portal' };
+    } else {
+      this.logger.log(
+        `Proceeding with Checkout Session for customer ${customerId}, Price ID: ${priceId}`,
+      );
+      const successUrl = `${this.FRONTEND_URL}`;
+      const cancelUrl = `${this.FRONTEND_URL}`;
+
+      try {
+        await this.stripe.prices.retrieve(priceId);
+      } catch (priceError) {
+        this.logger.error(priceError);
+
+        throw new BadRequestException(`Invalid subscription plan selected.`);
       }
 
-      initialSession = await this.stripe.checkout.sessions.create({
-        customer: customerId,
-        customer_email: customerId ? undefined : email,
-        client_reference_id: userId || undefined,
-        metadata: { userId: userId || '' },
+      try {
+        const checkoutSession = await this.stripe.checkout.sessions.create({
+          customer: customerId,
+          client_reference_id: userRecord?.id || userId || undefined,
+          metadata: { userId: userRecord?.id || userId || '' },
+          payment_method_types: ['card'],
+          mode: 'subscription',
+          line_items: [{ price: priceId, quantity: 1 }],
+          allow_promotion_codes: true,
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+        });
+        this.logger.log(`Created checkout session: ${checkoutSession.id}`);
 
-        payment_method_types: ['card'],
-        mode: 'subscription',
-        line_items: [
-          {
-            price: priceId,
-            quantity: 1,
-          },
-        ],
-        allow_promotion_codes: true,
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-      });
+        if (this.runSimulation && checkoutSession.id) {
+          const initialClientRefId = checkoutSession.client_reference_id;
+          const initialMetadataUserId = checkoutSession.metadata?.userId;
 
-      this.logger.log(`Created checkout session: ${initialSession.id}`);
+          const currentCustomerIdForSim = customerId;
 
-      if (this.runSimulation && initialSession.id) {
-        const sessionId = initialSession.id;
-
-        const initialClientRefId = initialSession.client_reference_id;
-        const initialMetadataUserId = initialSession.metadata?.userId;
-        const currentCustomerId = customerId;
-
-        this.logger.warn(
-          `DEV MODE: Simulating 'checkout.session.completed' webhook for Session ${sessionId}`,
-        );
-
-        setTimeout(async () => {
-          this.logger.log(
-            `DEV SIM: Running simulated activation for Session ${sessionId}`,
+          this.logger.warn(
+            `DEV MODE (SIMULATION ENABLED): Simulating 'checkout.session.completed' for Session ${checkoutSession.id}`,
           );
-          try {
-            const simulatedSubscriptionId = `sub_sim_${Date.now()}`;
+          setTimeout(async () => {
             this.logger.log(
-              `DEV SIM: Using simulated Subscription ID: ${simulatedSubscriptionId}`,
+              `DEV SIM: Running simulated activation for Session ${checkoutSession.id}`,
             );
+            try {
+              const simulatedSubscriptionId = `sub_sim_${Date.now()}`;
+              await this.processSubscriptionActivation(
+                currentCustomerIdForSim,
+                simulatedSubscriptionId,
+                initialClientRefId,
+                initialMetadataUserId,
+                true,
+                priceId,
+                'active',
+              );
+            } catch (simError) {
+              this.logger.error(
+                `DEV SIM: Error during simulated activation for Session ${checkoutSession.id}:`,
+                simError,
+              );
+            }
+          }, 4000);
+        }
 
-            await this.processSubscriptionActivation(
-              currentCustomerId,
-              simulatedSubscriptionId,
-              initialClientRefId,
-              initialMetadataUserId,
-              true,
-              priceId,
-              'active',
-            );
+        return { url: checkoutSession.url, type: 'checkout' };
+      } catch (error) {
+        this.logger.error('Error creating checkout session:', error);
+        if (error instanceof Stripe.errors.StripeError) {
+          throw new InternalServerErrorException(
+            `Stripe Error: ${error.message}`,
+          );
+        }
+        throw new InternalServerErrorException(
+          'Could not create payment session.',
+        );
+      }
+    }
+  }
+
+  async createCustomerPortalSession(
+    customerId: string,
+  ): Promise<{ url: string }> {
+    const returnUrl = `${this.FRONTEND_URL}`;
+
+    try {
+      const portalSession = await this.stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: returnUrl,
+      });
+      this.logger.log(`Created Customer Portal session for ${customerId}`);
+      return { url: portalSession.url };
+    } catch (error) {
+      this.logger.error(
+        `Stripe Error creating portal session for ${customerId}:`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        'Failed to create Stripe customer portal session.',
+      );
+    }
+  }
+
+  async handleSubscriptionRenewal(invoice: Stripe.Invoice): Promise<void> {
+    const subscriptionId = (invoice as any).subscription as string | null;
+    const customerId = (invoice as any).customer as string | null;
+    const invoiceId = invoice.id;
+    const metadata = (invoice as any).metadata;
+
+    this.logger.log(
+      `Handling renewal & usage reset for invoice.paid: ${invoiceId}, Sub: ${subscriptionId}, Cust: ${customerId}`,
+    );
+
+    if (
+      !subscriptionId ||
+      !customerId ||
+      !subscriptionId.startsWith('sub_') ||
+      !customerId.startsWith('cus_')
+    ) {
+      this.logger.warn(
+        `Invoice ${invoiceId} paid, but missing or invalid subscription or customer ID. Cannot process renewal/reset. Sub: ${subscriptionId}, Cust: ${customerId}`,
+      );
+      return;
+    }
+
+    try {
+      const activationResult = await this.processSubscriptionActivation(
+        customerId,
+        subscriptionId,
+        null,
+        metadata?.userId,
+        false,
+      );
+
+      if (
+        activationResult.accessRecordUpdated &&
+        activationResult.user &&
+        activationResult.plan &&
+        activationResult.subscription
+      ) {
+        let periodStartTimestamp: number | null = null;
+        const subCurrentPeriodStart = (activationResult.subscription as any)
+          .current_period_start;
+
+        if (typeof subCurrentPeriodStart === 'number') {
+          periodStartTimestamp = subCurrentPeriodStart;
+        } else if (
+          activationResult.subscription.latest_invoice &&
+          typeof activationResult.subscription.latest_invoice === 'object'
+        ) {
+          const firstLineItem = (
+            activationResult.subscription.latest_invoice as Stripe.Invoice
+          ).lines?.data[0];
+          if (
+            firstLineItem?.period &&
+            typeof firstLineItem.period.start === 'number'
+          ) {
+            periodStartTimestamp = firstLineItem.period.start;
             this.logger.log(
-              `DEV SIM: Simulated activation finished for Session ${sessionId}`,
-            );
-          } catch (simError) {
-            this.logger.error(
-              `DEV SIM: Error during simulated activation for Session ${sessionId}:`,
-              simError,
+              `Renewal: Using period start from Sub's LATEST INVOICE line item: ${periodStartTimestamp}`,
             );
           }
-        }, 4000);
-      }
+        }
 
-      return { url: initialSession.url };
-    } catch (error) {
-      this.logger.error('Error creating checkout session:', error);
-      if (error instanceof Stripe.errors.StripeError) {
-        throw new InternalServerErrorException(
-          `Stripe Error: ${error.message}`,
+        if (periodStartTimestamp === null) {
+          this.logger.error(
+            `Could not determine new cycle start for Sub ${subscriptionId} on renewal after invoice ${invoiceId} paid.`,
+          );
+          return;
+        }
+
+        const cycleStartDate = new Date(periodStartTimestamp * 1000);
+
+        const userAccessRecord = await this.prisma.userAccess.findUnique({
+          where: { userId: activationResult.user.id },
+        });
+        if (!userAccessRecord || !userAccessRecord.expiresAt) {
+          this.logger.error(
+            'User access record or expiresAt not found after update in renewal for sub ' +
+              subscriptionId,
+          );
+          return;
+        }
+        const cycleEndDate = userAccessRecord.expiresAt;
+
+        this.logger.log(
+          `Resetting usage for user ${activationResult.user.id} / Sub ${subscriptionId} for NEW renewal cycle: ${cycleStartDate.toISOString()} - ${cycleEndDate.toISOString()}`,
+        );
+        await this.upsertUsageRecordsForCycle(
+          activationResult.user.id,
+          activationResult.plan,
+          cycleStartDate,
+          cycleEndDate,
+        );
+      } else {
+        this.logger.warn(
+          `UserAccess not updated or missing data for Sub ${subscriptionId} during renewal (invoice ${invoiceId}), skipping usage reset.`,
         );
       }
-      throw new InternalServerErrorException(
-        'Could not create payment session.',
+    } catch (error) {
+      this.logger.error(
+        `Error handling subscription renewal for Sub ${subscriptionId} / Invoice ${invoiceId}:`,
+        error,
       );
     }
   }
@@ -506,6 +729,63 @@ export class StripeService {
         this.logger.error(
           `Database error removing UserAccess record for subscription ${subscriptionId}:`,
           error,
+        );
+      }
+    }
+  }
+
+  private async findUserByStripeData(
+    stripeCustomerId?: string | null,
+    internalUserId?: string | null,
+  ): Promise<User | null> {
+    if (stripeCustomerId) {
+      const user = await this.prisma.user.findUnique({
+        where: { stripe_customer_id: stripeCustomerId },
+      });
+      if (user) return user;
+    }
+    if (internalUserId) {
+      this.logger.warn(
+        `Could not find user by stripe_customer_id ${stripeCustomerId}, attempting lookup by internal UserRef: ${internalUserId}`,
+      );
+      const user = await this.prisma.user.findUnique({
+        where: { id: internalUserId },
+      });
+      if (user) return user;
+    }
+    this.logger.error(
+      `User not found for Stripe Customer ${stripeCustomerId} or Internal UserRef ${internalUserId}.`,
+    );
+    return null;
+  }
+
+  private async deleteUserAccessAndUsage(
+    userId: string,
+    subscriptionId?: string | null,
+  ): Promise<void> {
+    this.logger.log(
+      `Processing Delete for UserAccess and Usage for user ${userId} / sub ${subscriptionId ?? 'unknown'}`,
+    );
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.userAccess.deleteMany({ where: { userId: userId } });
+        await tx.userUsage.deleteMany({ where: { userId: userId } });
+      });
+      this.logger.log(
+        `Successfully removed UserAccess and UserUsage for user ${userId}.`,
+      );
+    } catch (deleteError) {
+      if ((deleteError as any).code === 'P2025') {
+        this.logger.warn(
+          `No UserAccess record found for user ${userId} to delete.`,
+        );
+      } else {
+        this.logger.error(
+          `Error removing UserAccess/Usage for user ${userId}:`,
+          deleteError,
+        );
+        throw new InternalServerErrorException(
+          'Failed to remove user access records.',
         );
       }
     }

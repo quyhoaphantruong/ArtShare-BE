@@ -9,13 +9,17 @@ import {
   Headers,
   HttpException,
   HttpStatus,
-  InternalServerErrorException,
+  ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { StripeService } from './stripe.service';
 import Stripe from 'stripe';
 import { Request } from 'express';
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session';
+import { CurrentUser } from 'src/auth/decorators/users.decorator';
+import { CurrentUserType } from 'src/auth/types/current-user.type';
+import { PrismaService } from 'src/prisma.service';
 
 @Controller('api/stripe')
 export class StripeController {
@@ -26,6 +30,7 @@ export class StripeController {
   constructor(
     private readonly stripeService: StripeService,
     private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
   ) {
     const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     const retrievedWebhookSecret = this.configService.get<string>(
@@ -69,22 +74,67 @@ export class StripeController {
   )
   async createCheckoutSession(
     @Body() createCheckoutDto: CreateCheckoutSessionDto,
+    @CurrentUser() user: CurrentUserType | null,
   ) {
     this.logger.log(
       `Received create-checkout-session request: ${JSON.stringify(createCheckoutDto)}`,
     );
     try {
-      const session =
-        await this.stripeService.createCheckoutSession(createCheckoutDto);
-      if (!session || !session.url) {
-        throw new InternalServerErrorException(
-          'Failed to create checkout session URL.',
-        );
-      }
-      return { url: session.url };
+      const dtoWithUser = {
+        ...createCheckoutDto,
+        userId: user?.id,
+        email: user?.email || createCheckoutDto.email,
+      };
+
+      const sessionResult =
+        await this.stripeService.createCheckoutOrPortalSession(dtoWithUser);
+
+      return sessionResult;
     } catch (error) {
       this.logger.error(
         `Error in createCheckoutSession controller: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+
+      if (
+        error instanceof ConflictException ||
+        error instanceof BadRequestException
+      ) {
+        throw new HttpException(error.message, error.getStatus());
+      }
+      throw error;
+    }
+  }
+
+  @Post('create-customer-portal-session')
+  async createPortalSession(@CurrentUser() user: CurrentUserType) {
+    this.logger.log(
+      `Received create-customer-portal-session request for user: ${user.id}`,
+    );
+
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+    });
+    const customerId = dbUser?.stripe_customer_id;
+
+    if (!customerId) {
+      this.logger.error(
+        `User ${user.id} requested portal session but has no Stripe Customer ID.`,
+      );
+
+      throw new HttpException(
+        'Billing information not found for this user.',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    try {
+      const portalSession =
+        await this.stripeService.createCustomerPortalSession(customerId);
+      return { url: portalSession.url };
+    } catch (error) {
+      this.logger.error(
+        `Error creating portal session for user ${user.id} / customer ${customerId}: ${(error as Error).message}`,
         (error as Error).stack,
       );
       throw error;
@@ -145,108 +195,149 @@ export class StripeController {
   }
 
   private async processWebhookEvent(event: Stripe.Event): Promise<void> {
+    const eventType = event.type;
+    const eventData = event.data.object as any;
+    const eventId = event.id;
+    this.logger.log(
+      `Webhook Processing: Event ID: ${eventId}, Type: ${eventType}`,
+    );
+
     try {
-      switch (event.type) {
+      let customerId: string | null = null;
+      let subscriptionId: string | null = null;
+      let clientReferenceId: string | null = null;
+      let metadataUserId: string | null | undefined = null;
+
+      switch (eventType) {
         case 'checkout.session.completed':
-          const session = event.data.object as Stripe.Checkout.Session;
+          const session = eventData as Stripe.Checkout.Session;
+          customerId = session.customer as string | null;
+          subscriptionId = session.subscription as string | null;
+          clientReferenceId = session.client_reference_id;
+          metadataUserId = session.metadata?.userId;
           this.logger.log(
-            `Webhook: Processing checkout.session.completed ${session.id}. Sub ID: ${session.subscription}`,
+            `Webhook: Processing ${eventType} ${session.id}. Sub ID: ${subscriptionId}`,
           );
 
-          await this.stripeService.processSubscriptionActivation(
-            session.customer as string | null,
-            session.subscription as string | null,
-            session.client_reference_id,
-            session.metadata?.userId,
-            false,
-          );
-          break;
-
-        case 'invoice.paid':
-          const invoiceData: any = event.data.object;
-          const invoiceId = invoiceData?.id || 'unknown';
-          const subscriptionIdFromInvoice = invoiceData?.subscription;
-          const customerIdFromInvoice = invoiceData?.customer;
-          const metadataFromInvoice = invoiceData?.metadata;
-
-          let validSubscriptionId: string | null = null;
-          let validCustomerId: string | null = null;
-
           if (
-            subscriptionIdFromInvoice &&
-            typeof subscriptionIdFromInvoice === 'string' &&
-            subscriptionIdFromInvoice.startsWith('sub_')
+            subscriptionId &&
+            typeof subscriptionId === 'string' &&
+            subscriptionId.startsWith('sub_')
           ) {
-            validSubscriptionId = subscriptionIdFromInvoice;
-          }
-          if (
-            customerIdFromInvoice &&
-            typeof customerIdFromInvoice === 'string' &&
-            customerIdFromInvoice.startsWith('cus_')
-          ) {
-            validCustomerId = customerIdFromInvoice;
-          }
-
-          if (validSubscriptionId && validCustomerId) {
-            this.logger.log(
-              `Webhook: Processing invoice.paid ${invoiceId} for Sub: ${validSubscriptionId}`,
-            );
-
             await this.stripeService.processSubscriptionActivation(
-              validCustomerId,
-              validSubscriptionId,
-              null,
-              metadataFromInvoice?.userId,
+              customerId,
+              subscriptionId,
+              clientReferenceId,
+              metadataUserId,
               false,
             );
           } else {
             this.logger.warn(
-              `Webhook: Skipping activation for Invoice ${invoiceId} due to missing/invalid subscription (${subscriptionIdFromInvoice}) or customer (${customerIdFromInvoice}) ID after validation.`,
+              `Webhook: Event ${eventType} (ID: ${eventId}) - Skipping activation, subscriptionId ('${subscriptionId}') missing/invalid.`,
+            );
+          }
+          break;
+
+        case 'invoice.paid':
+          const invoiceId = eventData?.id || 'unknown';
+          this.logger.log(
+            `Webhook: Processing ${eventType} for Invoice ${invoiceId}.`,
+          );
+
+          const subIdFromInvoice = eventData?.subscription;
+          const custIdFromInvoice = eventData?.customer;
+
+          this.logger.debug(
+            `Invoice.paid - Extracted Sub ID: ${subIdFromInvoice} (Type: ${typeof subIdFromInvoice})`,
+          );
+          this.logger.debug(
+            `Invoice.paid - Extracted Cus ID: ${custIdFromInvoice} (Type: ${typeof custIdFromInvoice})`,
+          );
+
+          if (
+            subIdFromInvoice &&
+            typeof subIdFromInvoice === 'string' &&
+            subIdFromInvoice.startsWith('sub_') &&
+            custIdFromInvoice &&
+            typeof custIdFromInvoice === 'string' &&
+            custIdFromInvoice.startsWith('cus_')
+          ) {
+            await this.stripeService.handleSubscriptionRenewal(
+              eventData as Stripe.Invoice,
+            );
+          } else {
+            this.logger.warn(
+              `Webhook: Invoice ${invoiceId} paid, but subscription (${subIdFromInvoice}) or customer (${custIdFromInvoice}) ID missing/invalid. Cannot process renewal.`,
             );
           }
           break;
 
         case 'customer.subscription.updated':
-          const updatedSub = event.data.object as Stripe.Subscription;
+          const updatedSub = eventData as Stripe.Subscription;
+          subscriptionId = updatedSub.id;
+          customerId = updatedSub.customer as string | null;
+          metadataUserId = updatedSub.metadata?.userId;
           this.logger.log(
-            `Webhook: Processing customer.subscription.updated ${updatedSub.id}. Status: ${updatedSub.status}, CancelAtPeriodEnd: ${updatedSub.cancel_at_period_end}`,
+            `Webhook: Processing ${eventType} ${subscriptionId}. Status: ${updatedSub.status}, CancelAtEnd: ${updatedSub.cancel_at_period_end}`,
           );
-          await this.stripeService.processSubscriptionActivation(
-            updatedSub.customer as string | null,
-            updatedSub.id,
-            null,
-            updatedSub.metadata?.userId,
-            false,
-          );
+
+          if (
+            subscriptionId &&
+            typeof subscriptionId === 'string' &&
+            subscriptionId.startsWith('sub_')
+          ) {
+            await this.stripeService.processSubscriptionActivation(
+              customerId,
+              subscriptionId,
+              null,
+              metadataUserId,
+              false,
+            );
+          } else {
+            this.logger.warn(
+              `Webhook: Event ${eventType} (ID: ${eventId}) - Skipping activation, subscriptionId ('${subscriptionId}') missing/invalid.`,
+            );
+          }
           break;
 
         case 'customer.subscription.deleted':
-          const deletedSub = event.data.object as Stripe.Subscription;
+          const deletedSub = eventData as Stripe.Subscription;
+          subscriptionId = deletedSub.id;
+          customerId = deletedSub.customer as string | null;
+          metadataUserId = deletedSub.metadata?.userId;
           this.logger.log(
-            `Webhook: Processing customer.subscription.deleted ${deletedSub.id}.`,
+            `Webhook: Processing ${eventType} ${subscriptionId}.`,
           );
 
-          await this.stripeService.processSubscriptionActivation(
-            deletedSub.customer as string | null,
-            deletedSub.id,
-            null,
-            deletedSub.metadata?.userId,
-            false,
-            null,
-            'canceled',
-          );
-
+          if (
+            subscriptionId &&
+            typeof subscriptionId === 'string' &&
+            subscriptionId.startsWith('sub_')
+          ) {
+            await this.stripeService.processSubscriptionActivation(
+              customerId,
+              subscriptionId,
+              null,
+              metadataUserId,
+              false,
+              null,
+              'canceled',
+            );
+          } else {
+            this.logger.warn(
+              `Webhook: Event ${eventType} (ID: ${eventId}) - Skipping activation, subscriptionId ('${subscriptionId}') missing/invalid.`,
+            );
+          }
           break;
 
         default:
-          this.logger.log(`Unhandled webhook event type: ${event.type}`);
+          this.logger.log(`Unhandled webhook event type: ${eventType}`);
       }
     } catch (error) {
       this.logger.error(
-        `Error processing event ${event.id} (Type: ${event.type}) in switch statement:`,
+        `Error processing event ${eventId} (Type: ${eventType}) in switch statement:`,
         error,
       );
-      throw error;
     }
   }
 }

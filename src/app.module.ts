@@ -16,6 +16,8 @@ import { CollectionModule } from './collection/collection.module';
 import { ReportModule } from './report/report.module';
 import { StripeModule } from './stripe/stripe.module';
 import { CommentModule } from './comment/comment.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { UsageModule } from './usage/usage.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { CommentModule } from './comment/comment.module';
     ReportModule,
     CommentModule,
     StripeModule,
+    UsageModule,
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true, // ✅ optional but useful
     }),
