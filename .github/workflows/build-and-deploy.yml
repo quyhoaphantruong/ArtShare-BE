@@ -32,7 +32,7 @@ jobs:
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          username: ${{ secrets.DO_USER }}
           key: ${{ secrets.SSHKEY }}
           passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }}
           port: 22
@@ -44,8 +44,7 @@ jobs:
             docker run -d \
               --name $CONTAINER_NAME \
               -p 80:${{ env.DROPLET_PORT }} \
-              -e DATABASE_URL="${{ secrets.DATABASE_URL_SECRET }}" \
-              -e API_KEY="${{ secrets.API_KEY_SECRET }}" \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e NODE_ENV="production" \ # It's good practice to explicitly set this
               # Add more -e flags for any other secrets/env vars your app needs
               $REGISTRY/$IMAGE_NAME:latest
