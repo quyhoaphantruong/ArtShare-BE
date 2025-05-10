@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -14,20 +15,49 @@ import { StripeWebhookProcessorService } from './stripe-webhook-processor.servic
 @Injectable()
 export class StripeService {
   private logger = new Logger(StripeService.name);
+  private readonly planToPriceIdMap: Record<string, string>;
 
   constructor(
     private readonly stripeCoreService: StripeCoreService,
     private readonly stripeDbService: StripeDbService,
     private readonly stripeWebhookProcessorService: StripeWebhookProcessorService,
-  ) {}
+  ) {
+    this.planToPriceIdMap = {
+      artist_monthly: process.env.STRIPE_ARTIST_MONTHLY_PRICE_ID || '',
+      artist_yearly: process.env.STRIPE_ARTIST_YEARLY_PRICE_ID || '',
+      studio_monthly: process.env.STRIPE_STUDIO_MONTHLY_PRICE_ID || '',
+      studio_yearly: process.env.STRIPE_STUDIO_YEARLY_PRICE_ID || '',
+    };
+  }
+
+  private async getStripePriceIdFromPlanId(
+    internalPlanId: string,
+  ): Promise<string> {
+    const stripePriceId = this.planToPriceIdMap[internalPlanId];
+
+    if (!stripePriceId) {
+      this.logger.error(
+        `Invalid planId: '${internalPlanId}'. No corresponding Stripe Price ID found in the mapping.`,
+      );
+      throw new InternalServerErrorException(
+        `The selected plan (${internalPlanId}) is not available.`,
+      );
+    }
+
+    this.logger.log(
+      `Resolved planId '${internalPlanId}' to Stripe Price ID: ${stripePriceId}`,
+    );
+    return stripePriceId;
+  }
 
   async createCheckoutOrPortalSession(
     dto: CreateCheckoutSessionDto,
   ): Promise<{ url: string | null; type: 'checkout' | 'portal' }> {
-    const { email, userId, priceId } = dto;
+    const { email, userId, planId } = dto;
+    const priceId = await this.getStripePriceIdFromPlanId(planId);
     const userIdentifier = userId || email || 'Guest';
     this.logger.log(
-      `Initiating session for Price ID: ${priceId}, user: ${userIdentifier}`,
+      `Initiating session for Price ID: ${planId}, user: ${userIdentifier}`,
     );
 
     let userRecord: User | null = null;
@@ -119,15 +149,29 @@ export class StripeService {
         throw new BadRequestException(`Invalid subscription plan selected.`);
       }
 
+      const devSuffix = '+location_VN';
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      let customerEmailForStripe: string | undefined = email;
+      if (isDevelopment && customerEmailForStripe) {
+        const emailParts = customerEmailForStripe.split('@');
+        if (emailParts.length === 2) {
+          customerEmailForStripe = `${emailParts[0]}${devSuffix}@${emailParts[1]}`;
+        } else {
+          console.warn(
+            `Received email in unexpected format, cannot add dev suffix: ${customerEmailForStripe}`,
+          );
+        }
+      }
+
       const checkoutSession =
         await this.stripeCoreService.createCheckoutSession({
-          customer: customerId,
           client_reference_id: userRecord?.id || userId || undefined,
           metadata: { userId: userRecord?.id || userId || '' },
           payment_method_types: ['card'],
           mode: 'subscription',
           line_items: [{ price: priceId, quantity: 1 }],
           allow_promotion_codes: true,
+          customer_email: customerEmailForStripe,
           success_url: `${this.stripeCoreService.getFrontendUrl()}`,
           cancel_url: `${this.stripeCoreService.getFrontendUrl()}`,
         });

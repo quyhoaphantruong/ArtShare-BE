@@ -19,7 +19,7 @@ const planData: Prisma.PlanCreateInput[] = [
   {
     id: 'artist_pro',
     name: 'Pro Artists',
-    stripeProductId: process.env.ARTIST_PRODUCT_ID,
+    stripeProductId: process.env.STRIPE_ARTIST_PRODUCT_ID,
     description: 'Great for small businesses',
     imageQualityAllowed: ImageQuality.HIGH,
     monthlyQuotaCredits: 5000,
@@ -34,7 +34,7 @@ const planData: Prisma.PlanCreateInput[] = [
   {
     id: 'studio',
     name: 'Studios',
-    stripeProductId: process.env.STUDIO_PRODUCT_ID,
+    stripeProductId: process.env.STRIPE_STUDIO_PRODUCT_ID,
     description: 'Great for large businesses',
 
     imageQualityAllowed: ImageQuality.HIGH,
