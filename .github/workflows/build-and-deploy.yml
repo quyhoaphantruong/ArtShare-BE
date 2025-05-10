@@ -6,7 +6,7 @@ on:
       - testdeploy
 
 env:
-  REGISTRY: registry.digitalocean.com/art-share
+  REGISTRY: registry.digitalocean.com/artshare-be
   IMAGE_NAME: artshare-backend
   CONTAINER_NAME: artshare-app
   DROPLET_PORT: 3000  # change if your app runs on a different port
