@@ -402,9 +402,10 @@ export class PostsManagementService {
     );
     const missing = posts.filter((p) => !embeddingIds.includes(p.id));
 
-    console.log(
-      `Found ${missing.length} posts missing in Qdrant. Re-inserting...`,
-    );
+    if (missing.length === 0) {
+      console.log('No missing posts found.');
+      return;
+    }
 
     // for each missing post, build Multer.Files from its image URLs
     for (const post of missing) {
