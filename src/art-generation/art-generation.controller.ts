@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { ArtGenerationService } from './art-generation.service';
 import { ImageGenerationDto } from './dto/request/image-generation.dto';
 import { ImageGenerationResponseDto } from './dto/response/image-generation.dto';
@@ -34,7 +34,7 @@ export class ArtGenerationController {
 
   @Patch('/prompt-history/:promptId')
   async updatePromptHistory(
-    @Param('promptId') promptId: number,
+    @Param('promptId', ParseIntPipe) promptId: number,
     @Body() updatePromptHistoryDto: UpdatePromptHistoryDto,
   ): Promise<PromptHistoryDto> {
     return await this.promptService.updatePromptHistory(promptId, updatePromptHistoryDto);
