@@ -3,7 +3,7 @@ name: Build and Deploy to DigitalOcean
 on:
   push:
     branches:
-      - main  # or 'master' depending on your repo
+      - testdeploy
 
 env:
   REGISTRY: registry.digitalocean.com/art-share
@@ -40,4 +40,11 @@ jobs:
             docker pull $REGISTRY/$IMAGE_NAME:latest
             docker stop $CONTAINER_NAME || true
             docker rm $CONTAINER_NAME || true
-            docker run -d --name $CONTAINER_NAME -p 80:${{ env.DROPLET_PORT }} $REGISTRY/$IMAGE_NAME:latest
+            docker run -d \
+              --name $CONTAINER_NAME \
+              -p 80:${{ env.DROPLET_PORT }} \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL_SECRET }}" \
+              -e API_KEY="${{ secrets.API_KEY_SECRET }}" \
+              -e NODE_ENV="production" \ # It's good practice to explicitly set this
+              # Add more -e flags for any other secrets/env vars your app needs
+              $REGISTRY/$IMAGE_NAME:latest
