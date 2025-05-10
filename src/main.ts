@@ -23,6 +23,7 @@ async function bootstrap() {
         enableImplicitConversion: true, // allows "true"/"false" to become boolean
       },
       whitelist: true,
+      forbidNonWhitelisted: true,
     }),
   );
 

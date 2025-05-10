@@ -319,6 +319,7 @@ model ArtGeneration {
   lighting                   String?
   camera                     String?
   created_at                 DateTime    @default(now())
+  updated_at                 DateTime?   @updatedAt
 
   @@map("art_generation")
 }
