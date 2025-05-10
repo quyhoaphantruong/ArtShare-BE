@@ -34,6 +34,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSHKEY }}
+          passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }}
           port: 22
           script: |
             docker login $REGISTRY -u doctl --password ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
