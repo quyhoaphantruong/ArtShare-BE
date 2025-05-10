@@ -43,7 +43,7 @@ RUN yarn install --frozen-lockfile --production
 # ---------- bring compiled code, generated client, and migrations ----------
 COPY --from=builder /usr/src/app/dist    ./dist
 COPY --from=builder /usr/src/app/node_modules/.prisma ./node_modules/.prisma
-COPY .env .env
+# COPY .env .env
 
 EXPOSE 3000
 CMD ["node", "dist/src/main.js"]
