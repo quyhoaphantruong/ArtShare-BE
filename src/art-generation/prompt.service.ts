@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { plainToInstance } from "class-transformer";
 import { PrismaService } from "src/prisma.service";
 import { PromptHistoryDto } from "./dto/response/prompt-history.dto";
@@ -36,7 +36,7 @@ export class PromptService {
       },
     });
     if (!existingPromptHistory) {
-      throw new BadRequestException(`Prompt history with id = ${promptId} not found`);
+      throw new NotFoundException(`Prompt history with id = ${promptId} not found`);
     }
     const updatedPromptHistory = await this.prismaService.artGeneration.update({
       where: {
