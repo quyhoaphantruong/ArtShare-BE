@@ -14,6 +14,7 @@ import { DeleteUsersDTO } from './dto/delete-users.dto';
 import { UpdateUserDTO } from './dto/update-users.dto';
 import { ApiResponse } from 'src/common/api-response';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { Role } from 'src/auth/enums/role.enum';
 
 @Injectable()
 export class UserService {
@@ -32,6 +33,7 @@ export class UserService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
+        id: true, // Good to include the ID
         username: true,
         email: true,
         full_name: true,
@@ -40,6 +42,15 @@ export class UserService {
         followers_count: true,
         followings_count: true,
         birthday: true,
+        roles: { // Select the related UserRole entries
+          select: {
+            role: { // From UserRole, select the related Role
+              select: {
+                role_name: true, // The actual name of the role, e.g., "admin", "user"
+              },
+            },
+          },
+        },
       },
     });
 
@@ -47,17 +58,23 @@ export class UserService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
+    // Map the roles to a simple array of strings (role names)
+    const roleNames = user.roles.map(userRole => userRole.role.role_name as Role); // Cast if necessary
+
     return {
+      id: user.id,
       username: user.username,
       email: user.email,
       full_name: user.full_name,
       profile_picture_url: user.profile_picture_url,
       bio: user.bio,
-      followings_count: user.followings_count,
       followers_count: user.followers_count,
+      followings_count: user.followings_count,
       birthday: user.birthday ?? null,
+      roles: roleNames, // Add the mapped roles here
     };
   }
+
 
   async updateUserProfile(
     userId: string,
