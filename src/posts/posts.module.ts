@@ -1,18 +1,19 @@
 import { Module } from '@nestjs/common';
-import { PostsService } from './posts.service';
+import { PostsManagementService } from './posts-management.service';
 import { PostsController } from './posts.controller';
 import { StorageService } from 'src/storage/storage.service';
 import { S3StorageProvider } from 'src/storage/providers/s3-storage.provider';
-import { EmbeddingService } from 'src/embedding/embedding.service';
 import { AuthModule } from 'src/auth/auth.module';
+import { EmbeddingModule } from 'src/embedding/embedding.module';
+import { PostsExploreService } from './posts-explore.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, EmbeddingModule],
   providers: [
-    PostsService,
+    PostsExploreService,
+    PostsManagementService,
     StorageService,
     S3StorageProvider,
-    EmbeddingService,
   ],
   controllers: [PostsController],
 })

@@ -3,21 +3,18 @@ import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
 import { EmbeddingService } from 'src/embedding/embedding.service';
-import { MediaType, Post, Prisma } from '@prisma/client';
+import { MediaType, Post } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
-import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
+import axios from 'axios';   
 import { PatchThumbnailDto } from './dto/request/patch-thumbnail.dto';
-import { SearchPostDto } from './dto/request/search-post.dto';
+import { nanoid } from 'nanoid';
+import { Readable } from 'stream';
 
-
-type PostDetails = Prisma.PostGetPayload<{
-  include: { categories: true, user: true, medias: true },
-  }>
 class VectorParams {
   titleEmbedding?: number[];
   descriptionEmbedding?: number[];
@@ -30,7 +27,7 @@ export class MediaData {
 }
 
 @Injectable()
-export class PostsService {
+export class PostsManagementService {
   private readonly qdrantCollectionName = 'posts';
   private readonly qdrantClient = new QdrantClient({
     url: process.env.QDRANT_URL,
@@ -258,151 +255,6 @@ export class PostsService {
     return this.prisma.post.delete({ where: { id: postId } });
   }
 
-  @TryCatch()
-  async getForYouPosts(
-    userId: string,
-    page: number,
-    page_size: number,
-    filter: string[],
-  ): Promise<PostListItemResponseDto[]> {
-    const skip = (page - 1) * page_size;
-
-    const whereClause =
-      filter && filter.length > 0
-        ? { categories: { some: { name: { in: filter } } } }
-        : {};
-
-    const posts = await this.prisma.post.findMany({
-      where: whereClause,
-      orderBy: { share_count: 'desc' },
-      take: page_size,
-      skip,
-      include: {
-        medias: true,
-        user: true,
-        categories: true,
-      },
-    });
-
-    return plainToInstance(PostListItemResponseDto, posts);
-  }
-
-  async getFollowingPosts(
-    userId: string,
-    page: number,
-    page_size: number,
-    filter: string[],
-  ): Promise<PostListItemResponseDto[]> {
-    const followingUsers = await this.prisma.follow.findMany({
-      where: { follower_id: userId },
-      select: { following_id: true },
-    });
-
-    const followingIds = followingUsers.map((follow) => follow.following_id);
-
-    const skip = (page - 1) * page_size;
-
-    const whereClause = {
-      user_id: { in: followingIds },
-      ...(filter &&
-        filter.length > 0 && {
-          categories: { some: { name: { in: filter } } },
-        }),
-    };
-
-    const posts = await this.prisma.post.findMany({
-      where: whereClause,
-      skip,
-      take: page_size,
-      include: {
-        medias: true,
-        user: true,
-        categories: true,
-      },
-      orderBy: {
-        created_at: 'desc',
-      },
-    });
-
-    return plainToInstance(PostListItemResponseDto, posts);
-  }
-
-  @TryCatch()
-  async getPostDetails(postId: number): Promise<PostDetailsResponseDto> {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
-      include: { medias: true, user: true, categories: true },
-    });
-
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
-
-    // update the view count
-    await this.prisma.post.update({
-      where: { id: postId },
-      data: { view_count: { increment: 1 } },
-    });
-    return plainToInstance(PostDetailsResponseDto, post);
-  }
-
-  @TryCatch()
-  async searchPosts(
-    body: SearchPostDto,
-  ): Promise<PostListItemResponseDto[]> {
-    const { q, page = 1, page_size = 25, filter } = body;
-
-    const queryEmbedding = await this.embeddingService.generateEmbeddingFromText(q);
-    const searchResponse = await this.qdrantClient.query(
-      this.qdrantCollectionName,
-      {
-        prefetch: [
-          {
-            query: queryEmbedding,
-            using: 'images',
-          },
-          {
-            query: queryEmbedding,
-            using: 'description',
-          },
-          {
-            query: queryEmbedding,
-            using: 'title',
-          },
-        ],
-        query: {
-          fusion: 'dbsf',
-        },
-        offset: (page - 1) * page_size,
-        limit: page_size,
-        // with_payload: true,
-      },
-    );
-
-    const pointIds: number[] = searchResponse.points.map((point) =>
-      Number(point.id),
-    );
-
-    const posts: PostDetails[] = await this.prisma.post.findMany({
-      where: { id: { in: pointIds } },
-      include: { medias: true, user: true, categories: true },
-    });
-
-    // Sort posts in the same order as returned by Qdrant
-    let sortedPosts: PostDetails[] = pointIds
-      .map((id) => posts.find((post: PostDetails) => post.id === id))
-      .filter((post): post is PostDetails => post !== undefined);
-    
-    if (filter && filter.length > 0) {
-      sortedPosts = sortedPosts.filter((post) =>
-        post.categories.some((category) =>
-          filter.includes(category.name),
-        ),
-      );
-    }
-    return plainToInstance(PostListItemResponseDto, sortedPosts);
-  }
-
   private async getVectorParams(
     title: string | undefined,
     description: string | undefined,
@@ -539,37 +391,75 @@ export class PostsService {
   }
 
   @TryCatch()
-  async findPostsByUsername(
-    username: string,
-    page: number,
-    page_size: number,
-  ): Promise<PostListItemResponseDto[]> {
-    const user = await this.prisma.user.findUnique({
-      where: { username: username },
-      select: { id: true },
+  async reinsertPostEmbeddings(): Promise<void> {
+    const posts = await this.prisma.post.findMany({
+      include: { medias: true },
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
+    // find which posts are missing in Qdrant
+    const embeddingIds = await this.getAllPostsEmbeddingsId(
+      posts.map((p) => p.id),
+    );
+    const missing = posts.filter((p) => !embeddingIds.includes(p.id));
+
+    if (missing.length === 0) {
+      console.log('No missing posts found.');
+      return;
     }
 
-    const skip = (page - 1) * page_size;
+    // for each missing post, build Multer.Files from its image URLs
+    for (const post of missing) {
+      const imageMedias = post.medias.filter(
+        (m) => m.media_type === MediaType.image,
+      );
 
-    const posts = await this.prisma.post.findMany({
-      where: { user_id: user.id },
-      skip,
-      take: page_size,
-      include: {
-        medias: true,
-        user: true,
-        categories: true,
-      },
-      orderBy: {
-        created_at: 'desc',
-      },
-    });
+      const imageFiles: Express.Multer.File[] = await Promise.all(
+        imageMedias.map(async (m) => {
+          const res = await axios.get<ArrayBuffer>(m.url, {
+            responseType: 'arraybuffer',
+          });
+          const buffer = Buffer.from(res.data);
+          const ext = m.url.split('.').pop() || 'png';
 
-    return plainToInstance(PostListItemResponseDto, posts);
+          return {
+            fieldname: 'file',
+            originalname: `${nanoid()}.${ext}`,
+            encoding: '7bit',
+            mimetype: `image/${ext}`,
+            buffer,
+            size: buffer.length,
+            destination: '',
+            filename: '',
+            path: '',
+            stream: Readable.from(buffer),
+          } as Express.Multer.File;
+        }),
+      );
+
+      // 4) hand off to your existing savePostEmbedding
+      await this.savePostEmbedding(
+        post.id,
+        post.title,
+        post.description ?? undefined,
+        imageFiles,
+      );
+    }
+  }
+
+  @TryCatch()
+  async getAllPostsEmbeddingsId(postIds: number[]): Promise<number[]> {
+    if (postIds.length === 0) {
+      return [];
+    }
+    const response = await this.qdrantClient.retrieve(
+      this.qdrantCollectionName,
+      {
+        ids: postIds,
+      },
+    );
+
+    // embeddingIds are saved as postIds
+    return response.map((point) => Number(point.id));
   }
 
   async updateThumbnailCropMeta(
@@ -590,5 +480,4 @@ export class PostsService {
       },
     });
   }
-
 }
