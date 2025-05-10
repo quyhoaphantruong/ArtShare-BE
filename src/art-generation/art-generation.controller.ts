@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ArtGenerationService } from './art-generation.service';
 import { ImageGenerationDto } from './dto/request/image-generation.dto';
 import { ImageGenerationResponseDto } from './dto/response/image-generation.dto';
@@ -7,6 +7,7 @@ import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { PromptHistoryDto } from './dto/response/prompt-history.dto';
 import { PromptService } from './prompt.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { UpdatePromptHistoryDto } from './dto/request/update-prompt-history.dto';
 
 @Controller('art-generation')
 @UseGuards(JwtAuthGuard)
@@ -29,5 +30,13 @@ export class ArtGenerationController {
     @CurrentUser() user: CurrentUserType,
   ): Promise<PromptHistoryDto[]> {
     return await this.promptService.getPromptHistory(user.id);
+  }
+
+  @Patch('/prompt-history/:promptId')
+  async updatePromptHistory(
+    @Param('promptId') promptId: number,
+    @Body() updatePromptHistoryDto: UpdatePromptHistoryDto,
+  ): Promise<PromptHistoryDto> {
+    return await this.promptService.updatePromptHistory(promptId, updatePromptHistoryDto);
   }
 }
