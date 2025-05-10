@@ -391,7 +391,6 @@ export class PostsManagementService {
   }
 
   @TryCatch()
-  
   async reinsertPostEmbeddings(): Promise<void> {
     const posts = await this.prisma.post.findMany({
       include: { medias: true },
