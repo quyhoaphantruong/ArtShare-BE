@@ -71,18 +71,18 @@ model Post {
   view_count    Int       @default(0)
   like_count    Int       @default(0)
   thumbnail_url String
-  updated_at    DateTime?    @updatedAt
-  is_mature     Boolean      @default(false)
-  ai_created    Boolean      @default(false)
+  updated_at    DateTime? @updatedAt
+  is_mature     Boolean   @default(false)
+  ai_created    Boolean   @default(false)
 
-  likes         Like[]
-  medias        Media[]
-  collections   Collection[]
-  user          User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  shares        Share[]
-  categories    Category[]   @relation("CategoryToPost")
-  thumbnail_crop_meta  Json? 
-  
+  likes               Like[]
+  medias              Media[]
+  collections         Collection[]
+  user                User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shares              Share[]
+  categories          Category[]   @relation("CategoryToPost")
+  thumbnail_crop_meta Json?
+
   @@index([user_id])
   @@map("post")
 }
