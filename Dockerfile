@@ -46,5 +46,5 @@ COPY --from=builder /usr/src/app/node_modules/.prisma ./node_modules/.prisma
 # COPY .env .env
 
 EXPOSE 3000
-# CMD ["node", "dist/src/main.js"]
-CMD ["sh", "-c", "echo '--- Contents of /usr/src/app (WORKDIR) ---' && ls -lha /usr/src/app && echo '--- Contents of /usr/src/app/dist ---' && ls -R /usr/src/app/dist && echo '--- End of listing ---' && sleep 3600"]
+CMD ["node", "dist/src/main.js"]
+# CMD ["sh", "-c", "echo '--- Contents of /usr/src/app (WORKDIR) ---' && ls -lha /usr/src/app && echo '--- Contents of /usr/src/app/dist ---' && ls -R /usr/src/app/dist && echo '--- End of listing ---' && sleep 3600"]
