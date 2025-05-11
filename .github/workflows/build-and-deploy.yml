@@ -9,8 +9,7 @@ env:
   IMAGE_NAME: artshare-backend
   CONTAINER_NAME: artshare-app
   DROPLET_PORT: 3000
-  # CHANGED: Use a path on persistent storage, not /tmp
-  DROPLET_TARGET_PATH: /opt/deploy_artifacts # Or /srv/deploy_artifacts or /root/deploy_artifacts
+  DROPLET_TARGET_PATH: /opt/deploy_artifacts # Using persistent storage
 
 jobs:
   build-and-deploy:
@@ -39,19 +38,27 @@ jobs:
           TAR_FILENAME="${{ env.IMAGE_NAME }}-${{ steps.build_image.outputs.image_tag }}.tar"
           echo "Debug: Constructed TAR_FILENAME = '$TAR_FILENAME'"
           if [ -z "$TAR_FILENAME" ] || [ "$TAR_FILENAME" == ".tar" ] || [ "$TAR_FILENAME" == "-.tar" ]; then echo "::error::TAR_FILENAME is empty or malformed: '$TAR_FILENAME'"; exit 1; fi
+          
           echo "Saving image ${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }} to $(pwd)/$TAR_FILENAME"
           docker save "${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }}" -o "$TAR_FILENAME"
           SAVED_STATUS=$?
           if [ $SAVED_STATUS -ne 0 ]; then echo "::error::Docker save command failed with status $SAVED_STATUS!"; ls -lha .; exit $SAVED_STATUS; fi
           echo "Docker save completed successfully."
+          
           echo "Verifying file existence and permissions for '$TAR_FILENAME' before chmod:"
           ls -lha "$TAR_FILENAME"
           if [ ! -f "$TAR_FILENAME" ]; then echo "::error::Tar file '$TAR_FILENAME' was NOT created by docker save!"; ls -lha .; exit 1; fi
+          
           echo "Attempting: chmod 644 \"$TAR_FILENAME\""
           chmod 644 "$TAR_FILENAME"
           CHMOD_STATUS=$?
           if [ $CHMOD_STATUS -ne 0 ]; then echo "::error::chmod command failed with status $CHMOD_STATUS for file '$TAR_FILENAME'!"; ls -lha "$TAR_FILENAME"; exit $CHMOD_STATUS; fi
           echo "Set permissions (644) on $TAR_FILENAME successfully."
+          
+          # ====> ADDED SIZE CHECK <====
+          echo "Size of saved tar file '$TAR_FILENAME':"
+          ls -lh "$TAR_FILENAME" 
+          
           echo "IMAGE_TAR_FILENAME_ENV=$TAR_FILENAME" >> $GITHUB_ENV
 
       - name: Verify tar file before SCP
@@ -69,11 +76,11 @@ jobs:
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.DO_USER }}
+          username: ${{ secrets.DO_USER }} # Should be root as per your confirmation
           key: ${{ secrets.SSHKEY }}
           passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }} # Ensure this secret is set if your key is passphrase protected
           source: "${{ env.IMAGE_TAR_FILENAME_ENV }}"
-          target: "${{ env.DROPLET_TARGET_PATH }}" # This now points to the new path
+          target: "${{ env.DROPLET_TARGET_PATH }}"
 
       - name: Deploy on Droplet
         uses: appleboy/ssh-action@v1.0.3
@@ -81,13 +88,13 @@ jobs:
           REMOTE_IMAGE_NAME: ${{ env.IMAGE_NAME }}
           REMOTE_CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
           REMOTE_DROPLET_PORT: ${{ env.DROPLET_PORT }}
-          REMOTE_TARGET_PATH: ${{ env.DROPLET_TARGET_PATH }} # This now points to the new path
+          REMOTE_TARGET_PATH: ${{ env.DROPLET_TARGET_PATH }}
           REMOTE_IMAGE_TAR_FILENAME: ${{ env.IMAGE_TAR_FILENAME_ENV }}
           REMOTE_IMAGE_TAG: ${{ steps.build_image.outputs.image_tag }}
           REMOTE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.DO_USER }}
+          username: ${{ secrets.DO_USER }} # Should be root
           key: ${{ secrets.SSHKEY }}
           passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }} # Ensure this secret is set if your key is passphrase protected
           port: 22
@@ -95,14 +102,15 @@ jobs:
             set -e
             echo "--- Starting deployment on Droplet ---"
             
-            # Create the target directory on the Droplet if it doesn't exist
-            # Ensure your DO_USER has permissions to create/write to this directory
-            # If DO_USER is not root, you might need 'sudo mkdir' and 'sudo chown'
             echo "Ensuring target directory $REMOTE_TARGET_PATH exists..."
-            mkdir -p "$REMOTE_TARGET_PATH" # The -p flag creates parent directories if needed and doesn't error if it exists
+            mkdir -p "$REMOTE_TARGET_PATH"
 
             FULL_IMAGE_TAR_PATH="$REMOTE_TARGET_PATH/$REMOTE_IMAGE_TAR_FILENAME"
             FULL_IMAGE_NAME_WITH_TAG="$REMOTE_IMAGE_NAME:$REMOTE_IMAGE_TAG"
+
+            echo "Current disk space on Droplet before load:"
+            df -h "$REMOTE_TARGET_PATH" # Show space for the target path's filesystem
+            df -h / # Show space for root filesystem
 
             echo "Loading Docker image from $FULL_IMAGE_TAR_PATH..."
             docker load -i "$FULL_IMAGE_TAR_PATH"
