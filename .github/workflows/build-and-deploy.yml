@@ -3,7 +3,7 @@ name: Deploy NestJS App to DO Droplet via SCP
 on:
   push:
     branches:
-      - main # Or your preferred deployment branch (e.g., develop, staging)
+      - testdeploy # Or your preferred deployment branch (e.g., develop, staging)
 
 # Define environment variables used throughout the workflow
 # IMAGE_NAME: The name for your Docker image (e.g., artshare-backend)
@@ -25,7 +25,7 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        
+
       - name: Build Docker image
         id: build_image
         run: |
