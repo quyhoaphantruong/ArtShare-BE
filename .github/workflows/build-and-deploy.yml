@@ -3,18 +3,13 @@ name: Deploy NestJS App to DO Droplet via SCP
 on:
   push:
     branches:
-      - testdeploy
+      - testdeploy # Or your preferred deployment branch
 
-# Define environment variables used throughout the workflow
-# IMAGE_NAME: The name for your Docker image (e.g., artshare-backend)
-# CONTAINER_NAME: The name for your running Docker container on the droplet (e.g., artshare-app)
-# DROPLET_PORT: The port your NestJS application listens on inside the container (e.g., 3000)
-# DROPLET_TARGET_PATH: A temporary path on your droplet to copy the image tarball (e.g., /tmp or /root/deploy_images)
 env:
   IMAGE_NAME: artshare-backend
   CONTAINER_NAME: artshare-app
-  DROPLET_PORT: 3000 # Important: Ensure this matches your NestJS app's port
-  DROPLET_TARGET_PATH: /tmp # Temporary path on the droplet for the tar file
+  DROPLET_PORT: 3000
+  DROPLET_TARGET_PATH: /tmp
 
 jobs:
   build-and-deploy:
@@ -27,126 +22,111 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
-        id: build_image
+        id: build_image # Step ID
         run: |
           IMAGE_TAG="${{ github.sha }}"
           echo "Building image: ${{ env.IMAGE_NAME }}:$IMAGE_TAG"
           docker build -t "${{ env.IMAGE_NAME }}:$IMAGE_TAG" .
-          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          if [ $? -ne 0 ]; then
+            echo "::error::Docker build failed!"
+            exit 1
+          fi
+          echo "Docker build completed successfully."
+          # Set the output for this step, named 'image_tag'
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
       - name: Save Docker image to tar
-        id: save_tar
+        id: save_tar # Step ID
         run: |
-          # Construct the tar filename using the output from the build_image step
-          # Ensure steps.build_image.outputs.image_tag_output is correctly populated from the previous step
-          if [ -z "${{ steps.build_image.outputs.image_tag_output }}" ]; then
-            echo "::error::IMAGE_TAG output from build_image step is empty!"
-            exit 1
-          fi
-          if [ -z "${{ env.IMAGE_NAME }}" ]; then
-            echo "::error::IMAGE_NAME environment variable is empty!"
+          # Check if the output from the 'build_image' step is available
+          if [ -z "${{ steps.build_image.outputs.image_tag }}" ]; then # CORRECTED: Check for 'image_tag'
+            echo "::error::Output 'image_tag' from build_image step is empty!" # CORRECTED: Error message
             exit 1
           fi
 
-          TAR_FILENAME="${{ env.IMAGE_NAME }}-${{ steps.build_image.outputs.image_tag_output }}.tar"
-          echo "Debug: Constructed TAR_FILENAME = '$TAR_FILENAME'" # Debug Line 1
+          # Construct the tar filename using the 'image_tag' output
+          TAR_FILENAME="${{ env.IMAGE_NAME }}-${{ steps.build_image.outputs.image_tag }}.tar" # CORRECTED: Use 'image_tag'
+          echo "Debug: Constructed TAR_FILENAME = '$TAR_FILENAME'"
 
-          # Check if TAR_FILENAME is empty right after construction
           if [ -z "$TAR_FILENAME" ] || [ "$TAR_FILENAME" == ".tar" ] || [ "$TAR_FILENAME" == "-.tar" ]; then
-            echo "::error::TAR_FILENAME is empty or malformed after construction: '$TAR_FILENAME'"
-            echo "IMAGE_NAME was: '${{ env.IMAGE_NAME }}'"
-            echo "image_tag_output was: '${{ steps.build_image.outputs.image_tag_output }}'"
+            echo "::error::TAR_FILENAME is empty or malformed: '$TAR_FILENAME'"
             exit 1
           fi
 
-          echo "Attempting to save image ${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag_output }} to $(pwd)/$TAR_FILENAME"
-          docker save "${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag_output }}" -o "$TAR_FILENAME"
+          echo "Saving image ${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }} to $(pwd)/$TAR_FILENAME"
+          docker save "${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }}" -o "$TAR_FILENAME"
           
-          SAVED_STATUS=$? # Capture exit status immediately
+          SAVED_STATUS=$?
           if [ $SAVED_STATUS -ne 0 ]; then
             echo "::error::Docker save command failed with status $SAVED_STATUS!"
-            ls -lha . # List directory contents to see if the file was partially created or if other issues exist
+            ls -lha . # List directory contents for debugging
             exit $SAVED_STATUS
           fi
           echo "Docker save completed successfully."
 
-          echo "Debug: TAR_FILENAME before ls = '$TAR_FILENAME'" # Debug Line 2
           echo "Verifying file existence and permissions for '$TAR_FILENAME' before chmod:"
-          ls -lha "$TAR_FILENAME" # See if the file exists and its current permissions
+          ls -lha "$TAR_FILENAME"
           if [ ! -f "$TAR_FILENAME" ]; then
-             echo "::error::Docker save seemed to succeed, but tar file '$TAR_FILENAME' was NOT created!"
-             ls -lha . # List directory contents again
+             echo "::error::Tar file '$TAR_FILENAME' was NOT created by docker save!"
+             ls -lha .
              exit 1
           fi
           
-          echo "Debug: TAR_FILENAME before chmod = '$TAR_FILENAME'" # Debug Line 3
-          # Ensure TAR_FILENAME is not empty before calling chmod
-          if [ -z "$TAR_FILENAME" ]; then
-            echo "::error::TAR_FILENAME became empty before chmod! This should not happen."
-            exit 1
-          fi
-
           echo "Attempting: chmod 644 \"$TAR_FILENAME\""
           chmod 644 "$TAR_FILENAME"
           CHMOD_STATUS=$?
           if [ $CHMOD_STATUS -ne 0 ]; then
             echo "::error::chmod command failed with status $CHMOD_STATUS for file '$TAR_FILENAME'!"
-            ls -lha "$TAR_FILENAME" # Show permissions again if chmod failed
+            ls -lha "$TAR_FILENAME"
             exit $CHMOD_STATUS
           fi
           echo "Set permissions (644) on $TAR_FILENAME successfully."
           
           # Set the tar filename as an environment variable for subsequent steps
           echo "IMAGE_TAR_FILENAME_ENV=$TAR_FILENAME" >> $GITHUB_ENV
-          echo "Outputting tar_filename_output=$TAR_FILENAME"
-          echo "tar_filename_output=$TAR_FILENAME" >> $GITHUB_OUTPUT
 
-      - name: Verify tar file before SCP # ADD THIS ENTIRE STEP FOR DEBUGGING
+      - name: Verify tar file before SCP
         run: |
           echo "Current directory: $(pwd)"
           echo "Workspace contents:"
           ls -lha .
           echo "---"
-          echo "Checking saved tar file: ${{ env.IMAGE_TAR_FILENAME_ENV }}" # Use the env var set above
-          # Check if file exists and list its permissions
+          echo "Checking saved tar file from env: ${{ env.IMAGE_TAR_FILENAME_ENV }}"
           ls -lha "${{ env.IMAGE_TAR_FILENAME_ENV }}"
           if [ ! -f "${{ env.IMAGE_TAR_FILENAME_ENV }}" ]; then
-            echo "::error::Tar file ${{ env.IMAGE_TAR_FILENAME_ENV }} not found!"
+            echo "::error::Tar file ${{ env.IMAGE_TAR_FILENAME_ENV }} not found before SCP!"
             exit 1
           fi
-          echo "Tar file exists and permissions are listed above. Should be readable (e.g., -rw-r--r--)."
+          echo "Tar file exists and permissions are listed above."
 
       - name: Copy Docker image tar to Droplet
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.DO_USER }} # Your SSH username for the Droplet
-          key: ${{ secrets.SSHKEY }}         # Your SSH private key
-          source: "${{ env.IMAGE_TAR_FILENAME_ENV  }}" # The tar file created in the previous step
-          target: "${{ env.DROPLET_TARGET_PATH }}"  # Directory on the Droplet to copy the tar file
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.SSHKEY }}
+          source: "${{ env.IMAGE_TAR_FILENAME_ENV }}" # Use the env var
+          target: "${{ env.DROPLET_TARGET_PATH }}"
 
       - name: Deploy on Droplet
         uses: appleboy/ssh-action@v1.0.3
-        # Pass necessary variables from GitHub Actions to the script's environment on the Droplet
         env:
           REMOTE_IMAGE_NAME: ${{ env.IMAGE_NAME }}
           REMOTE_CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
           REMOTE_DROPLET_PORT: ${{ env.DROPLET_PORT }}
           REMOTE_TARGET_PATH: ${{ env.DROPLET_TARGET_PATH }}
-          REMOTE_IMAGE_TAR_FILENAME: ${{ env.IMAGE_TAR_FILENAME_ENV  }} # Passed from previous step
-          REMOTE_IMAGE_TAG: ${{ steps.build_image.outputs.image_tag_output  }}
-          REMOTE_DATABASE_URL: ${{ secrets.DATABASE_URL }} # Your database connection string
+          REMOTE_IMAGE_TAR_FILENAME: ${{ env.IMAGE_TAR_FILENAME_ENV }} # Use the env var
+          REMOTE_IMAGE_TAG: ${{ steps.build_image.outputs.image_tag }}   # CORRECTED: Use 'image_tag'
+          REMOTE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.SSHKEY }}
-          # passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }} # Uncomment if your SSH key has a passphrase
+          # passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }}
           port: 22
           script: |
-            set -e # Exit immediately if a command exits with a non-zero status
-
+            set -e
             echo "--- Starting deployment on Droplet ---"
-
             FULL_IMAGE_TAR_PATH="$REMOTE_TARGET_PATH/$REMOTE_IMAGE_TAR_FILENAME"
             FULL_IMAGE_NAME_WITH_TAG="$REMOTE_IMAGE_NAME:$REMOTE_IMAGE_TAG"
 
@@ -157,11 +137,11 @@ jobs:
             rm "$FULL_IMAGE_TAR_PATH"
 
             echo "Checking for existing container: $REMOTE_CONTAINER_NAME..."
-            if [ "$(docker ps -q -f name="^/$REMOTE_CONTAINER_NAME$")" ]; then # More precise name matching
+            if [ "$(docker ps -q -f name="^/$REMOTE_CONTAINER_NAME$")" ]; then
               echo "Stopping container $REMOTE_CONTAINER_NAME..."
               docker stop "$REMOTE_CONTAINER_NAME"
             fi
-            if [ "$(docker ps -aq -f name="^/$REMOTE_CONTAINER_NAME$")" ]; then # More precise name matching
+            if [ "$(docker ps -aq -f name="^/$REMOTE_CONTAINER_NAME$")" ]; then
               echo "Removing container $REMOTE_CONTAINER_NAME..."
               docker rm "$REMOTE_CONTAINER_NAME"
             fi
@@ -174,10 +154,5 @@ jobs:
               -e DATABASE_URL="$REMOTE_DATABASE_URL" \
               -e NODE_ENV="production" \
               "$FULL_IMAGE_NAME_WITH_TAG"
-
-            # Optional: Clean up old, unused (dangling) Docker images to save space
-            # Use with caution, especially if you might need to quickly roll back to an older image manually on the server
-            # echo "Cleaning up dangling Docker images..."
-            # docker image prune -af
 
             echo "--- Deployment on Droplet completed ---"
