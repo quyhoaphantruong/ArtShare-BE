@@ -3,7 +3,7 @@ name: Deploy NestJS App to DO Droplet via SCP
 on:
   push:
     branches:
-      - testdeploy # Or your preferred deployment branch (e.g., develop, staging)
+      - testdeploy
 
 # Define environment variables used throughout the workflow
 # IMAGE_NAME: The name for your Docker image (e.g., artshare-backend)
@@ -35,6 +35,7 @@ jobs:
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Save Docker image to tar
+        id: save_tar
         run: |
           IMAGE_TAR_FILENAME="${{ env.IMAGE_NAME }}-${{ steps.build_image.outputs.image_tag }}.tar"
           echo "Saving image ${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }} to $IMAGE_TAR_FILENAME"
@@ -66,7 +67,7 @@ jobs:
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.SSHKEY }}
           # passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }} # Uncomment if your SSH key has a passphrase
-          port: 22 # Your Droplet's SSH port (default is 22)
+          port: 22
           script: |
             set -e # Exit immediately if a command exits with a non-zero status
 
