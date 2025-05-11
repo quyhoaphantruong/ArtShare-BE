@@ -17,8 +17,6 @@ RUN yarn install --frozen-lockfile
 # copy schema first (in case you decided not to commit migrations yet)
 COPY prisma ./prisma
 RUN yarn prisma generate
-RUN ls -R /usr/src/app/dist
-RUN echo "------------------------------------------------------"
 
 # ---------- copy source & compile ----------
 COPY . .
