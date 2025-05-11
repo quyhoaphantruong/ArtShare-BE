@@ -84,49 +84,57 @@ jobs:
 
       - name: Deploy on Droplet
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          # These variables are set for the action's execution environment.
-          # The script running on the remote server should inherit them.
-          VAR_IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          VAR_CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
-          VAR_DROPLET_PORT: ${{ env.DROPLET_PORT }}
-          VAR_TARGET_PATH_ON_DROPLET: ${{ env.DROPLET_TARGET_PATH }} # Renamed for clarity in debugging
-          VAR_IMAGE_TAR_FILENAME: ${{ env.IMAGE_TAR_FILENAME_ENV }}
-          VAR_IMAGE_TAG: ${{ steps.build_image.outputs.image_tag }}
-          VAR_DATABASE_URL: ${{ secrets.DATABASE_URL }}
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.SSHKEY }}
-          passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }} # Ensure this secret is set if your key is passphrase protected
+          passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }}
           port: 22
           script: |
             set -e # Exit immediately if a command exits with a non-zero status
 
+            # Define variables on the remote server using values processed by GitHub Actions
+            # These values are injected BEFORE the script is sent to the remote server.
+            DEPLOY_TARGET_PATH="${{ env.DROPLET_TARGET_PATH }}"
+            DEPLOY_IMAGE_TAR_FILENAME="${{ env.IMAGE_TAR_FILENAME_ENV }}" # From GITHUB_ENV in 'Save' step
+            DEPLOY_IMAGE_TAG="${{ steps.build_image.outputs.image_tag }}"  # From 'build_image' step output
+            DEPLOY_IMAGE_NAME="${{ env.IMAGE_NAME }}"
+            DEPLOY_CONTAINER_NAME="${{ env.CONTAINER_NAME }}"
+            DEPLOY_DROPLET_PORT="${{ env.DROPLET_PORT }}"
+            DEPLOY_DATABASE_URL="${{ secrets.DATABASE_URL }}"
+
             echo "--- Starting deployment on Droplet ---"
-            echo "--- Debugging Remote Environment Variables ---"
-            echo "Value of VAR_TARGET_PATH_ON_DROPLET is: '$VAR_TARGET_PATH_ON_DROPLET'"
-            echo "Value of VAR_IMAGE_TAR_FILENAME is: '$VAR_IMAGE_TAR_FILENAME'"
-            echo "Value of VAR_IMAGE_TAG is: '$VAR_IMAGE_TAG'"
+            echo "--- Verifying Variables on Remote Server ---"
+            echo "Target Path: '$DEPLOY_TARGET_PATH'"
+            echo "Image Tar Filename: '$DEPLOY_IMAGE_TAR_FILENAME'"
+            echo "Image Tag: '$DEPLOY_IMAGE_TAG'"
+            echo "Image Name: '$DEPLOY_IMAGE_NAME'"
+            echo "Container Name: '$DEPLOY_CONTAINER_NAME'"
+            echo "Droplet Port: '$DEPLOY_DROPLET_PORT'"
             echo "--------------------------------------------"
 
             # Explicitly check if the target path variable is empty
-            if [ -z "$VAR_TARGET_PATH_ON_DROPLET" ]; then
-              echo "::error:: Critical Error: VAR_TARGET_PATH_ON_DROPLET is empty on the remote server!"
-              echo "This means the env var was not passed correctly to the SSH script."
-              echo "Printing all 'VAR_' prefixed environment variables available to the script:"
-              printenv | grep '^VAR_'
+            if [ -z "$DEPLOY_TARGET_PATH" ]; then
+              echo "::error:: Critical Error: DEPLOY_TARGET_PATH is empty on the remote server!"
+              exit 1
+            fi
+            if [ -z "$DEPLOY_IMAGE_TAR_FILENAME" ]; then
+              echo "::error:: Critical Error: DEPLOY_IMAGE_TAR_FILENAME is empty on the remote server!"
+              exit 1
+            fi
+            if [ -z "$DEPLOY_IMAGE_TAG" ]; then
+              echo "::error:: Critical Error: DEPLOY_IMAGE_TAG is empty on the remote server!"
               exit 1
             fi
 
-            echo "Ensuring target directory '$VAR_TARGET_PATH_ON_DROPLET' exists..."
-            mkdir -p "$VAR_TARGET_PATH_ON_DROPLET"
+            echo "Ensuring target directory '$DEPLOY_TARGET_PATH' exists..."
+            mkdir -p "$DEPLOY_TARGET_PATH"
 
-            FULL_IMAGE_TAR_PATH="$VAR_TARGET_PATH_ON_DROPLET/$VAR_IMAGE_TAR_FILENAME"
-            FULL_IMAGE_NAME_WITH_TAG="$VAR_IMAGE_NAME:$VAR_IMAGE_TAG" # Using VAR_IMAGE_NAME and VAR_IMAGE_TAG now
+            FULL_IMAGE_TAR_PATH="$DEPLOY_TARGET_PATH/$DEPLOY_IMAGE_TAR_FILENAME"
+            FULL_IMAGE_NAME_WITH_TAG="$DEPLOY_IMAGE_NAME:$DEPLOY_IMAGE_TAG"
 
             echo "Current disk space on Droplet before load:"
-            df -h "$VAR_TARGET_PATH_ON_DROPLET"
+            df -h "$DEPLOY_TARGET_PATH"
             df -h /
 
             echo "Loading Docker image from $FULL_IMAGE_TAR_PATH..."
@@ -135,22 +143,22 @@ jobs:
             echo "Removing Docker image tar file: $FULL_IMAGE_TAR_PATH..."
             rm "$FULL_IMAGE_TAR_PATH"
 
-            echo "Checking for existing container: $VAR_CONTAINER_NAME..."
-            if [ "$(docker ps -q -f name="^/$VAR_CONTAINER_NAME$")" ]; then
-              echo "Stopping container $VAR_CONTAINER_NAME..."
-              docker stop "$VAR_CONTAINER_NAME"
+            echo "Checking for existing container: $DEPLOY_CONTAINER_NAME..."
+            if [ "$(docker ps -q -f name="^/$DEPLOY_CONTAINER_NAME$")" ]; then
+              echo "Stopping container $DEPLOY_CONTAINER_NAME..."
+              docker stop "$DEPLOY_CONTAINER_NAME"
             fi
-            if [ "$(docker ps -aq -f name="^/$VAR_CONTAINER_NAME$")" ]; then
-              echo "Removing container $VAR_CONTAINER_NAME..."
-              docker rm "$VAR_CONTAINER_NAME"
+            if [ "$(docker ps -aq -f name="^/$DEPLOY_CONTAINER_NAME$")" ]; then
+              echo "Removing container $DEPLOY_CONTAINER_NAME..."
+              docker rm "$DEPLOY_CONTAINER_NAME"
             fi
 
-            echo "Running new container $FULL_IMAGE_NAME_WITH_TAG as $VAR_CONTAINER_NAME on port $VAR_DROPLET_PORT..."
+            echo "Running new container $FULL_IMAGE_NAME_WITH_TAG as $DEPLOY_CONTAINER_NAME on port $DEPLOY_DROPLET_PORT..."
             docker run -d \
-              --name "$VAR_CONTAINER_NAME" \
+              --name "$DEPLOY_CONTAINER_NAME" \
               --restart always \
-              -p 80:"$VAR_DROPLET_PORT" \
-              -e DATABASE_URL="$VAR_DATABASE_URL" \
+              -p 80:"$DEPLOY_DROPLET_PORT" \
+              -e DATABASE_URL="$DEPLOY_DATABASE_URL" \
               -e NODE_ENV="production" \
               "$FULL_IMAGE_NAME_WITH_TAG"
 
