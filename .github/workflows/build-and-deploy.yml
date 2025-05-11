@@ -37,14 +37,69 @@ jobs:
       - name: Save Docker image to tar
         id: save_tar
         run: |
-          IMAGE_TAR_FILENAME="${{ env.IMAGE_NAME }}-${{ steps.build_image.outputs.image_tag }}.tar"
-          echo "Saving image ${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }} to $IMAGE_TAR_FILENAME"
-          docker save "${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }}" -o "$IMAGE_TAR_FILENAME"
+          # Construct the tar filename using the output from the build_image step
+          # Ensure steps.build_image.outputs.image_tag_output is correctly populated from the previous step
+          if [ -z "${{ steps.build_image.outputs.image_tag_output }}" ]; then
+            echo "::error::IMAGE_TAG output from build_image step is empty!"
+            exit 1
+          fi
+          if [ -z "${{ env.IMAGE_NAME }}" ]; then
+            echo "::error::IMAGE_NAME environment variable is empty!"
+            exit 1
+          fi
+
+          TAR_FILENAME="${{ env.IMAGE_NAME }}-${{ steps.build_image.outputs.image_tag_output }}.tar"
+          echo "Debug: Constructed TAR_FILENAME = '$TAR_FILENAME'" # Debug Line 1
+
+          # Check if TAR_FILENAME is empty right after construction
+          if [ -z "$TAR_FILENAME" ] || [ "$TAR_FILENAME" == ".tar" ] || [ "$TAR_FILENAME" == "-.tar" ]; then
+            echo "::error::TAR_FILENAME is empty or malformed after construction: '$TAR_FILENAME'"
+            echo "IMAGE_NAME was: '${{ env.IMAGE_NAME }}'"
+            echo "image_tag_output was: '${{ steps.build_image.outputs.image_tag_output }}'"
+            exit 1
+          fi
+
+          echo "Attempting to save image ${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag_output }} to $(pwd)/$TAR_FILENAME"
+          docker save "${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag_output }}" -o "$TAR_FILENAME"
           
+          SAVED_STATUS=$? # Capture exit status immediately
+          if [ $SAVED_STATUS -ne 0 ]; then
+            echo "::error::Docker save command failed with status $SAVED_STATUS!"
+            ls -lha . # List directory contents to see if the file was partially created or if other issues exist
+            exit $SAVED_STATUS
+          fi
+          echo "Docker save completed successfully."
+
+          echo "Debug: TAR_FILENAME before ls = '$TAR_FILENAME'" # Debug Line 2
+          echo "Verifying file existence and permissions for '$TAR_FILENAME' before chmod:"
+          ls -lha "$TAR_FILENAME" # See if the file exists and its current permissions
+          if [ ! -f "$TAR_FILENAME" ]; then
+             echo "::error::Docker save seemed to succeed, but tar file '$TAR_FILENAME' was NOT created!"
+             ls -lha . # List directory contents again
+             exit 1
+          fi
+          
+          echo "Debug: TAR_FILENAME before chmod = '$TAR_FILENAME'" # Debug Line 3
+          # Ensure TAR_FILENAME is not empty before calling chmod
+          if [ -z "$TAR_FILENAME" ]; then
+            echo "::error::TAR_FILENAME became empty before chmod! This should not happen."
+            exit 1
+          fi
+
+          echo "Attempting: chmod 644 \"$TAR_FILENAME\""
           chmod 644 "$TAR_FILENAME"
-          echo "Set permissions (644) on $TAR_FILENAME"
+          CHMOD_STATUS=$?
+          if [ $CHMOD_STATUS -ne 0 ]; then
+            echo "::error::chmod command failed with status $CHMOD_STATUS for file '$TAR_FILENAME'!"
+            ls -lha "$TAR_FILENAME" # Show permissions again if chmod failed
+            exit $CHMOD_STATUS
+          fi
+          echo "Set permissions (644) on $TAR_FILENAME successfully."
           
-          echo "IMAGE_TAR_FILENAME=$IMAGE_TAR_FILENAME" >> $GITHUB_ENV # Make tar filename available to next steps
+          # Set the tar filename as an environment variable for subsequent steps
+          echo "IMAGE_TAR_FILENAME_ENV=$TAR_FILENAME" >> $GITHUB_ENV
+          echo "Outputting tar_filename_output=$TAR_FILENAME"
+          echo "tar_filename_output=$TAR_FILENAME" >> $GITHUB_OUTPUT
 
       - name: Verify tar file before SCP # ADD THIS ENTIRE STEP FOR DEBUGGING
         run: |
