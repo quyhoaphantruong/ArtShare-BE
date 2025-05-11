@@ -40,7 +40,26 @@ jobs:
           IMAGE_TAR_FILENAME="${{ env.IMAGE_NAME }}-${{ steps.build_image.outputs.image_tag }}.tar"
           echo "Saving image ${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }} to $IMAGE_TAR_FILENAME"
           docker save "${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }}" -o "$IMAGE_TAR_FILENAME"
+          
+          chmod 644 "$TAR_FILENAME"
+          echo "Set permissions (644) on $TAR_FILENAME"
+          
           echo "IMAGE_TAR_FILENAME=$IMAGE_TAR_FILENAME" >> $GITHUB_ENV # Make tar filename available to next steps
+
+      - name: Verify tar file before SCP # ADD THIS ENTIRE STEP FOR DEBUGGING
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Workspace contents:"
+          ls -lha .
+          echo "---"
+          echo "Checking saved tar file: ${{ env.IMAGE_TAR_FILENAME_ENV }}" # Use the env var set above
+          # Check if file exists and list its permissions
+          ls -lha "${{ env.IMAGE_TAR_FILENAME_ENV }}"
+          if [ ! -f "${{ env.IMAGE_TAR_FILENAME_ENV }}" ]; then
+            echo "::error::Tar file ${{ env.IMAGE_TAR_FILENAME_ENV }} not found!"
+            exit 1
+          fi
+          echo "Tar file exists and permissions are listed above. Should be readable (e.g., -rw-r--r--)."
 
       - name: Copy Docker image tar to Droplet
         uses: appleboy/scp-action@v0.1.7
@@ -48,7 +67,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.DO_USER }} # Your SSH username for the Droplet
           key: ${{ secrets.SSHKEY }}         # Your SSH private key
-          source: "${{ env.IMAGE_TAR_FILENAME }}" # The tar file created in the previous step
+          source: "${{ env.IMAGE_TAR_FILENAME_ENV  }}" # The tar file created in the previous step
           target: "${{ env.DROPLET_TARGET_PATH }}"  # Directory on the Droplet to copy the tar file
 
       - name: Deploy on Droplet
@@ -59,8 +78,8 @@ jobs:
           REMOTE_CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
           REMOTE_DROPLET_PORT: ${{ env.DROPLET_PORT }}
           REMOTE_TARGET_PATH: ${{ env.DROPLET_TARGET_PATH }}
-          REMOTE_IMAGE_TAR_FILENAME: ${{ env.IMAGE_TAR_FILENAME }} # Passed from previous step
-          REMOTE_IMAGE_TAG: ${{ steps.build_image.outputs.image_tag }}
+          REMOTE_IMAGE_TAR_FILENAME: ${{ env.IMAGE_TAR_FILENAME_ENV  }} # Passed from previous step
+          REMOTE_IMAGE_TAG: ${{ steps.build_image.outputs.image_tag_output  }}
           REMOTE_DATABASE_URL: ${{ secrets.DATABASE_URL }} # Your database connection string
         with:
           host: ${{ secrets.HOST }}
