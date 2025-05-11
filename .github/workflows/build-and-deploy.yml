@@ -1,3 +1,87 @@
+name: Deploy NestJS App to DO Droplet via SCP
+
+on:
+  push:
+    branches:
+      - testdeploy
+
+env:
+  IMAGE_NAME: artshare-backend
+  CONTAINER_NAME: artshare-app
+  DROPLET_PORT: 3000
+  DROPLET_TARGET_PATH: /opt/deploy_artifacts # Using persistent storage
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        id: build_image
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          echo "Building image: ${{ env.IMAGE_NAME }}:$IMAGE_TAG"
+          docker build -t "${{ env.IMAGE_NAME }}:$IMAGE_TAG" .
+          if [ $? -ne 0 ]; then echo "::error::Docker build failed!"; exit 1; fi
+          echo "Docker build completed successfully."
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Save Docker image to tar
+        id: save_tar
+        run: |
+          if [ -z "${{ steps.build_image.outputs.image_tag }}" ]; then echo "::error::Output 'image_tag' from build_image step is empty!"; exit 1; fi
+          TAR_FILENAME="${{ env.IMAGE_NAME }}-${{ steps.build_image.outputs.image_tag }}.tar"
+          echo "Debug: Constructed TAR_FILENAME = '$TAR_FILENAME'"
+          if [ -z "$TAR_FILENAME" ] || [ "$TAR_FILENAME" == ".tar" ] || [ "$TAR_FILENAME" == "-.tar" ]; then echo "::error::TAR_FILENAME is empty or malformed: '$TAR_FILENAME'"; exit 1; fi
+          
+          echo "Saving image ${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }} to $(pwd)/$TAR_FILENAME"
+          docker save "${{ env.IMAGE_NAME }}:${{ steps.build_image.outputs.image_tag }}" -o "$TAR_FILENAME"
+          SAVED_STATUS=$?
+          if [ $SAVED_STATUS -ne 0 ]; then echo "::error::Docker save command failed with status $SAVED_STATUS!"; ls -lha .; exit $SAVED_STATUS; fi
+          echo "Docker save completed successfully."
+          
+          echo "Verifying file existence and permissions for '$TAR_FILENAME' before chmod:"
+          ls -lha "$TAR_FILENAME"
+          if [ ! -f "$TAR_FILENAME" ]; then echo "::error::Tar file '$TAR_FILENAME' was NOT created by docker save!"; ls -lha .; exit 1; fi
+          
+          echo "Attempting: chmod 644 \"$TAR_FILENAME\""
+          chmod 644 "$TAR_FILENAME"
+          CHMOD_STATUS=$?
+          if [ $CHMOD_STATUS -ne 0 ]; then echo "::error::chmod command failed with status $CHMOD_STATUS for file '$TAR_FILENAME'!"; ls -lha "$TAR_FILENAME"; exit $CHMOD_STATUS; fi
+          echo "Set permissions (644) on $TAR_FILENAME successfully."
+          
+          # ====> ADDED SIZE CHECK <====
+          echo "Size of saved tar file '$TAR_FILENAME':"
+          ls -lh "$TAR_FILENAME" 
+          
+          echo "IMAGE_TAR_FILENAME_ENV=$TAR_FILENAME" >> $GITHUB_ENV
+
+      - name: Verify tar file before SCP
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Workspace contents:"
+          ls -lha .
+          echo "---"
+          echo "Checking saved tar file from env: ${{ env.IMAGE_TAR_FILENAME_ENV }}"
+          ls -lha "${{ env.IMAGE_TAR_FILENAME_ENV }}"
+          if [ ! -f "${{ env.IMAGE_TAR_FILENAME_ENV }}" ]; then echo "::error::Tar file ${{ env.IMAGE_TAR_FILENAME_ENV }} not found before SCP!"; exit 1; fi
+          echo "Tar file exists and permissions are listed above."
+
+      - name: Copy Docker image tar to Droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.DO_USER }} # Should be root as per your confirmation
+          key: ${{ secrets.SSHKEY }}
+          passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }} # Ensure this secret is set if your key is passphrase protected
+          source: "${{ env.IMAGE_TAR_FILENAME_ENV }}"
+          target: "${{ env.DROPLET_TARGET_PATH }}"
+
       - name: Deploy on Droplet
         uses: appleboy/ssh-action@v1.0.3
         env:
