@@ -2,7 +2,6 @@ import {
   IsString,
   IsNotEmpty,
   IsEnum,
-  IsOptional,
   IsArray,
 } from 'class-validator';
 export enum CategoryType {
@@ -23,6 +22,6 @@ export class CreateCategoryDto {
   type: CategoryType;
 
   @IsString()
-  @IsOptional()
-  description?: string;
+  @IsNotEmpty()
+  description: string;
 }

@@ -6,6 +6,7 @@ import { S3StorageProvider } from 'src/storage/providers/s3-storage.provider';
 import { AuthModule } from 'src/auth/auth.module';
 import { EmbeddingModule } from 'src/embedding/embedding.module';
 import { PostsExploreService } from './posts-explore.service';
+import { WorkflowAssistService } from './workflow-assist.service';
 
 @Module({
   imports: [AuthModule, EmbeddingModule],
@@ -14,6 +15,7 @@ import { PostsExploreService } from './posts-explore.service';
     PostsManagementService,
     StorageService,
     S3StorageProvider,
+    WorkflowAssistService,
   ],
   controllers: [PostsController],
 })

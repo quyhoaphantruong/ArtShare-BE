@@ -136,7 +136,7 @@ model Category {
   created_at     DateTime     @default(now())
   id             Int          @id @default(autoincrement())
   name           String       @unique
-  description    String?
+  description    String
   example_images String[]
   type           CategoryType @default(ATTRIBUTE)
   updated_at     DateTime?    @updatedAt

@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
@@ -10,15 +15,17 @@ import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
-import axios from 'axios';   
+import axios from 'axios';
 import { PatchThumbnailDto } from './dto/request/patch-thumbnail.dto';
 import { nanoid } from 'nanoid';
 import { Readable } from 'stream';
+import { VECTOR_DIMENSION } from 'src/embedding/embedding.utils';
+import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
 
 class VectorParams {
-  titleEmbedding?: number[];
-  descriptionEmbedding?: number[];
-  imagesEmbedding?: number[][];
+  titleEmbedding: number[];
+  descriptionEmbedding: number[];
+  imagesEmbedding: number[];
 }
 
 export class MediaData {
@@ -29,30 +36,25 @@ export class MediaData {
 @Injectable()
 export class PostsManagementService {
   private readonly qdrantCollectionName = 'posts';
-  private readonly qdrantClient = new QdrantClient({
-    url: process.env.QDRANT_URL,
-    port: 6333,
-    apiKey: process.env.QDRANT_API_KEY,
-  });
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly embeddingService: EmbeddingService,
+    private readonly qdrantClient: QdrantClient,
   ) {}
 
-  private async ensureQdrantCollectionExists() {
-    const collections = await this.qdrantClient.getCollections();
-    const exists = collections.collections.some(
-      (col) => col.name === this.qdrantCollectionName,
+  private async ensurePostCollectionExists() {
+    const collectionInfo = await this.qdrantClient.collectionExists(
+      this.qdrantCollectionName,
     );
 
-    if (!exists) {
+    if (!collectionInfo.exists) {
       await this.qdrantClient.createCollection(this.qdrantCollectionName, {
         vectors: {
-          title: { size: 512, distance: 'Cosine' },
-          description: { size: 512, distance: 'Cosine' },
-          images: { size: 512, distance: 'Cosine' },
+          title: { size: VECTOR_DIMENSION, distance: 'Cosine' },
+          description: { size: VECTOR_DIMENSION, distance: 'Cosine' },
+          images: { size: VECTOR_DIMENSION, distance: 'Dot' },
         },
       });
 
@@ -71,7 +73,7 @@ export class PostsManagementService {
     const { cate_ids, video_url, thumbnail_url, ...createPostData } =
       createPostDto;
 
-      console.log(createPostDto.thumbnail_crop_meta)
+    console.log(createPostDto.thumbnail_crop_meta);
 
     const imageUploads: FileUploadResponse[] =
       await this.storageService.uploadFiles(images, 'posts');
@@ -100,7 +102,7 @@ export class PostsManagementService {
       include: { medias: true, user: true, categories: true },
     });
 
-    await this.ensureQdrantCollectionExists();
+    await this.ensurePostCollectionExists();
 
     await this.savePostEmbedding(
       post.id,
@@ -226,8 +228,8 @@ export class PostsManagementService {
 
     this.updatePostEmbedding(
       postId,
-      postUpdateData.title,
-      postUpdateData.description,
+      updatedPost.title,
+      updatedPost.description ?? undefined,
       images,
     );
 
@@ -256,18 +258,18 @@ export class PostsManagementService {
   }
 
   private async getVectorParams(
-    title: string | undefined,
+    title: string,
     description: string | undefined,
     imageFiles: Express.Multer.File[],
   ): Promise<VectorParams> {
-    const [titleEmbedding, descriptionEmbedding, imageEmbeddings] =
+    const [titleEmbedding, descriptionEmbedding, imagesEmbedding]: number[][] =
       await Promise.all([
-        title
-          ? this.embeddingService.generateEmbeddingFromText(title)
-          : undefined,
+        this.embeddingService.generateEmbeddingFromText(title),
+
         description
           ? this.embeddingService.generateEmbeddingFromText(description)
-          : undefined,
+          : Promise.resolve(new Array(VECTOR_DIMENSION).fill(0)),
+
         imageFiles && imageFiles.length > 0
           ? Promise.all(
               imageFiles.map((image) =>
@@ -275,14 +277,14 @@ export class PostsManagementService {
                   new Blob([image.buffer]),
                 ),
               ),
-            )
-          : undefined,
+            ).then((embeds: number[][]) => this.averageEmbeddings(embeds))
+          : Promise.resolve(new Array(VECTOR_DIMENSION).fill(0)),
       ]);
 
     return {
       titleEmbedding: titleEmbedding,
       descriptionEmbedding: descriptionEmbedding,
-      imagesEmbedding: imageEmbeddings,
+      imagesEmbedding: imagesEmbedding,
     };
   }
 
@@ -308,32 +310,20 @@ export class PostsManagementService {
     const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
       await this.getVectorParams(title, description, imageFiles);
 
-    // 🔥 Ensure no undefined is passed!
-    if (!titleEmbedding) {
-      throw new Error('titleEmbedding is required but missing!');
-    }
-    const averageImagesEmbedding =
-      imagesEmbedding && imagesEmbedding.length > 0
-        ? this.averageEmbeddings(imagesEmbedding)
-        : new Array(512).fill(0); // 512 = your images vector size
-    const safeDescriptionEmbedding =
-      descriptionEmbedding ?? new Array(512).fill(0); // 768 = your description vector size
-    const pointsVector = [
-      {
-        id: postId,
-        vector: {
-          title: titleEmbedding,
-          description: safeDescriptionEmbedding,
-          images: averageImagesEmbedding,
-        } as Record<string, number[]>,
-      },
-    ];
-
     const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
       {
         wait: true,
-        points: pointsVector,
+        points: [
+          {
+            id: postId,
+            vector: {
+              title: titleEmbedding,
+              description: descriptionEmbedding,
+              images: imagesEmbedding,
+            } as Record<string, number[]>,
+          },
+        ],
       },
     );
 
@@ -343,7 +333,7 @@ export class PostsManagementService {
   @TryCatch()
   private async updatePostEmbedding(
     postId: number,
-    title: string | undefined,
+    title: string,
     description: string | undefined,
     imageFiles: Express.Multer.File[],
   ): Promise<void> {
@@ -357,25 +347,13 @@ export class PostsManagementService {
       imageFiles,
     );
 
-    if (!titleEmbedding) {
-      throw new Error('titleEmbedding is required but missing!');
-    }
-
-    const safeDescriptionEmbedding =
-      descriptionEmbedding ?? new Array(512).fill(0);
-
-    const averageImagesEmbedding =
-      imagesEmbedding && imagesEmbedding.length > 0
-        ? this.averageEmbeddings(imagesEmbedding)
-        : new Array(512).fill(0);
-
     const pointVector = [
       {
         id: postId,
         vector: {
           title: titleEmbedding,
-          description: safeDescriptionEmbedding,
-          images: averageImagesEmbedding,
+          description: descriptionEmbedding,
+          images: imagesEmbedding,
         } as Record<string, number[]>,
       },
     ];
@@ -391,75 +369,108 @@ export class PostsManagementService {
   }
 
   @TryCatch()
-  async reinsertPostEmbeddings(): Promise<void> {
+  async syncPostEmbeddings(): Promise<SyncEmbeddingResponseDto> {
+    // Check if the collection exists
+    const collectionInfo = await this.qdrantClient.collectionExists(
+      this.qdrantCollectionName,
+    );
+    if (!collectionInfo.exists) {
+      throw new BadRequestException(
+        `Collection '${this.qdrantCollectionName}' does not exist.`,
+      );
+    }
+
+    // delete all points in the collection by using empty filter
+    await this.qdrantClient.delete(this.qdrantCollectionName, {
+      filter: {
+        must: [],
+      },
+    });
+    console.log(
+      `Deleted all points in collection '${this.qdrantCollectionName}'.`,
+    );
+
     const posts = await this.prisma.post.findMany({
       include: { medias: true },
     });
 
-    // find which posts are missing in Qdrant
-    const embeddingIds = await this.getAllPostsEmbeddingsId(
-      posts.map((p) => p.id),
+    if (!posts || posts.length === 0) {
+      console.log('No posts found.');
+      return {
+        message: 'No posts found to sync',
+        count: 0,
+        syncedItems: [],
+      };
+    }
+    console.log(`Found ${posts.length} posts to sync.`);
+
+    const points = await Promise.all(
+      posts.map(async (post) => {
+        const imageMedias = post.medias.filter(
+          (m) => m.media_type === MediaType.image,
+        );
+        const imageFiles: Express.Multer.File[] =
+          await this.buildImageFilesFromUrls(imageMedias.map((m) => m.url));
+
+        // get your embeddings
+        const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
+          await this.getVectorParams(
+            post.title,
+            post.description ?? undefined,
+            imageFiles,
+          );
+
+        return {
+          id: post.id,
+          vector: {
+            title: titleEmbedding,
+            description: descriptionEmbedding,
+            images: imagesEmbedding,
+          } as Record<string, number[]>,
+        };
+      }),
     );
-    const missing = posts.filter((p) => !embeddingIds.includes(p.id));
 
-    if (missing.length === 0) {
-      console.log('No missing posts found.');
-      return;
-    }
-
-    // for each missing post, build Multer.Files from its image URLs
-    for (const post of missing) {
-      const imageMedias = post.medias.filter(
-        (m) => m.media_type === MediaType.image,
-      );
-
-      const imageFiles: Express.Multer.File[] = await Promise.all(
-        imageMedias.map(async (m) => {
-          const res = await axios.get<ArrayBuffer>(m.url, {
-            responseType: 'arraybuffer',
-          });
-          const buffer = Buffer.from(res.data);
-          const ext = m.url.split('.').pop() || 'png';
-
-          return {
-            fieldname: 'file',
-            originalname: `${nanoid()}.${ext}`,
-            encoding: '7bit',
-            mimetype: `image/${ext}`,
-            buffer,
-            size: buffer.length,
-            destination: '',
-            filename: '',
-            path: '',
-            stream: Readable.from(buffer),
-          } as Express.Multer.File;
-        }),
-      );
-
-      // 4) hand off to your existing savePostEmbedding
-      await this.savePostEmbedding(
-        post.id,
-        post.title,
-        post.description ?? undefined,
-        imageFiles,
-      );
-    }
-  }
-
-  @TryCatch()
-  async getAllPostsEmbeddingsId(postIds: number[]): Promise<number[]> {
-    if (postIds.length === 0) {
-      return [];
-    }
-    const response = await this.qdrantClient.retrieve(
+    const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
       {
-        ids: postIds,
+        wait: true,
+        points: points,
       },
     );
 
-    // embeddingIds are saved as postIds
-    return response.map((point) => Number(point.id));
+    console.log('Upsert result:', operationInfo);
+    return {
+      message: 'Post embeddings synced successfully',
+      count: points.length,
+      syncedItems: points.map((point) => point.id.toString()),
+    };
+  }
+
+  private async buildImageFilesFromUrls(
+    imageUrls: string[],
+  ): Promise<Express.Multer.File[]> {
+    return await Promise.all(
+      imageUrls.map(async (url) => {
+        const res = await axios.get<ArrayBuffer>(url, {
+          responseType: 'arraybuffer',
+        });
+        const buffer = Buffer.from(res.data);
+        const ext = url.split('.').pop() ?? 'png';
+        return {
+          fieldname: 'file',
+          originalname: `${nanoid()}.${ext}`,
+          encoding: '7bit',
+          mimetype: `image/${ext}`,
+          buffer,
+          size: buffer.length,
+          destination: '',
+          filename: '',
+          path: '',
+          stream: Readable.from(buffer),
+        } as Express.Multer.File;
+      }),
+    );
   }
 
   async updateThumbnailCropMeta(
@@ -476,7 +487,7 @@ export class PostsManagementService {
     return this.prisma.post.update({
       where: { id: postId },
       data: {
-        thumbnail_crop_meta:  { ...dto }, // assuming JSON column
+        thumbnail_crop_meta: { ...dto }, // assuming JSON column
       },
     });
   }
