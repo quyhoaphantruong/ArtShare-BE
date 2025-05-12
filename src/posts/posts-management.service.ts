@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
@@ -74,10 +73,7 @@ export class PostsManagementService {
     const { cate_ids, video_url, thumbnail_url, ...createPostData } =
       createPostDto;
 
-    Logger.debug(
-      `Thumbnail crop metadata: ${createPostDto.thumbnail_crop_meta}`,
-      'PostsManagementService',
-    );
+    console.log(createPostDto.thumbnail_crop_meta);
 
     const imageUploads: FileUploadResponse[] =
       await this.storageService.uploadFiles(images, 'posts');
