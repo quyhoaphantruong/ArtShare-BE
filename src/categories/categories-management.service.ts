@@ -19,6 +19,9 @@ export class CategoriesManagementService {
     private readonly embeddingService: EmbeddingService,
   ) {}
 
+  private readonly INVALID_DESCRIPTION_ERROR =
+    'Description cannot be null or empty or contain only whitespace';
+
   private readonly categoriesCollectionName = 'categories';
 
   private async ensureCategoriesCollectionExists() {
@@ -29,25 +32,26 @@ export class CategoriesManagementService {
       await this.qdrantClient.createCollection(this.categoriesCollectionName, {
         vectors: {
           description: { size: VECTOR_DIMENSION, distance: 'Cosine' },
-        }
+        },
       });
       console.log('Collection categories created successfully');
     }
-
   }
 
   @TryCatch()
   async create(
     createCategoryDto: CreateCategoryDto,
   ): Promise<CategoryResponseDto> {
+    await this.verifyCreateRequest(createCategoryDto);
+
+    await this.ensureCategoriesCollectionExists();
+
     const createdCategory = await this.prisma.category.create({
       data: createCategoryDto,
     });
-    
-    await this.ensureCategoriesCollectionExists();
 
     this.upsertCategoryEmbeddings([createdCategory]);
-  
+
     return plainToInstance(CategoryResponseDto, createdCategory);
   }
 
@@ -56,6 +60,8 @@ export class CategoriesManagementService {
     id: number,
     updateCategoryDto: UpdateCategoryDto,
   ): Promise<CategoryResponseDto> {
+    await this.verifyUpdateRequest(updateCategoryDto);
+
     await this.checkCategoryExists(id);
 
     const updatedCategory = await this.prisma.category.update({
@@ -68,12 +74,41 @@ export class CategoriesManagementService {
     return plainToInstance(CategoryResponseDto, updatedCategory);
   }
 
+  private async verifyCreateRequest(
+    createCategoryDto: CreateCategoryDto,
+  ): Promise<void> {
+    if (this.isInvalidDescription(createCategoryDto.description)) {
+      throw new BadRequestException(this.INVALID_DESCRIPTION_ERROR);
+    }
+  }
+
+  private async verifyUpdateRequest(
+    updateCategoryDto: UpdateCategoryDto,
+  ): Promise<void> {
+    if (
+      updateCategoryDto.description !== undefined &&
+      this.isInvalidDescription(updateCategoryDto.description)
+    ) {
+      throw new BadRequestException(this.INVALID_DESCRIPTION_ERROR);
+    }
+  }
+
+  private isInvalidDescription(description: string): boolean {
+    return description == null || description.trim() === '';
+  }
+
   @TryCatch()
   async remove(id: number): Promise<CategoryResponseDto> {
     await this.checkCategoryExists(id);
 
     const deletedCategory = await this.prisma.category.delete({
       where: { id },
+    });
+
+    // Remove the category embedding from Qdrant
+    await this.qdrantClient.delete(this.categoriesCollectionName, {
+      wait: true,
+      points: [id],
     });
     return plainToInstance(CategoryResponseDto, deletedCategory);
   }
@@ -114,25 +149,30 @@ export class CategoriesManagementService {
     return {
       message: 'Category embeddings synced successfully',
       count: categories.length,
-      syncedItems: categories.map(category => category.name),
-    }
+      syncedItems: categories.map((category) => category.name),
+    };
   }
 
   // Performs the insert + update action on specified points. Any point with an existing {id} will be overwritten.
   @TryCatch()
   async upsertCategoryEmbeddings(categories: Category[]): Promise<void> {
+    if (categories.length === 0) {
+      return;
+    }
+
     const points = await Promise.all(
       categories.map(async (c) => {
-        if (c.description === null || c.description.trim() === '') {
+        if (this.isInvalidDescription(c.description)) {
           // If description is null or just whitespace, it's an issue.
           // This should ideally be caught by DTO validation earlier for create/update.
           // For sync operations, this might indicate legacy data that needs fixing.
           throw new BadRequestException(
-            `Category '${c.name}' (ID: ${c.id}) has a missing or empty description, which is required for embedding.`,
+            `Category '${c.name}' (ID: ${c.id}): ${this.INVALID_DESCRIPTION_ERROR}`,
           );
         }
-        const embedding =
-          await this.embeddingService.generateEmbeddingFromText(c.description);
+        const embedding = await this.embeddingService.generateEmbeddingFromText(
+          c.description,
+        );
         return {
           id: c.id,
           vector: {
@@ -146,16 +186,13 @@ export class CategoriesManagementService {
       }),
     );
 
-    // Only proceed if all points were successfully prepared (no errors thrown)
-    if (points.length > 0) {
-      const operationInfo = await this.qdrantClient.upsert(
-        this.categoriesCollectionName,
-        {
-          wait: true,
-          points: points,
-        },
-      );
-      console.log('Upsert category embedding operation info:', operationInfo);
-    }
+    const operationInfo = await this.qdrantClient.upsert(
+      this.categoriesCollectionName,
+      {
+        wait: true,
+        points: points,
+      },
+    );
+    console.log('Upsert category embedding operation info:', operationInfo);
   }
 }
