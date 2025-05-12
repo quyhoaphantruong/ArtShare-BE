@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/request/create-category.dto';
 import { UpdateCategoryDto } from './dto/request/update-category.dto';
 import { PrismaService } from 'src/prisma.service';
@@ -31,7 +31,7 @@ export class CategoriesManagementService {
           description: { size: VECTOR_DIMENSION, distance: 'Cosine' },
         }
       });
-      console.log('Collection categories created successfully');
+      Logger.log('Collection categories created successfully', 'CategoriesManagementService');
     }
 
   }

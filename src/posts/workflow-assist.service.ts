@@ -35,14 +35,14 @@ export class WorkflowAssistService {
       throw new BadRequestException('No images provided');
     }
 
-    const [cateNames] = await Promise.all([
-      // this.generateTitleAndDescription(imageFiles),
+    const [{ title, description }, cateNames] = await Promise.all([
+      this.generateTitleAndDescription(imageFiles),
       this.generateCategoryNames(imageFiles),
     ]);
 
     return {
-      title: 'title',
-      description: 'description',
+      title: title,
+      description: description,
       category_names: cateNames,
     };
   }
