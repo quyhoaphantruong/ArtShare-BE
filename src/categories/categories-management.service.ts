@@ -123,6 +123,14 @@ export class CategoriesManagementService {
   async upsertCategoryEmbeddings(categories: Category[]): Promise<void> {
     const points = await Promise.all(
       categories.map(async (c) => {
+        if (c.description === null || c.description.trim() === '') {
+          // If description is null or just whitespace, it's an issue.
+          // This should ideally be caught by DTO validation earlier for create/update.
+          // For sync operations, this might indicate legacy data that needs fixing.
+          throw new BadRequestException(
+            `Category '${c.name}' (ID: ${c.id}) has a missing or empty description, which is required for embedding.`,
+          );
+        }
         const embedding =
           await this.embeddingService.generateEmbeddingFromText(c.description);
         return {
@@ -138,14 +146,16 @@ export class CategoriesManagementService {
       }),
     );
 
-    const operationInfo = await this.qdrantClient.upsert(
-      this.categoriesCollectionName,
-      {
-        wait: true,
-        points: points,
-      },
-    );
-
-    console.log('Upsert category embedding operation info:', operationInfo);
+    // Only proceed if all points were successfully prepared (no errors thrown)
+    if (points.length > 0) {
+      const operationInfo = await this.qdrantClient.upsert(
+        this.categoriesCollectionName,
+        {
+          wait: true,
+          points: points,
+        },
+      );
+      console.log('Upsert category embedding operation info:', operationInfo);
+    }
   }
 }
