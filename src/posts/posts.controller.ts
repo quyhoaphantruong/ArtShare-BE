@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   Param,
@@ -25,12 +26,17 @@ import { PostsManagementService } from './posts-management.service';
 import { PostsExploreService } from './posts-explore.service';
 import { PatchThumbnailDto } from './dto/request/patch-thumbnail.dto';
 import { SearchPostDto } from './dto/request/search-post.dto';
+import { GeneratePostMetadataRequestDto } from './dto/request/generate-post-metadata.dto';
+import { WorkflowAssistService } from './workflow-assist.service';
+import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-metadata.dto';
+import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
 
 @Controller('posts')
 export class PostsController {
   constructor(
     private readonly postsManagementService: PostsManagementService,
     private readonly postsExploreService: PostsExploreService,
+    private readonly workflowAssistService: WorkflowAssistService,
   ) {}
 
   @Post()
@@ -52,13 +58,13 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('images'))
   async updatePost(
-    @Param('post_id') postId: number,
+    @Param('post_id', ParseIntPipe) postId: number,
     @Body() updatePostDto: UpdatePostDto,
     @UploadedFiles() images: Express.Multer.File[],
     @CurrentUser() user: CurrentUserType,
   ): Promise<PostDetailsResponseDto> {
     return this.postsManagementService.updatePost(
-      Number(postId),
+      postId,
       updatePostDto,
       images,
       user.id,
@@ -67,8 +73,8 @@ export class PostsController {
 
   @Delete(':post_id')
   @UseGuards(JwtAuthGuard)
-  async deletePost(@Param('post_id') postId: number) {
-    return this.postsManagementService.deletePost(Number(postId));
+  async deletePost(@Param('post_id', ParseIntPipe) postId: number) {
+    return this.postsManagementService.deletePost(postId);
   }
 
   @Post('search')
@@ -122,13 +128,14 @@ export class PostsController {
   @Get('user/:username')
   async findPostsByUsername(
     @Param('username') username: string,
-    @Query('page') page: string = '1',
-    @Query('page_size') pageSize: string = '25',
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
+    pageSize: number,
   ): Promise<PostListItemResponseDto[]> {
     return this.postsExploreService.findPostsByUsername(
       username,
-      Number(page),
-      Number(pageSize),
+      page,
+      pageSize,
     );
   }
 
@@ -138,25 +145,37 @@ export class PostsController {
     @Body() dto: PatchThumbnailDto,
     @CurrentUser() user: CurrentUserType,
   ) {
-    return this.postsManagementService.updateThumbnailCropMeta(postId, dto, user.id);
-  }
-
-
-  @Get(':post_id/relevant')
-  async getRelevantPosts(
-    @Param('post_id') postId: number,
-    @Query('page') page: string = '1',
-    @Query('page_size') pageSize: string = '25',
-  ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.getRelevantPosts(
-      Number(postId),
-      Number(page),
-      Number(pageSize),
+    return this.postsManagementService.updateThumbnailCropMeta(
+      postId,
+      dto,
+      user.id,
     );
   }
 
-  @Post('reinsert-embeddings')
-  async reinsertEmbeddings() {
-    return this.postsManagementService.reinsertPostEmbeddings();
+  @Get(':post_id/relevant')
+  async getRelevantPosts(
+    @Param('post_id', ParseIntPipe) postId: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
+    pageSize: number,
+  ): Promise<PostListItemResponseDto[]> {
+    return this.postsExploreService.getRelevantPosts(
+      postId,
+      page,
+      pageSize,
+    );
+  }
+
+  @Post('sync-embeddings')
+  async syncPostsEmbedding(): Promise<SyncEmbeddingResponseDto> {
+    return this.postsManagementService.syncPostEmbeddings();
+  }
+
+  @Post('generate-metadata')
+  @UseInterceptors(FilesInterceptor('images'))
+  async generatePostMetadata(
+    @UploadedFiles() images: Express.Multer.File[],
+  ): Promise<GeneratePostMetadataResponseDto> {
+    return this.workflowAssistService.generatePostMetadata(images);
   }
 }

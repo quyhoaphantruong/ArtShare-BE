@@ -23,6 +23,6 @@ export class CreateCategoryDto {
   type: CategoryType;
 
   @IsString()
-  @IsOptional()
-  description?: string;
+  @IsNotEmpty()
+  description: string;
 }
