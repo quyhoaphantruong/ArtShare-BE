@@ -2,7 +2,6 @@ import {
   IsString,
   IsNotEmpty,
   IsEnum,
-  IsOptional,
   IsArray,
 } from 'class-validator';
 export enum CategoryType {

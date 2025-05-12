@@ -1,8 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-metadata.dto';
-import { GeneratePostMetadataRequestDto } from './dto/request/generate-post-metadata.dto';
 import { PrismaService } from 'src/prisma.service';
-import axios from 'axios';
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';

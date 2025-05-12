@@ -7,7 +7,6 @@ import { CategoryResponseDto } from './dto/response/category.dto';
 import { plainToInstance } from 'class-transformer';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { EmbeddingService } from 'src/embedding/embedding.service';
-import getUuidByString from 'uuid-by-string';
 import { VECTOR_DIMENSION } from 'src/embedding/embedding.utils';
 import { SyncEmbeddingResponseDto } from '../common/response/sync-embedding.dto';
 import { Category } from '@prisma/client';

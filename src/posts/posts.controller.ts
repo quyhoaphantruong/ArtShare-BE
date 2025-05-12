@@ -26,7 +26,6 @@ import { PostsManagementService } from './posts-management.service';
 import { PostsExploreService } from './posts-explore.service';
 import { PatchThumbnailDto } from './dto/request/patch-thumbnail.dto';
 import { SearchPostDto } from './dto/request/search-post.dto';
-import { GeneratePostMetadataRequestDto } from './dto/request/generate-post-metadata.dto';
 import { WorkflowAssistService } from './workflow-assist.service';
 import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-metadata.dto';
 import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
