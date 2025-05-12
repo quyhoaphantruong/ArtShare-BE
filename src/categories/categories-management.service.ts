@@ -16,7 +16,7 @@ export class CategoriesManagementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly qdrantClient: QdrantClient,
-    private readonly embddingService: EmbeddingService,
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   private readonly categoriesCollectionName = 'categories';
@@ -124,7 +124,7 @@ export class CategoriesManagementService {
     const points = await Promise.all(
       categories.map(async (c) => {
         const embedding =
-          await this.embddingService.generateEmbeddingFromText(c.description);
+          await this.embeddingService.generateEmbeddingFromText(c.description);
         return {
           id: c.id,
           vector: {
