@@ -28,31 +28,33 @@ model UserRole {
 }
 
 model User {
-  id                  String    @id
-  username            String    @unique
-  email               String    @unique
+  id                  String       @id
+  username            String       @unique
+  email               String       @unique
   full_name           String?
   profile_picture_url String?
   bio                 String?
-  birthday            DateTime? @db.Date
-  created_at          DateTime  @default(now())
-  updated_at          DateTime? @updatedAt
+  created_at          DateTime     @default(now())
+  updated_at          DateTime?    @updatedAt
   refresh_token       String?
-  followers_count     Int       @default(0)
-  followings_count    Int       @default(0)
-
-  collections Collection[]
-  blogs       Blog[]
-  bookmarks   Bookmark[]
-  comments    Comment[]
-  followers   Follow[]     @relation("Follower")
-  followings  Follow[]     @relation("Following")
-  likes       Like[]
-  posts       Post[]
-  ratings     Rating[]
-  shares      Share[]
-  roles       UserRole[]
-  Report      Report[]     @relation("UserReports")
+  birthday            DateTime?    @db.Date
+  followers_count     Int          @default(0)
+  followings_count    Int          @default(0)
+  stripe_customer_id  String?      @unique
+  collections         Collection[]
+  blogs               Blog[]
+  bookmarks           Bookmark[]
+  comments            Comment[]
+  followers           Follow[]     @relation("Follower")
+  followings          Follow[]     @relation("Following")
+  likes               Like[]
+  posts               Post[]
+  ratings             Rating[]
+  Report              Report[]     @relation("UserReports")
+  shares              Share[]
+  userAccess          UserAccess?
+  roles               UserRole[]
+  UserUsage           UserUsage[]
 
   @@map("user")
 }
@@ -77,40 +79,40 @@ model Post {
 
   likes               Like[]
   medias              Media[]
-  collections         Collection[]
-  user                User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user                User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
   shares              Share[]
-  categories          Category[]   @relation("CategoryToPost")
+  categories          Category[]  @relation("CategoryToPost")
   thumbnail_crop_meta Json?
+  Collection          Collection? @relation(fields: [collectionId], references: [id])
+  collectionId        Int?
 
   @@index([user_id])
   @@map("post")
 }
 
 model Blog {
-  id              Int       @id @default(autoincrement())
+  id              Int        @id @default(autoincrement())
   user_id         String
   title           String
   content         String
-  created_at      DateTime  @default(now())
-  is_published    Boolean   @default(false)
-  like_count      Int       @default(0)
-  comment_count   Int       @default(0)
-  share_count     Int       @default(0)
-  view_count      Int       @default(0)
-  updated_at      DateTime? @updatedAt
-  average_rating  Float     @default(0)
-  is_protected    Boolean   @default(false)
-  rating_count    Int       @default(0)
+  created_at      DateTime   @default(now())
+  is_published    Boolean    @default(false)
+  like_count      Int        @default(0)
+  comment_count   Int        @default(0)
+  share_count     Int        @default(0)
+  updated_at      DateTime?  @updatedAt
+  average_rating  Float      @default(0)
+  is_protected    Boolean    @default(false)
+  rating_count    Int        @default(0)
+  pictures        String[]
   embedded_videos String[]
-
-  pictures   String[]
-  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  bookmarks  Bookmark[]
-  likes      Like[]
-  ratings    Rating[]
-  shares     Share[]
-  categories Category[] @relation("CategoryToBlog")
+  view_count      Int        @default(0)
+  user            User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  bookmarks       Bookmark[]
+  likes           Like[]
+  ratings         Rating[]
+  shares          Share[]
+  categories      Category[] @relation("CategoryToBlog")
 
   @@index([user_id])
   @@index([created_at])
@@ -147,15 +149,14 @@ model Category {
 }
 
 model Like {
-  id         Int      @id @default(autoincrement())
   user_id    String
-  post_id    Int?
-  blog_id    Int?
   created_at DateTime @default(now())
-
-  post Post? @relation(fields: [post_id], references: [id], onDelete: Cascade)
-  blog Blog? @relation(fields: [blog_id], references: [id], onDelete: Cascade)
-  user User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  blog_id    Int?
+  id         Int      @id @default(autoincrement())
+  post_id    Int?
+  blog       Blog?    @relation(fields: [blog_id], references: [id], onDelete: Cascade)
+  post       Post?    @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, post_id], map: "unique_user_post_like")
   @@unique([user_id, blog_id], map: "unique_user_blog_like")
@@ -166,11 +167,11 @@ model Comment {
   id                Int        @id @default(autoincrement())
   user_id           String
   parent_comment_id Int?
-  target_id         Int
-  target_type       TargetType
   content           String
   created_at        DateTime   @default(now())
   updated_at        DateTime?  @updatedAt
+  target_id         Int
+  target_type       TargetType
   parent_comment    Comment?   @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
   replies           Comment[]  @relation("CommentReplies")
   user              User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -183,15 +184,13 @@ model Comment {
 model Share {
   id             Int           @id @default(autoincrement())
   user_id        String
-  post_id        Int?
-  blog_id        Int?
   share_platform SharePlatform
   created_at     DateTime      @default(now())
-
-  /// Relations
-  post Post? @relation(fields: [post_id], references: [id], onDelete: Cascade)
-  blog Blog? @relation(fields: [blog_id], references: [id], onDelete: Cascade)
-  user User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  blog_id        Int?
+  post_id        Int?
+  blog           Blog?         @relation(fields: [blog_id], references: [id], onDelete: Cascade)
+  post           Post?         @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, post_id], map: "unique_user_post_share")
   @@unique([user_id, blog_id], map: "unique_user_blog_share")
@@ -254,24 +253,116 @@ model Collection {
 }
 
 model Report {
-  id Int @id @default(autoincrement())
-
+  id          Int              @id @default(autoincrement())
   reporter_id String
   target_id   Int
   target_type ReportTargetType
+  reason      String
+  status      ReportStatus     @default(PENDING)
+  created_at  DateTime         @default(now()) @map("created_at")
+  reporter    User             @relation("UserReports", fields: [reporter_id], references: [id], onDelete: Cascade)
 
-  reason String       @db.Text
-  status ReportStatus @default(PENDING)
-
-  created_at DateTime @default(now()) @map("created_at")
-
-  reporter User @relation("UserReports", fields: [reporter_id], references: [id], onDelete: Cascade)
-
-  // --- Indexes ---
   @@index([reporter_id])
   @@index([status])
   @@index([target_id, target_type])
   @@map("report")
+}
+
+model UserAccess {
+  userId               String   @id
+  planId               String
+  expiresAt            DateTime @map("expires_at")
+  stripeSubscriptionId String   @unique @map("stripe_subscription_id")
+  stripePriceId        String   @map("stripe_price_id")
+  stripeCustomerId     String   @map("stripe_customer_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  cancelAtPeriodEnd    Boolean  @default(false) @map("cancel_at_period_end")
+  plan                 Plan     @relation(fields: [planId], references: [id])
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+  @@map("user_access")
+}
+
+model Plan {
+  id                      String       @id
+  name                    String
+  description             String?
+  stripeProductId         String?      @unique
+  imageQualityAllowed     ImageQuality @default(LOW) @map("image_quality_allowed")
+  monthlyQuotaCredits     Int?         @map("monthly_quota_credits")
+  storageQuotaMB          Int?         @map("storage_quota_mb")
+  maxTeamSeats            Int          @default(1) @map("max_team_seats")
+  allowHighResolution     Boolean      @default(false) @map("allow_high_resolution")
+  maxResolutionWidth      Int?         @map("max_resolution_width")
+  maxResolutionHeight     Int?         @map("max_resolution_height")
+  removeWatermark         Boolean      @default(false) @map("remove_watermark")
+  smartSuggestionsEnabled Boolean      @default(false) @map("smart_suggestions_enabled")
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+  userAccess              UserAccess[]
+
+  @@map("plans")
+}
+
+model UserUsage {
+  id             String   @id @default(cuid())
+  userId         String
+  featureKey     String
+  usedAmount     Float    @default(0) @map("used_amount")
+  cycleStartedAt DateTime @map("cycle_started_at")
+  cycleEndsAt    DateTime @map("cycle_ends_at")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, featureKey, cycleStartedAt])
+  @@index([userId, featureKey, cycleEndsAt])
+  @@map("user_usage")
+}
+
+model ArtGeneration {
+  id                         Int         @id @default(autoincrement())
+  user_id                    String
+  user_prompt                String
+  final_prompt               String
+  model_key                  String
+  number_of_images_generated Int
+  image_urls                 String[]
+  aspect_ratio               AspectRatio
+  style                      String?
+  lighting                   String?
+  camera                     String?
+  created_at                 DateTime    @default(now())
+
+  @@map("art_generation")
+}
+
+enum PaidAccessLevel {
+  FREE       @map("free")
+  ARTIST_PRO @map("artist_pro")
+  STUDIO     @map("studio")
+  ENTERPRISE @map("enterprise")
+}
+
+enum ImageQuality {
+  LOW    @map("low")
+  MEDIUM @map("medium")
+  HIGH   @map("high")
+}
+
+enum CommercialRightsLevel {
+  NONE     @map("none")
+  STANDARD @map("standard")
+  ENHANCED @map("enhanced")
+}
+
+enum SupportLevel {
+  COMMUNITY @map("community")
+  STANDARD  @map("standard")
+  PRIORITY  @map("priority")
+  DEDICATED @map("dedicated")
 }
 
 enum MediaType {
@@ -304,24 +395,6 @@ enum ReportStatus {
   PENDING
   REVIEWED
   RESOLVED
-}
-
-model ArtGeneration {
-  id                         Int         @id @default(autoincrement())
-  user_id                    String
-  user_prompt                String
-  final_prompt               String
-  model_key                  String
-  number_of_images_generated Int
-  image_urls                 String[]
-  aspect_ratio               AspectRatio
-  style                      String?
-  lighting                   String?
-  camera                     String?
-  created_at                 DateTime    @default(now())
-  updated_at                 DateTime?   @updatedAt
-
-  @@map("art_generation")
 }
 
 enum AspectRatio {

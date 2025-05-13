@@ -14,8 +14,11 @@ import { ConfigModule } from '@nestjs/config';
 import { CategoriesModule } from './categories/categories.module';
 import { CollectionModule } from './collection/collection.module';
 import { ReportModule } from './report/report.module';
+import { StripeModule } from './stripe/stripe.module';
 import { CommentModule } from './comment/comment.module';
 import { ArtGenerationModule } from './art-generation/art-generation.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { UsageModule } from './usage/usage.module';
 
 @Module({
   imports: [
@@ -35,6 +38,9 @@ import { ArtGenerationModule } from './art-generation/art-generation.module';
     CollectionModule,
     ReportModule,
     CommentModule,
+    StripeModule,
+    UsageModule,
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true, // ✅ optional but useful
     }),

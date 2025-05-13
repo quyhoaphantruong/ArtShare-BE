@@ -1,0 +1,20 @@
+import {
+  IsOptional,
+  IsString,
+  IsEmail,
+  IsNotEmpty,
+} from 'class-validator';
+
+export class CreateCheckoutSessionDto {
+  @IsString()
+  @IsNotEmpty()
+  planId: string;
+
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+
+  @IsString()
+  @IsOptional()
+  userId?: string;
+}
