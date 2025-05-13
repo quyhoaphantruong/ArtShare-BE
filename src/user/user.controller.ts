@@ -32,11 +32,12 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  @Get('profile')
+  @Get('profile/:userId')
   async getProfile(
+    @Param('userId') userId: string,
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<UserProfileDTO> {
-    return this.userService.getUserProfile(currentUser.id);
+    return this.userService.getUserProfile(userId, currentUser);
   }
 
   @Patch('profile')

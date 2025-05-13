@@ -10,4 +10,5 @@ export class UserProfileDTO {
   followings_count: number;
   birthday?: Date | null;
   roles: Role[]; // Or string[] if you prefer simple strings from backend
+  isFollowing: boolean;
 }

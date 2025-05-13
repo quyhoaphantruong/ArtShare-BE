@@ -15,6 +15,7 @@ import { UpdateUserDTO } from './dto/update-users.dto';
 import { ApiResponse } from 'src/common/api-response';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { Role } from 'src/auth/enums/role.enum';
+import { CurrentUserType } from 'src/auth/types/current-user.type';
 
 @Injectable()
 export class UserService {
@@ -29,11 +30,11 @@ export class UserService {
     });
   }
 
-  async getUserProfile(userId: string): Promise<UserProfileDTO> {
+  async getUserProfile(userId: string, currentUser: CurrentUserType): Promise<UserProfileDTO> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
-        id: true, // Good to include the ID
+        id: true,
         username: true,
         email: true,
         full_name: true,
@@ -42,7 +43,7 @@ export class UserService {
         followers_count: true,
         followings_count: true,
         birthday: true,
-        roles: { // Select the related UserRole entries
+        roles: {
           select: {
             role: { // From UserRole, select the related Role
               select: {
@@ -60,6 +61,15 @@ export class UserService {
 
     // Map the roles to a simple array of strings (role names)
     const roleNames = user.roles.map(userRole => userRole.role.role_name as Role); // Cast if necessary
+    let isFollowing = false;
+    if (currentUser.id !== user.id) {
+      isFollowing = await this.prisma.follow.count({
+        where: {
+          follower_id: currentUser.id,
+          following_id: user.id
+        }
+      }) > 0;
+    }
 
     return {
       id: user.id,
@@ -71,7 +81,8 @@ export class UserService {
       followers_count: user.followers_count,
       followings_count: user.followings_count,
       birthday: user.birthday ?? null,
-      roles: roleNames, // Add the mapped roles here
+      roles: roleNames,
+      isFollowing,
     };
   }
 
