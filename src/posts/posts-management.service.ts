@@ -1,26 +1,31 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
 import { StorageService } from 'src/storage/storage.service';
 import { EmbeddingService } from 'src/embedding/embedding.service';
-import { MediaType, Post, Prisma } from '@prisma/client';
+import { MediaType, Post } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
-import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
-import { SearchPostDto } from './dto/request/search-post.dto';
+import axios from 'axios';
+import { PatchThumbnailDto } from './dto/request/patch-thumbnail.dto';
+import { nanoid } from 'nanoid';
+import { Readable } from 'stream';
+import { VECTOR_DIMENSION } from 'src/embedding/embedding.utils';
+import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
 
-
-type PostDetails = Prisma.PostGetPayload<{
-  include: { categories: true, user: true, medias: true },
-  }>
 class VectorParams {
-  titleEmbedding?: number[];
-  descriptionEmbedding?: number[];
-  imagesEmbedding?: number[][];
+  titleEmbedding: number[];
+  descriptionEmbedding: number[];
+  imagesEmbedding: number[];
 }
 
 export class MediaData {
@@ -29,32 +34,27 @@ export class MediaData {
 }
 
 @Injectable()
-export class PostsService {
+export class PostsManagementService {
   private readonly qdrantCollectionName = 'posts';
-  private readonly qdrantClient = new QdrantClient({
-    url: process.env.QDRANT_URL,
-    port: 6333,
-    apiKey: process.env.QDRANT_API_KEY,
-  });
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly embeddingService: EmbeddingService,
+    private readonly qdrantClient: QdrantClient,
   ) {}
 
-  private async ensureQdrantCollectionExists() {
-    const collections = await this.qdrantClient.getCollections();
-    const exists = collections.collections.some(
-      (col) => col.name === this.qdrantCollectionName,
+  private async ensurePostCollectionExists() {
+    const collectionInfo = await this.qdrantClient.collectionExists(
+      this.qdrantCollectionName,
     );
 
-    if (!exists) {
+    if (!collectionInfo.exists) {
       await this.qdrantClient.createCollection(this.qdrantCollectionName, {
         vectors: {
-          title: { size: 512, distance: 'Cosine' },
-          description: { size: 512, distance: 'Cosine' },
-          images: { size: 512, distance: 'Cosine' },
+          title: { size: VECTOR_DIMENSION, distance: 'Cosine' },
+          description: { size: VECTOR_DIMENSION, distance: 'Cosine' },
+          images: { size: VECTOR_DIMENSION, distance: 'Dot' },
         },
       });
 
@@ -72,6 +72,8 @@ export class PostsService {
   ): Promise<PostDetailsResponseDto> {
     const { cate_ids, video_url, thumbnail_url, ...createPostData } =
       createPostDto;
+
+    console.log(createPostDto.thumbnail_crop_meta);
 
     const imageUploads: FileUploadResponse[] =
       await this.storageService.uploadFiles(images, 'posts');
@@ -95,11 +97,12 @@ export class PostsService {
         categories: {
           connect: (cate_ids || []).map((cate_id) => ({ id: cate_id })),
         },
+        thumbnail_crop_meta: JSON.parse(createPostDto.thumbnail_crop_meta),
       },
       include: { medias: true, user: true, categories: true },
     });
 
-    await this.ensureQdrantCollectionExists();
+    await this.ensurePostCollectionExists();
 
     await this.savePostEmbedding(
       post.id,
@@ -205,6 +208,7 @@ export class PostsService {
       where: { id: postId },
       data: {
         ...postUpdateData,
+        thumbnail_crop_meta: JSON.parse(updatePostDto.thumbnail_crop_meta),
         thumbnail_url: thumbnail_url,
         categories: {
           set: (cate_ids || []).map((id) => ({ id })),
@@ -224,8 +228,8 @@ export class PostsService {
 
     this.updatePostEmbedding(
       postId,
-      postUpdateData.title,
-      postUpdateData.description,
+      updatedPost.title,
+      updatedPost.description ?? undefined,
       images,
     );
 
@@ -253,164 +257,19 @@ export class PostsService {
     return this.prisma.post.delete({ where: { id: postId } });
   }
 
-  @TryCatch()
-  async getForYouPosts(
-    userId: string,
-    page: number,
-    page_size: number,
-    filter: string[],
-  ): Promise<PostListItemResponseDto[]> {
-    const skip = (page - 1) * page_size;
-
-    const whereClause =
-      filter && filter.length > 0
-        ? { categories: { some: { name: { in: filter } } } }
-        : {};
-
-    const posts = await this.prisma.post.findMany({
-      where: whereClause,
-      orderBy: { share_count: 'desc' },
-      take: page_size,
-      skip,
-      include: {
-        medias: true,
-        user: true,
-        categories: true,
-      },
-    });
-
-    return plainToInstance(PostListItemResponseDto, posts);
-  }
-
-  async getFollowingPosts(
-    userId: string,
-    page: number,
-    page_size: number,
-    filter: string[],
-  ): Promise<PostListItemResponseDto[]> {
-    const followingUsers = await this.prisma.follow.findMany({
-      where: { follower_id: userId },
-      select: { following_id: true },
-    });
-
-    const followingIds = followingUsers.map((follow) => follow.following_id);
-
-    const skip = (page - 1) * page_size;
-
-    const whereClause = {
-      user_id: { in: followingIds },
-      ...(filter &&
-        filter.length > 0 && {
-          categories: { some: { name: { in: filter } } },
-        }),
-    };
-
-    const posts = await this.prisma.post.findMany({
-      where: whereClause,
-      skip,
-      take: page_size,
-      include: {
-        medias: true,
-        user: true,
-        categories: true,
-      },
-      orderBy: {
-        created_at: 'desc',
-      },
-    });
-
-    return plainToInstance(PostListItemResponseDto, posts);
-  }
-
-  @TryCatch()
-  async getPostDetails(postId: number): Promise<PostDetailsResponseDto> {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
-      include: { medias: true, user: true, categories: true },
-    });
-
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
-
-    // update the view count
-    await this.prisma.post.update({
-      where: { id: postId },
-      data: { view_count: { increment: 1 } },
-    });
-    return plainToInstance(PostDetailsResponseDto, post);
-  }
-
-  @TryCatch()
-  async searchPosts(
-    body: SearchPostDto,
-  ): Promise<PostListItemResponseDto[]> {
-    const { q, page = 1, page_size = 25, filter } = body;
-
-    const queryEmbedding = await this.embeddingService.generateEmbeddingFromText(q);
-    const searchResponse = await this.qdrantClient.query(
-      this.qdrantCollectionName,
-      {
-        prefetch: [
-          {
-            query: queryEmbedding,
-            using: 'images',
-          },
-          {
-            query: queryEmbedding,
-            using: 'description',
-          },
-          {
-            query: queryEmbedding,
-            using: 'title',
-          },
-        ],
-        query: {
-          fusion: 'dbsf',
-        },
-        offset: (page - 1) * page_size,
-        limit: page_size,
-        // with_payload: true,
-      },
-    );
-
-    const pointIds: number[] = searchResponse.points.map((point) =>
-      Number(point.id),
-    );
-
-    const posts: PostDetails[] = await this.prisma.post.findMany({
-      where: { id: { in: pointIds } },
-      include: { medias: true, user: true, categories: true },
-    });
-
-    // Sort posts in the same order as returned by Qdrant
-    let sortedPosts: PostDetails[] = pointIds
-      .map((id) => posts.find((post: PostDetails) => post.id === id))
-      .filter((post): post is PostDetails => post !== undefined);
-    
-    if (filter && filter.length > 0) {
-      sortedPosts = sortedPosts.filter((post) =>
-        post.categories.some((category) =>
-          filter.includes(category.name),
-        ),
-      );
-    }
-    return plainToInstance(PostListItemResponseDto, sortedPosts);
-  }
-
   private async getVectorParams(
-    title: string | undefined,
+    title: string,
     description: string | undefined,
     imageFiles: Express.Multer.File[],
   ): Promise<VectorParams> {
-    const [titleEmbedding, descriptionEmbedding, imageEmbeddings] =
+    const [titleEmbedding, descriptionEmbedding, imagesEmbedding]: number[][] =
       await Promise.all([
-        title
-          ? this.embeddingService.generateEmbeddingFromText(title)
-          : undefined,
+        this.embeddingService.generateEmbeddingFromText(title),
+
         description
           ? this.embeddingService.generateEmbeddingFromText(description)
-          : undefined,
+          : Promise.resolve(new Array(VECTOR_DIMENSION).fill(0)),
+
         imageFiles && imageFiles.length > 0
           ? Promise.all(
               imageFiles.map((image) =>
@@ -418,14 +277,14 @@ export class PostsService {
                   new Blob([image.buffer]),
                 ),
               ),
-            )
-          : undefined,
+            ).then((embeds: number[][]) => this.averageEmbeddings(embeds))
+          : Promise.resolve(new Array(VECTOR_DIMENSION).fill(0)),
       ]);
 
     return {
       titleEmbedding: titleEmbedding,
       descriptionEmbedding: descriptionEmbedding,
-      imagesEmbedding: imageEmbeddings,
+      imagesEmbedding: imagesEmbedding,
     };
   }
 
@@ -451,32 +310,20 @@ export class PostsService {
     const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
       await this.getVectorParams(title, description, imageFiles);
 
-    // 🔥 Ensure no undefined is passed!
-    if (!titleEmbedding) {
-      throw new Error('titleEmbedding is required but missing!');
-    }
-    const averageImagesEmbedding =
-      imagesEmbedding && imagesEmbedding.length > 0
-        ? this.averageEmbeddings(imagesEmbedding)
-        : new Array(512).fill(0); // 512 = your images vector size
-    const safeDescriptionEmbedding =
-      descriptionEmbedding ?? new Array(512).fill(0); // 768 = your description vector size
-    const pointsVector = [
-      {
-        id: postId,
-        vector: {
-          title: titleEmbedding,
-          description: safeDescriptionEmbedding,
-          images: averageImagesEmbedding,
-        } as Record<string, number[]>,
-      },
-    ];
-
     const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
       {
         wait: true,
-        points: pointsVector,
+        points: [
+          {
+            id: postId,
+            vector: {
+              title: titleEmbedding,
+              description: descriptionEmbedding,
+              images: imagesEmbedding,
+            } as Record<string, number[]>,
+          },
+        ],
       },
     );
 
@@ -486,7 +333,7 @@ export class PostsService {
   @TryCatch()
   private async updatePostEmbedding(
     postId: number,
-    title: string | undefined,
+    title: string,
     description: string | undefined,
     imageFiles: Express.Multer.File[],
   ): Promise<void> {
@@ -500,25 +347,13 @@ export class PostsService {
       imageFiles,
     );
 
-    if (!titleEmbedding) {
-      throw new Error('titleEmbedding is required but missing!');
-    }
-
-    const safeDescriptionEmbedding =
-      descriptionEmbedding ?? new Array(512).fill(0);
-
-    const averageImagesEmbedding =
-      imagesEmbedding && imagesEmbedding.length > 0
-        ? this.averageEmbeddings(imagesEmbedding)
-        : new Array(512).fill(0);
-
     const pointVector = [
       {
         id: postId,
         vector: {
           title: titleEmbedding,
-          description: safeDescriptionEmbedding,
-          images: averageImagesEmbedding,
+          description: descriptionEmbedding,
+          images: imagesEmbedding,
         } as Record<string, number[]>,
       },
     ];
@@ -534,36 +369,126 @@ export class PostsService {
   }
 
   @TryCatch()
-  async findPostsByUsername(
-    username: string,
-    page: number,
-    page_size: number,
-  ): Promise<PostListItemResponseDto[]> {
-    const user = await this.prisma.user.findUnique({
-      where: { username: username },
-      select: { id: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
+  async syncPostEmbeddings(): Promise<SyncEmbeddingResponseDto> {
+    // Check if the collection exists
+    const collectionInfo = await this.qdrantClient.collectionExists(
+      this.qdrantCollectionName,
+    );
+    if (!collectionInfo.exists) {
+      throw new BadRequestException(
+        `Collection '${this.qdrantCollectionName}' does not exist.`,
+      );
     }
 
-    const skip = (page - 1) * page_size;
-
-    const posts = await this.prisma.post.findMany({
-      where: { user_id: user.id },
-      skip,
-      take: page_size,
-      include: {
-        medias: true,
-        user: true,
-        categories: true,
-      },
-      orderBy: {
-        created_at: 'desc',
+    // delete all points in the collection by using empty filter
+    await this.qdrantClient.delete(this.qdrantCollectionName, {
+      filter: {
+        must: [],
       },
     });
+    console.log(
+      `Deleted all points in collection '${this.qdrantCollectionName}'.`,
+    );
 
-    return plainToInstance(PostListItemResponseDto, posts);
+    const posts = await this.prisma.post.findMany({
+      include: { medias: true },
+    });
+
+    if (!posts || posts.length === 0) {
+      console.log('No posts found.');
+      return {
+        message: 'No posts found to sync',
+        count: 0,
+        syncedItems: [],
+      };
+    }
+    console.log(`Found ${posts.length} posts to sync.`);
+
+    const points = await Promise.all(
+      posts.map(async (post) => {
+        const imageMedias = post.medias.filter(
+          (m) => m.media_type === MediaType.image,
+        );
+        const imageFiles: Express.Multer.File[] =
+          await this.buildImageFilesFromUrls(imageMedias.map((m) => m.url));
+
+        // get your embeddings
+        const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
+          await this.getVectorParams(
+            post.title,
+            post.description ?? undefined,
+            imageFiles,
+          );
+
+        return {
+          id: post.id,
+          vector: {
+            title: titleEmbedding,
+            description: descriptionEmbedding,
+            images: imagesEmbedding,
+          } as Record<string, number[]>,
+        };
+      }),
+    );
+
+    const operationInfo = await this.qdrantClient.upsert(
+      this.qdrantCollectionName,
+      {
+        wait: true,
+        points: points,
+      },
+    );
+
+    console.log('Upsert result:', operationInfo);
+    return {
+      message: 'Post embeddings synced successfully',
+      count: points.length,
+      syncedItems: points.map((point) => point.id.toString()),
+    };
+  }
+
+  private async buildImageFilesFromUrls(
+    imageUrls: string[],
+  ): Promise<Express.Multer.File[]> {
+    return await Promise.all(
+      imageUrls.map(async (url) => {
+        const res = await axios.get<ArrayBuffer>(url, {
+          responseType: 'arraybuffer',
+        });
+        const buffer = Buffer.from(res.data);
+        const ext = url.split('.').pop() ?? 'png';
+        return {
+          fieldname: 'file',
+          originalname: `${nanoid()}.${ext}`,
+          encoding: '7bit',
+          mimetype: `image/${ext}`,
+          buffer,
+          size: buffer.length,
+          destination: '',
+          filename: '',
+          path: '',
+          stream: Readable.from(buffer),
+        } as Express.Multer.File;
+      }),
+    );
+  }
+
+  async updateThumbnailCropMeta(
+    postId: number,
+    dto: PatchThumbnailDto,
+    userId: string,
+  ) {
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+
+    if (!post || post.user_id !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    return this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        thumbnail_crop_meta: { ...dto }, // assuming JSON column
+      },
+    });
   }
 }

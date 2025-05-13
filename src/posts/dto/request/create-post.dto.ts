@@ -55,4 +55,7 @@ export class CreatePostDto {
     { toClassOnly: true },
   )
   cate_ids?: number[];
+
+  @IsString()
+  thumbnail_crop_meta: string = "{}";
 }

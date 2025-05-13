@@ -7,12 +7,15 @@ import express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  const port = process.env.PORT ?? 3000;
   const logger = new Logger('Bootstrap');
 
   // Enable CORS
   app.enableCors({
-    origin: [process.env.FRONTEND_URL || 'http://localhost:5173'],
+    origin: [
+      process.env.FRONTEND_URL || 'http://localhost:5173',
+      process.env.ADMIN_FRONTEND_URL || 'http://localhost:5174',
+    ], // List allowed origins
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // List allowed HTTP methods
     allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
     credentials: true, // Allow cookies or authorization headers to be sent
@@ -25,6 +28,7 @@ async function bootstrap() {
         enableImplicitConversion: true, // allows "true"/"false" to become boolean
       },
       whitelist: true,
+      forbidNonWhitelisted: true,
     }),
   );
 
@@ -53,6 +57,7 @@ async function bootstrap() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(port);
+  console.log(`@@ App is listening on http://localhost:${port}`);
 }
 bootstrap();

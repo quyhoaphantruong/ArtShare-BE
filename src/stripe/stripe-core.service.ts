@@ -39,7 +39,7 @@ export class StripeCoreService {
     }
 
     this.stripe = new Stripe(secretKey, {
-      apiVersion: '2025-03-31.basil',
+      apiVersion: '2025-04-30.basil',
       typescript: true,
     });
 

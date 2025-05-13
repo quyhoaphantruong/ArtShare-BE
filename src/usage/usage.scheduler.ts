@@ -19,7 +19,7 @@ export class UsageScheduler {
         'CRITICAL: Stripe Secret Key not configured for UsageScheduler.',
       );
     } else {
-      this.stripe = new Stripe(secretKey, { apiVersion: '2025-03-31.basil' });
+      this.stripe = new Stripe(secretKey, { apiVersion: '2025-04-30.basil' });
       this.logger.log('UsageScheduler initialized Stripe client.');
     }
   }

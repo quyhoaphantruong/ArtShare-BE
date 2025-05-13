@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -11,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtPayload } from './types/jwtPayload.type';
 import { Tokens } from './types/tokens.type';
 import { Prisma } from '@prisma/client';
+import { Role } from './enums/role.enum';
 
 @Injectable()
 export class AuthService {
@@ -161,6 +163,19 @@ export class AuthService {
       this.logger.error('Invalid token', (error as Error).stack);
       throw new Error('Invalid token');
     }
+  }
+
+  async loginAdmin(token: string) {
+    const decoded = await admin.auth().verifyIdToken(token);
+    const user = await this.prisma.user.findUnique({ where:{id:decoded.uid}, include:{roles:{include:{role:true}}}});
+    if (!user) throw new UnauthorizedException('User not found');
+    const roleNames = user.roles.map(r=>r.role.role_name);
+    if (!roleNames.includes(Role.ADMIN)) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const tokens = await this.getTokens(user.id, decoded.email!, roleNames);
+    await this.prisma.user.update({ where:{id:user.id}, data:{refresh_token:tokens.refresh_token} });
+    return tokens;
   }
 
   // Đăng xuất (tạm thời chỉ xóa refresh token trên Firebase, tuỳ chỉnh theo yêu cầu)

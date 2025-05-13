@@ -56,7 +56,7 @@ export class StripeController {
     @CurrentUser() user: CurrentUserType | null,
   ) {
     this.logger.log(
-      `Received create-checkout-session request for user: ${user?.id || createCheckoutDto.email || 'Guest'}, Price ID: ${createCheckoutDto.priceId}`,
+      `Received create-checkout-session request for user: ${user?.id || createCheckoutDto.email || 'Guest'}, Plan ID: ${createCheckoutDto.planId}`,
     );
     try {
       const dtoWithUserContext = {
