@@ -16,6 +16,7 @@ import { ApiResponse } from 'src/common/api-response';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { Role } from 'src/auth/enums/role.enum';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
+import { UserProfileMeDTO } from './dto/get-user-me.dto';
 
 @Injectable()
 export class UserService {
@@ -84,6 +85,42 @@ export class UserService {
       roles: roleNames,
       isFollowing,
     };
+  }
+
+  async getUserProfileForMe(currentUser: CurrentUserType): Promise<UserProfileMeDTO> {
+    const userId = currentUser.id;
+      const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        full_name: true,
+        profile_picture_url: true,
+        roles: {
+          select: {
+            role: { // From UserRole, select the related Role
+              select: {
+                role_name: true, // The actual name of the role, e.g., "admin", "user"
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        full_name: user.full_name,
+        profile_picture_url: user.profile_picture_url,
+        roles: []
+    }
   }
 
 
