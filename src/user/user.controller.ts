@@ -40,6 +40,14 @@ export class UserController {
     return this.userService.getUserProfile(userId, currentUser);
   }
 
+  @Get('profile')
+  @ApiOperation({ summary: 'Cập nhật thông tin cá nhân của người dùng hiện tại' })
+  async getUserProfile(
+    @CurrentUser() currentUser: CurrentUserType,
+  ) {
+    return this.userService.getUserProfileForMe(currentUser);
+  }
+
   @Patch('profile')
   @ApiOperation({ summary: 'Cập nhật thông tin cá nhân của người dùng hiện tại' })
   async updateProfile(
