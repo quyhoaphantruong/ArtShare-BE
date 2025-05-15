@@ -8,7 +8,7 @@ import {
   IsString,
 } from 'class-validator';
 
-export class CreatePostDto {
+export class CreatePostRequestDto {
   @IsString()
   @IsNotEmpty()
   title!: string;
@@ -22,6 +22,7 @@ export class CreatePostDto {
   video_url?: string;
 
   @IsString()
+  @IsNotEmpty()
   thumbnail_url: string;
 
   @IsBoolean()

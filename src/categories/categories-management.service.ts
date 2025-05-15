@@ -10,6 +10,7 @@ import { EmbeddingService } from 'src/embedding/embedding.service';
 import { VECTOR_DIMENSION } from 'src/embedding/embedding.utils';
 import { SyncEmbeddingResponseDto } from '../common/response/sync-embedding.dto';
 import { Category } from '@prisma/client';
+import { QdrantService } from 'src/embedding/qdrant.service';
 
 @Injectable()
 export class CategoriesManagementService {
@@ -17,6 +18,7 @@ export class CategoriesManagementService {
     private readonly prisma: PrismaService,
     private readonly qdrantClient: QdrantClient,
     private readonly embeddingService: EmbeddingService,
+    private readonly qdrantService: QdrantService,
   ) {}
 
   private readonly INVALID_DESCRIPTION_ERROR =
@@ -25,10 +27,8 @@ export class CategoriesManagementService {
   private readonly categoriesCollectionName = 'categories';
 
   private async ensureCategoriesCollectionExists() {
-    const collectionInfo = await this.qdrantClient.collectionExists(
-      this.categoriesCollectionName,
-    );
-    if (!collectionInfo.exists) {
+    const collectionExists = await this.qdrantService.collectionExists(this.categoriesCollectionName);
+    if (!collectionExists) {
       await this.qdrantClient.createCollection(this.categoriesCollectionName, {
         vectors: {
           description: { size: VECTOR_DIMENSION, distance: 'Cosine' },
@@ -105,11 +105,8 @@ export class CategoriesManagementService {
       where: { id },
     });
 
-    // Remove the category embedding from Qdrant
-    await this.qdrantClient.delete(this.categoriesCollectionName, {
-      wait: true,
-      points: [id],
-    });
+    await this.qdrantService.deletePoints(this.categoriesCollectionName, [id]);
+
     return plainToInstance(CategoryResponseDto, deletedCategory);
   }
 

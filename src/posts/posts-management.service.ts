@@ -11,7 +11,6 @@ import { EmbeddingService } from 'src/embedding/embedding.service';
 import { MediaType, Post } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { TryCatch } from 'src/common/try-catch.decorator';
-import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
@@ -21,11 +20,19 @@ import { nanoid } from 'nanoid';
 import { Readable } from 'stream';
 import { VECTOR_DIMENSION } from 'src/embedding/embedding.utils';
 import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
+import { QdrantService } from 'src/embedding/qdrant.service';
+import { CreatePostRequestDto } from './dto/request/create-post.dto';
 
 class VectorParams {
   titleEmbedding: number[];
   descriptionEmbedding: number[];
   imagesEmbedding: number[];
+}
+
+class MediaTocreate {
+  url: string;
+  media_type: MediaType;
+  creator_id: string;
 }
 
 export class MediaData {
@@ -42,14 +49,16 @@ export class PostsManagementService {
     private readonly storageService: StorageService,
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
+    private readonly qdrantService: QdrantService,
   ) {}
 
+  @TryCatch("something went wrong with ensuring post collection exists")
   private async ensurePostCollectionExists() {
-    const collectionInfo = await this.qdrantClient.collectionExists(
+    const collectionExists = this.qdrantService.collectionExists(
       this.qdrantCollectionName,
     );
 
-    if (!collectionInfo.exists) {
+    if (!collectionExists) {
       await this.qdrantClient.createCollection(this.qdrantCollectionName, {
         vectors: {
           title: { size: VECTOR_DIMENSION, distance: 'Cosine' },
@@ -66,52 +75,117 @@ export class PostsManagementService {
 
   @TryCatch()
   async createPost(
-    createPostDto: CreatePostDto,
+    request: CreatePostRequestDto,
     images: Express.Multer.File[],
     userId: string,
   ): Promise<PostDetailsResponseDto> {
-    const { cate_ids, video_url, thumbnail_url, ...createPostData } =
-      createPostDto;
+    const { cate_ids = [], video_url, ...rest } = request;
 
-    console.log(createPostDto.thumbnail_crop_meta);
+    const { parsedCropMeta } = await this.validateCreateRequest(
+      request,
+      images,
+    );
 
-    const imageUploads: FileUploadResponse[] =
-      await this.storageService.uploadFiles(images, 'posts');
+    const mediasToCreate = await this.buildMediasToCreate(
+      images,
+      userId,
+      video_url,
+    );
 
-    const mediasData = [
-      ...(video_url ? [{ url: video_url, media_type: MediaType.video }] : []),
-      ...imageUploads.map(({ url }) => ({ url, media_type: MediaType.image })),
-    ];
-    const post = await this.prisma.post.create({
+    const createdPost = await this.prisma.post.create({
       data: {
         user_id: userId,
-        ...createPostData,
-        thumbnail_url: thumbnail_url || imageUploads[0]?.url || '', // Set thumbnail_url to the first image
-        medias: {
-          create: mediasData.map(({ url, media_type }) => ({
-            media_type,
-            url,
-            creator_id: userId,
-          })),
-        },
-        categories: {
-          connect: (cate_ids || []).map((cate_id) => ({ id: cate_id })),
-        },
-        thumbnail_crop_meta: JSON.parse(createPostDto.thumbnail_crop_meta),
+        ...rest,
+        medias: { create: mediasToCreate },
+        categories: { connect: cate_ids.map((id) => ({ id })) },
+        thumbnail_crop_meta: parsedCropMeta,
       },
       include: { medias: true, user: true, categories: true },
     });
 
-    await this.ensurePostCollectionExists();
-
-    await this.savePostEmbedding(
-      post.id,
-      createPostData.title,
-      createPostData.description,
+    void this.upsertPostEmbedding(
+      createdPost.id,
+      createdPost.title,
+      createdPost.description ?? undefined,
       images,
     );
 
-    return plainToInstance(PostDetailsResponseDto, post);
+    return plainToInstance(PostDetailsResponseDto, createdPost);
+  }
+
+  private async validateCreateRequest(
+    request: CreatePostRequestDto,
+    images: Express.Multer.File[],
+  ): Promise<{ parsedCropMeta: any }> {
+    const {
+      cate_ids = [],
+      video_url,
+      thumbnail_url,
+      title,
+      description,
+      ...rest
+    } = request;
+
+    console.log(request.thumbnail_crop_meta);
+    // Validate and parse crop metadata
+    // TODO: should define a proper type for this crop metadata
+    let parsedCropMeta: any;
+    try {
+      parsedCropMeta = JSON.parse(request.thumbnail_crop_meta);
+    } catch {
+      throw new BadRequestException('Invalid thumbnail_crop_meta JSON');
+    }
+
+    // Ensure at least one media provided
+    if (!video_url && images.length === 0) {
+      throw new BadRequestException(
+        'Provide video_url or upload at least one image',
+      );
+    }
+
+    // Validate category IDs exist
+    if (cate_ids.length) {
+      const count = await this.prisma.category.count({
+        where: { id: { in: cate_ids } },
+      });
+      if (count !== cate_ids.length) {
+        throw new BadRequestException('One or more categories not found');
+      }
+    }
+
+    return { parsedCropMeta };
+  }
+
+  private async buildMediasToCreate(
+    images: Express.Multer.File[],
+    userId: string,
+    video_url?: string,
+  ): Promise<MediaTocreate[]> {
+    const mediasToCreate: MediaTocreate[] = [];
+
+    if (video_url) {
+      mediasToCreate.push({
+        url: video_url,
+        media_type: MediaType.video,
+        creator_id: userId,
+      });
+    }
+
+    if (images.length > 0) {
+      const uploadedImages = await this.storageService.uploadFiles(
+        images,
+        'posts',
+      );
+      mediasToCreate.push(
+        ...uploadedImages.map(({ url }) => ({
+          url,
+          media_type: MediaType.image,
+          creator_id: userId,
+        })),
+      );
+    }
+
+    return mediasToCreate;
   }
 
   @TryCatch()
@@ -226,8 +300,8 @@ export class PostsManagementService {
       include: { medias: true, user: true, categories: true },
     });
 
-    this.updatePostEmbedding(
-      postId,
+    this.upsertPostEmbedding(
+      updatedPost.id,
       updatedPost.title,
       updatedPost.description ?? undefined,
       images,
@@ -236,6 +310,7 @@ export class PostsManagementService {
     return plainToInstance(PostDetailsResponseDto, updatedPost);
   }
 
+  @TryCatch()
   async deletePost(postId: number): Promise<Post> {
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
@@ -245,16 +320,25 @@ export class PostsManagementService {
     if (!post) {
       throw new NotFoundException('Post not found');
     }
+    const deletedPost = await this.prisma.post.delete({
+      where: { id: postId },
+    });
 
-    if (post.medias && post.medias.length > 0) {
-      await Promise.all(
-        post.medias.map((media) =>
-          this.storageService.deleteFiles([media.url]),
-        ),
-      );
+    this.cleanupExternalResources(
+      postId,
+      post.medias.map((m) => m.url),
+    ).catch((err) => {
+      console.error(`Failed external cleanup for post ${postId}:`, err);
+    });
+
+    return deletedPost;
+  }
+
+  private async cleanupExternalResources(postId: number, urls: string[]) {
+    if (urls.length) {
+      await this.storageService.deleteFiles(urls);
     }
-
-    return this.prisma.post.delete({ where: { id: postId } });
+    await this.qdrantService.deletePoints(this.qdrantCollectionName, [postId]);
   }
 
   private async getVectorParams(
@@ -301,12 +385,13 @@ export class PostsManagementService {
   }
 
   @TryCatch()
-  private async savePostEmbedding(
+  private async upsertPostEmbedding(
     postId: number,
     title: string,
     description: string | undefined,
     imageFiles: Express.Multer.File[],
   ): Promise<void> {
+    await this.ensurePostCollectionExists();
     const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
       await this.getVectorParams(title, description, imageFiles);
 
@@ -328,44 +413,6 @@ export class PostsManagementService {
     );
 
     console.log('Upsert operation info:', operationInfo);
-  }
-
-  @TryCatch()
-  private async updatePostEmbedding(
-    postId: number,
-    title: string,
-    description: string | undefined,
-    imageFiles: Express.Multer.File[],
-  ): Promise<void> {
-    const {
-      titleEmbedding,
-      descriptionEmbedding,
-      imagesEmbedding,
-    }: VectorParams = await this.getVectorParams(
-      title,
-      description,
-      imageFiles,
-    );
-
-    const pointVector = [
-      {
-        id: postId,
-        vector: {
-          title: titleEmbedding,
-          description: descriptionEmbedding,
-          images: imagesEmbedding,
-        } as Record<string, number[]>,
-      },
-    ];
-
-    const operationInfo = await this.qdrantClient.updateVectors(
-      this.qdrantCollectionName,
-      {
-        points: pointVector,
-      },
-    );
-
-    console.log('Update operation info:', operationInfo);
   }
 
   @TryCatch()
