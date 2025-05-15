@@ -28,36 +28,36 @@ model UserRole {
 }
 
 model User {
-  id                  String       @id
-  username            String       @unique
-  email               String       @unique
+  id                  String        @id
+  username            String        @unique
+  email               String        @unique
   full_name           String?
   profile_picture_url String?
   bio                 String?
-  created_at          DateTime     @default(now())
-  updated_at          DateTime?    @updatedAt
+  created_at          DateTime      @default(now())
+  updated_at          DateTime?     @updatedAt
   refresh_token       String?
-  birthday            DateTime?    @db.Date
-  followers_count     Int          @default(0)
-  followings_count    Int          @default(0)
-  stripe_customer_id  String?      @unique
+  birthday            DateTime?     @db.Date
+  followers_count     Int           @default(0)
+  followings_count    Int           @default(0)
+  stripe_customer_id  String?       @unique
   collections         Collection[]
   blogs               Blog[]
   bookmarks           Bookmark[]
   comments            Comment[]
-  followers           Follow[]     @relation("Follower")
-  followings          Follow[]     @relation("Following")
+  followers           Follow[]      @relation("Follower")
+  followings          Follow[]      @relation("Following")
   likes               Like[]
   posts               Post[]
   ratings             Rating[]
-  Report              Report[]     @relation("UserReports")
+  Report              Report[]      @relation("UserReports")
   shares              Share[]
   userAccess          UserAccess?
   roles               UserRole[]
   UserUsage           UserUsage[]
+  CommentLike         CommentLike[]
 
   @@map("user")
-  CommentLike CommentLike[]
 }
 
 model Post {
@@ -169,33 +169,34 @@ model CommentLike {
   comment_id Int
   created_at DateTime @default(now())
 
-  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  comment Comment @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  comment Comment   @relation(fields: [comment_id], references: [id], onDelete: Cascade)
 
   @@id([user_id, comment_id])
   @@index([comment_id])
   @@map("comment_like")
-  Comment Comment[] @relation("CommentLikes")
 }
 
 model Comment {
-  id                Int        @id @default(autoincrement())
-  user_id           String
-  parent_comment_id Int?
-  content           String
-  created_at        DateTime   @default(now())
-  updated_at        DateTime?  @updatedAt
-  target_id         Int
-  like_count        Int @default(0)
-  target_type       TargetType
-  parent_comment    Comment?   @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
-  replies           Comment[]  @relation("CommentReplies")
-  user              User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id                    Int           @id @default(autoincrement())
+  user_id               String
+  parent_comment_id     Int?
+  content               String
+  created_at            DateTime      @default(now())
+  updated_at            DateTime?     @updatedAt
+  target_id             Int
+  like_count            Int           @default(0)
+  target_type           TargetType
+  parent_comment        Comment?      @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
+  replies               Comment[]     @relation("CommentReplies")
+  user                  User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  CommentLike           CommentLike[]
+  commentLikeUser_id    String?
+  commentLikeComment_id Int?
 
   @@index([target_id, target_type])
   @@index([parent_comment_id])
   @@map("comment")
-  CommentLike CommentLike[]
 }
 
 model Share {
@@ -406,6 +407,7 @@ enum ReportTargetType {
   POST
   BLOG
   COMMENT
+  USER
 }
 
 enum ReportStatus {
