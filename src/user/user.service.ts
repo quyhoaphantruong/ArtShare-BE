@@ -87,41 +87,54 @@ export class UserService {
     };
   }
 
-  async getUserProfileForMe(currentUser: CurrentUserType): Promise<UserProfileMeDTO> {
-    const userId = currentUser.id;
-      const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+  async getUserProfileForMe(
+    currentUser: CurrentUserType
+  ): Promise<UserProfileMeDTO> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: currentUser.id },
       select: {
         id: true,
         username: true,
         email: true,
         full_name: true,
         profile_picture_url: true,
+        bio: true,
+        followers_count: true,
+        followings_count: true,
+        birthday: true,
         roles: {
           select: {
-            role: { // From UserRole, select the related Role
-              select: {
-                role_name: true, // The actual name of the role, e.g., "admin", "user"
-              },
+            role: {
+              select: { role_name: true },
             },
           },
         },
       },
     });
-
+  
     if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
+      throw new NotFoundException(`User with ID ${currentUser.id} not found`);
     }
-
+  
+    const roleNames = user.roles.map(
+      (ur) => ur.role.role_name as Role
+    );
+  
     return {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        full_name: user.full_name,
-        profile_picture_url: user.profile_picture_url,
-        roles: []
-    }
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      full_name: user.full_name,
+      profile_picture_url: user.profile_picture_url,
+      bio: user.bio,
+      followers_count: user.followers_count,
+      followings_count: user.followings_count,
+      birthday: user.birthday ?? null,
+      roles: roleNames,
+      isFollowing: false,
+    };
   }
+  
 
 
   async updateUserProfile(
