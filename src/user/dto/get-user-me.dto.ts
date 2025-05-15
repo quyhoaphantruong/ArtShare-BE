@@ -5,4 +5,5 @@ export class UserProfileMeDTO {
   full_name?: string | null;
   profile_picture_url?: string | null;
   roles: string[];
+  is_onboard: boolean;
 }

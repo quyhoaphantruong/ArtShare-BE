@@ -40,8 +40,17 @@ export class UserController {
     return this.userService.getUserProfile(userId, currentUser);
   }
 
+  @Get('profile/username/:username')
+  async getProfileByUsername(
+    @Param('username') username: string,
+    @CurrentUser() currentUser: CurrentUserType,
+  ): Promise<UserProfileDTO> {
+    return this.userService.getUserProfileByUsername(username, currentUser);
+  }
+
+  
+
   @Get('profile')
-  @ApiOperation({ summary: 'Cập nhật thông tin cá nhân của người dùng hiện tại' })
   async getUserProfile(
     @CurrentUser() currentUser: CurrentUserType,
   ) {
@@ -49,7 +58,6 @@ export class UserController {
   }
 
   @Patch('profile')
-  @ApiOperation({ summary: 'Cập nhật thông tin cá nhân của người dùng hiện tại' })
   async updateProfile(
     @CurrentUser() currentUser: CurrentUserType,
     @Body() updateUserDto: UpdateUserDTO,
@@ -57,13 +65,11 @@ export class UserController {
     return this.userService.updateUserProfile(currentUser.id, updateUserDto);
   }
 
-  // Xoá nhiều người dùng
   @Delete()
   async deleteUsers(@Body() deleteUsersDTO: DeleteUsersDTO): Promise<any> {
     return this.userService.deleteUsers(deleteUsersDTO);
   }
 
-  // Xoá người dùng bằng userId
   @Delete(':userId')
   async deleteUserById(@Param('userId') userId: string): Promise<any> {
     return this.userService.deleteUserById(userId);

@@ -41,6 +41,7 @@ model User {
   followers_count     Int           @default(0)
   followings_count    Int           @default(0)
   stripe_customer_id  String?       @unique
+  is_onboard          Boolean       @default(false)
   collections         Collection[]
   blogs               Blog[]
   bookmarks           Bookmark[]

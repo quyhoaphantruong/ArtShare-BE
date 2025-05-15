@@ -43,9 +43,6 @@ export class CommentReplyDto {
   user: UserBriefDto;
 }
 
-/*  ────────────────────────────────────────────────
-    Main DTO for top-level comments
-*/
 export class CommentDto {
   @ApiProperty({ example: 17 })
   id: number;
