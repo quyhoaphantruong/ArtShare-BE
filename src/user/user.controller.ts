@@ -32,11 +32,20 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  @Get('profile')
+  @Get('profile/:userId')
   async getProfile(
+    @Param('userId') userId: string,
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<UserProfileDTO> {
-    return this.userService.getUserProfile(currentUser.id);
+    return this.userService.getUserProfile(userId, currentUser);
+  }
+
+  @Get('profile')
+  @ApiOperation({ summary: 'Cập nhật thông tin cá nhân của người dùng hiện tại' })
+  async getUserProfile(
+    @CurrentUser() currentUser: CurrentUserType,
+  ) {
+    return this.userService.getUserProfileForMe(currentUser);
   }
 
   @Patch('profile')

@@ -1,5 +1,6 @@
 import { Role } from "src/auth/enums/role.enum";
-export class UserProfileDTO {
+
+export class UserProfileMeDTO {
   id: string; // It's good practice to return the ID as well
   username: string;
   email: string;
