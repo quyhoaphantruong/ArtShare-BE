@@ -35,15 +35,15 @@ export class WorkflowAssistService {
       throw new BadRequestException('No images provided');
     }
 
-    const [{ title, description }, cateNames] = await Promise.all([
+    const [{ title, description }, categories] = await Promise.all([
       this.generateTitleAndDescription(imageFiles),
-      this.generateCategoryNames(imageFiles),
+      this.generateCategories(imageFiles),
     ]);
 
     return {
       title: title,
       description: description,
-      category_names: cateNames,
+      categories: categories,
     };
   }
 
@@ -93,9 +93,9 @@ export class WorkflowAssistService {
     };
   }
 
-  private async generateCategoryNames(
+  private async generateCategories(
     imageFiles: Express.Multer.File[],
-  ): Promise<string[]> {
+  ): Promise<{ id: number; name: string }[]> {
     const batchInput = await Promise.all(
       imageFiles.map(async (file) => {
         return {
@@ -118,14 +118,18 @@ export class WorkflowAssistService {
     );
     console.dir(searchResponse, { depth: null });
 
-    return Array.from(
-      new Set(
-        searchResponse.flatMap((r) =>
-          r.points
-            .map((p) => p.payload?.name)
-            .filter((name): name is string => name !== undefined),
-        ),
-      ),
+    // extract id & name, then dedupe by id
+    const allHits: { id: number; name: string }[] = searchResponse.flatMap(
+      (r) =>
+        r.points.map((p) => ({
+          id: p.id as number,
+          name: (p.payload?.name || '') as string,
+        })),
     );
+    const uniqueById = Array.from(
+      new Map(allHits.map((hit) => [hit.id, hit])).values(),
+    );
+
+    return uniqueById;
   }
 }
