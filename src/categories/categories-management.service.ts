@@ -132,6 +132,12 @@ export class CategoriesManagementService {
       );
     }
 
+    await this.qdrantClient.delete(this.categoriesCollectionName, {
+      filter: {
+        must: [],
+      },
+    });
+
     const categories: Category[] = await this.prisma.category.findMany();
     if (categories.length === 0) {
       return {

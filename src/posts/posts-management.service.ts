@@ -120,10 +120,6 @@ export class PostsManagementService {
     const {
       cate_ids = [],
       video_url,
-      thumbnail_url,
-      title,
-      description,
-      ...rest
     } = request;
 
     console.log(request.thumbnail_crop_meta);

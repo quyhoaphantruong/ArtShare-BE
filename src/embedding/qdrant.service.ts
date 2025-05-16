@@ -21,4 +21,13 @@ export class QdrantService {
       points: ids,
     });
   }
+
+  @TryCatch()
+  async deleteAllPoints(collectionName: string): Promise<void> {
+    await this.qdrantClient.delete(collectionName, {
+      filter: {
+        must: [],
+      },
+    });
+  }
 }
