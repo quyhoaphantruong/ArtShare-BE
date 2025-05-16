@@ -19,9 +19,7 @@ export class UserBriefDto {
   profile_picture_url: string | null;
 }
 
-/*  ────────────────────────────────────────────────
-    DTO for a **reply** (one level deep, no nesting)
-*/
+
 export class CommentReplyDto {
   @ApiProperty({ example: 42 })
   id: number;
