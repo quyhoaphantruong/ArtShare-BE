@@ -50,11 +50,11 @@ model User {
   likes               Like[]
   posts               Post[]
   ratings             Rating[]
-  Report              Report[]     @relation("UserReports")
+  report              Report[]     @relation("UserReports")
   shares              Share[]
   userAccess          UserAccess?
   roles               UserRole[]
-  UserUsage           UserUsage[]
+  userUsage           UserUsage[]
 
   @@map("user")
 }
