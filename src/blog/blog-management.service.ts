@@ -16,18 +16,16 @@ import { BookmarkResponseDto } from './dto/response/bookmark-response.dto';
 import { ProtectResponseDto } from './dto/response/protect-response.dto';
 import { RatingResponseDto } from './dto/response/rating-response.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
-import { EmbeddingService } from 'src/embedding/embedding.service';
-import { QdrantClient } from '@qdrant/js-client-rest';
+import { BlogEmbeddingService } from './blog-embedding.service';
 
 @Injectable()
 export class BlogManagementService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly embeddingService: EmbeddingService,
-    private readonly qdrantClient: QdrantClient,
+    private readonly blogEmbeddingService: BlogEmbeddingService,
   ) {}
-  private readonly qdrantCollectionName = 'blogs';
 
+  @TryCatch()
   async createBlog(
     createBlogDto: CreateBlogDto,
     userId: string,
@@ -62,43 +60,12 @@ export class BlogManagementService {
       );
     }
 
-    void this.upsertBlogEmbeddings(
+    void this.blogEmbeddingService.upsertBlogEmbeddings(
       newBlog.id,
       newBlog.title,
       newBlog.content,
     );
     return mappedBlog;
-  }
-
-  @TryCatch()
-  private async upsertBlogEmbeddings(
-    blogId: number,
-    title: string,
-    content: string,
-  ): Promise<void> {
-    const [titleEmbedding, contentEmbedding] = await Promise.all([
-      this.embeddingService.generateEmbeddingFromText(title),
-      this.embeddingService.generateEmbeddingFromText(content),
-    ]);
-
-    const operationInfo = await this.qdrantClient.upsert(
-      this.qdrantCollectionName,
-      {
-        wait: true,
-        points: [
-          {
-            id: blogId,
-            vector: {
-              title: titleEmbedding,
-              content: contentEmbedding,
-            },
-            payload: { blogId: blogId },
-          },
-        ],
-      },
-    );
-
-    console.log('Upsert operation info:', operationInfo);
   }
 
   async updateBlog(
@@ -139,7 +106,7 @@ export class BlogManagementService {
       );
     }
 
-    void this.upsertBlogEmbeddings(
+    void this.blogEmbeddingService.upsertBlogEmbeddings(
       updatedBlog.id,
       updatedBlog.title,
       updatedBlog.content,

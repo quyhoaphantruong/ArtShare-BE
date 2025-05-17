@@ -29,6 +29,7 @@ import { WorkflowAssistService } from './workflow-assist.service';
 import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-metadata.dto';
 import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
 import { CreatePostRequestDto } from './dto/request/create-post.dto';
+import { PostsEmbeddingService } from './posts-embedding.service';
 
 @Controller('posts')
 export class PostsController {
@@ -36,6 +37,7 @@ export class PostsController {
     private readonly postsManagementService: PostsManagementService,
     private readonly postsExploreService: PostsExploreService,
     private readonly workflowAssistService: WorkflowAssistService,
+    private readonly postsEmbeddingService: PostsEmbeddingService,
   ) {}
 
   @Post()
@@ -167,7 +169,7 @@ export class PostsController {
 
   @Post('sync-embeddings')
   async syncPostsEmbedding(): Promise<SyncEmbeddingResponseDto> {
-    return this.postsManagementService.syncPostEmbeddings();
+    return this.postsEmbeddingService.syncPostEmbeddings();
   }
 
   @Post('generate-metadata')

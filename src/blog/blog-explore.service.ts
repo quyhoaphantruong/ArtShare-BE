@@ -10,8 +10,10 @@ import {
   mapBlogToListItemDto,
 } from './helpers/blog-mapping.helper';
 import { BlogDetailsResponseDto } from './dto/response/blog-details.dto';
-import { NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { TryCatch } from 'src/common/try-catch.decorator';
 
+@Injectable()
 export class BlogExploreService {
   constructor(
     private readonly prisma: PrismaService,
@@ -42,6 +44,7 @@ export class BlogExploreService {
     return whereClause;
   }
 
+  @TryCatch()
   async getBlogs(
     take: number,
     skip: number,

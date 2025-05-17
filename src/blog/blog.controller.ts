@@ -98,14 +98,13 @@ export class BlogController {
    */
   @Get('search')
   async searchBlogs(
-    @Query('q') searchQuery: string,
     @Query() queryDto: GetBlogsQueryDto,
   ): Promise<BlogListItemResponseDto[]> {
-    const { take, skip } = queryDto;
+    const { take, skip, search } = queryDto;
     const finalTake = take ?? 10;
     const finalSkip = skip ?? 0;
 
-    return this.blogExploreService.getBlogs(finalTake, finalSkip, searchQuery);
+    return this.blogExploreService.getBlogs(finalTake, finalSkip, search);
   }
 
   /**
