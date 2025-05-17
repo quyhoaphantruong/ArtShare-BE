@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { plainToInstance } from 'class-transformer';
+import { PostCategoryResponseDto } from './dto/response/category.dto';
 
 const PostMetadata = z.object({
   title: z.string(),
@@ -35,15 +37,24 @@ export class WorkflowAssistService {
       throw new BadRequestException('No images provided');
     }
 
-    const [{ title, description }, cateNames] = await Promise.all([
+    const [{ title, description }, matchedCategories] = await Promise.all([
       this.generateTitleAndDescription(imageFiles),
-      this.generateCategoryNames(imageFiles),
+      this.generateCategories(imageFiles),
     ]);
 
+    // query categories based on the categories returned from generating
+    const categories = await this.prismaService.category.findMany({
+      where: {
+        id: {
+          in: matchedCategories.map((c) => c.id),
+        },
+      },
+    });
+    
     return {
       title: title,
       description: description,
-      category_names: cateNames,
+      categories: plainToInstance(PostCategoryResponseDto, categories, {excludeExtraneousValues: true}),
     };
   }
 
@@ -93,9 +104,9 @@ export class WorkflowAssistService {
     };
   }
 
-  private async generateCategoryNames(
+  private async generateCategories(
     imageFiles: Express.Multer.File[],
-  ): Promise<string[]> {
+  ): Promise<{ id: number; name: string }[]> {
     const batchInput = await Promise.all(
       imageFiles.map(async (file) => {
         return {
@@ -118,14 +129,18 @@ export class WorkflowAssistService {
     );
     console.dir(searchResponse, { depth: null });
 
-    return Array.from(
-      new Set(
-        searchResponse.flatMap((r) =>
-          r.points
-            .map((p) => p.payload?.name)
-            .filter((name): name is string => name !== undefined),
-        ),
-      ),
+    // extract id & name, then dedupe by id
+    const allHits: { id: number; name: string }[] = searchResponse.flatMap(
+      (r) =>
+        r.points.map((p) => ({
+          id: p.id as number,
+          name: (p.payload?.name || '') as string,
+        })),
     );
+    const uniqueById = Array.from(
+      new Map(allHits.map((hit) => [hit.id, hit])).values(),
+    );
+
+    return uniqueById;
   }
 }

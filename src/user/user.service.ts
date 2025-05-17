@@ -27,6 +27,9 @@ import {
   FollowUnfollowDataDto,
   UnfollowUserResponseDto,
 } from 'src/common/response/api-response.dto';
+import { CurrentUserType } from 'src/auth/types/current-user.type';
+import { UserProfileMeDTO } from './dto/get-user-me.dto';
+import { FollowerDto } from './dto/follower.dto';
 
 @Injectable()
 export class UserService {
@@ -317,7 +320,10 @@ export class UserService {
     return { id: user.id, profilePictureUrl: user.profile_picture_url };
   }
 
-  async getUserProfile(userId: string): Promise<UserProfileDTO> {
+  async getUserProfile(
+    userId: string,
+    currentUser: CurrentUserType,
+  ): Promise<UserProfileDTO> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -330,11 +336,36 @@ export class UserService {
         followers_count: true,
         followings_count: true,
         birthday: true,
-        roles: { select: { role: { select: { role_name: true } } } },
+        is_onboard: true,
+        roles: {
+          select: {
+            role: {
+              select: {
+                role_name: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    if (!user) throw new NotFoundException(`User with ID ${userId} not found`);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    const roleNames = user.roles.map(
+      (userRole) => userRole.role.role_name as Role,
+    );
+    let isFollowing = false;
+    if (currentUser.id !== user.id) {
+      isFollowing =
+        (await this.prisma.follow.count({
+          where: {
+            follower_id: currentUser.id,
+            following_id: user.id,
+          },
+        })) > 0;
+    }
 
     return {
       id: user.id,
@@ -346,14 +377,92 @@ export class UserService {
       followers_count: user.followers_count,
       followings_count: user.followings_count,
       birthday: user.birthday ?? null,
-      roles: user.roles.map((ur) => ur.role.role_name as Role),
+      roles: roleNames,
+      isFollowing,
+      is_onboard: user.is_onboard,
     };
+  }
+
+  async getUserProfileForMe(
+    currentUser: CurrentUserType,
+  ): Promise<UserProfileMeDTO> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: currentUser.id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        full_name: true,
+        profile_picture_url: true,
+        bio: true,
+        followers_count: true,
+        followings_count: true,
+        birthday: true,
+        is_onboard: true,
+        roles: {
+          select: {
+            role: {
+              select: { role_name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${currentUser.id} not found`);
+    }
+
+    const roleNames = user.roles.map((ur) => ur.role.role_name as Role);
+
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      full_name: user.full_name,
+      profile_picture_url: user.profile_picture_url,
+      bio: user.bio,
+      followers_count: user.followers_count,
+      followings_count: user.followings_count,
+      birthday: user.birthday ?? null,
+      roles: roleNames,
+      isFollowing: false,
+      is_onboard: user.is_onboard,
+    };
+  }
+
+  async getUserProfileByUsername(
+    username: string,
+    currentUser: CurrentUserType,
+  ): Promise<UserProfileDTO> {
+    const record = await this.prisma.user.findUnique({
+      where: { username },
+      select: { id: true },
+    });
+
+    if (!record) {
+      throw new NotFoundException(
+        `User with username "${username}" not found.`,
+      );
+    }
+
+    return this.getUserProfile(record.id, currentUser);
   }
 
   async updateUserProfile(
     userId: string,
     updateUserDto: UpdateUserDTO,
-  ): Promise<UserProfileDTO> {
+  ): Promise<
+    Pick<
+      User,
+      | 'username'
+      | 'email'
+      | 'full_name'
+      | 'profile_picture_url'
+      | 'bio'
+      | 'birthday'
+    >
+  > {
     try {
       const currentUser = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -403,7 +512,7 @@ export class UserService {
 
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
-        data: dataToUpdate,
+        data: { ...dataToUpdate, is_onboard: true },
 
         select: {
           id: true,
@@ -413,6 +522,7 @@ export class UserService {
           profile_picture_url: true,
           bio: true,
           birthday: true,
+          is_onboard: true,
           followers_count: true,
           followings_count: true,
           roles: {
@@ -427,18 +537,7 @@ export class UserService {
         },
       });
 
-      return {
-        id: updatedUser.id,
-        username: updatedUser.username,
-        email: updatedUser.email,
-        full_name: updatedUser.full_name,
-        profile_picture_url: updatedUser.profile_picture_url,
-        bio: updatedUser.bio,
-        birthday: updatedUser.birthday ?? null,
-        followers_count: updatedUser.followers_count,
-        followings_count: updatedUser.followings_count,
-        roles: updatedUser.roles.map((ur) => ur.role.role_name as Role),
-      };
+      return updatedUser;
     } catch (error: any) {
       if (error instanceof PrismaClientKnownRequestError) {
         if (error.code === 'P2025')
@@ -783,5 +882,51 @@ export class UserService {
         throw new NotFoundException('Follow relationship not found to delete.');
       throw new InternalServerErrorException('Could not unfollow user.');
     }
+  }
+
+  async getFollowersListByUserId(userId: string): Promise<FollowerDto[]> {
+    const follows = await this.prisma.follow.findMany({
+      where: { following_id: userId },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            username: true,
+            full_name: true,
+            profile_picture_url: true,
+          },
+        },
+      },
+    });
+
+    return follows.map((f) => ({
+      id: f.follower.id,
+      username: f.follower.username,
+      full_name: f.follower.full_name,
+      profile_picture_url: f.follower.profile_picture_url,
+    }));
+  }
+
+  async getFollowingsListByUserId(userId: string): Promise<FollowerDto[]> {
+    const follows = await this.prisma.follow.findMany({
+      where: { follower_id: userId },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            username: true,
+            full_name: true,
+            profile_picture_url: true,
+          },
+        },
+      },
+    });
+
+    return follows.map((f) => ({
+      id: f.follower.id,
+      username: f.follower.username,
+      full_name: f.follower.full_name,
+      profile_picture_url: f.follower.profile_picture_url,
+    }));
   }
 }

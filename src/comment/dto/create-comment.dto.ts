@@ -6,8 +6,9 @@ import {
     IsOptional,
     MinLength,
   } from 'class-validator';
-  import { TargetType } from '@prisma/client';
   import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+  import { TargetType } from 'src/common/enum/target-type.enum';
+
   
   export class CreateCommentDto {
     @ApiProperty({

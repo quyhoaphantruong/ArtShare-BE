@@ -14,4 +14,5 @@ export class BlogDetailsResponseDto {
   user: BlogUserInfoResponseDto;
   pictures: string[];
   embeddedVideos: string[];
+  isLikedByCurrentUser: boolean;
 }

@@ -13,7 +13,6 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
@@ -29,6 +28,8 @@ import { SearchPostDto } from './dto/request/search-post.dto';
 import { WorkflowAssistService } from './workflow-assist.service';
 import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-metadata.dto';
 import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
+import { CreatePostRequestDto } from './dto/request/create-post.dto';
+import { PostsEmbeddingService } from './posts-embedding.service';
 
 @Controller('posts')
 export class PostsController {
@@ -36,21 +37,18 @@ export class PostsController {
     private readonly postsManagementService: PostsManagementService,
     private readonly postsExploreService: PostsExploreService,
     private readonly workflowAssistService: WorkflowAssistService,
+    private readonly postsEmbeddingService: PostsEmbeddingService,
   ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('images'))
   async createPost(
-    @Body() createPostDto: CreatePostDto,
+    @Body() request: CreatePostRequestDto,
     @UploadedFiles() images: Express.Multer.File[],
     @CurrentUser() user: CurrentUserType,
   ): Promise<any> {
-    return this.postsManagementService.createPost(
-      createPostDto,
-      images,
-      user.id,
-    );
+    return this.postsManagementService.createPost(request, images, user.id);
   }
 
   @Patch(':post_id')
@@ -77,10 +75,12 @@ export class PostsController {
   }
 
   @Post('search')
+  @Public()
   async searchPosts(
     @Body() body: SearchPostDto,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.searchPosts(body);
+    return this.postsExploreService.searchPosts(body, user?.id ?? '');
   }
 
   @Post('for-you')
@@ -118,9 +118,10 @@ export class PostsController {
   @Public()
   @Get(':post_id')
   async getPostDetails(
-    @Param('post_id') postId: number,
+    @Param('post_id', ParseIntPipe) postId: number,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostDetailsResponseDto> {
-    return this.postsExploreService.getPostDetails(Number(postId));
+    return this.postsExploreService.getPostDetails(postId, user?.id ?? '');
   }
 
   @Public()
@@ -130,11 +131,13 @@ export class PostsController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
     pageSize: number,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
     return this.postsExploreService.findPostsByUsername(
       username,
       page,
       pageSize,
+      user?.id ?? '',
     );
   }
 
@@ -151,23 +154,21 @@ export class PostsController {
     );
   }
 
+  @Public()
   @Get(':post_id/relevant')
   async getRelevantPosts(
     @Param('post_id', ParseIntPipe) postId: number,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
     pageSize: number,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.getRelevantPosts(
-      postId,
-      page,
-      pageSize,
-    );
+    return this.postsExploreService.getRelevantPosts(postId, page, pageSize, user?.id ?? '');
   }
 
   @Post('sync-embeddings')
   async syncPostsEmbedding(): Promise<SyncEmbeddingResponseDto> {
-    return this.postsManagementService.syncPostEmbeddings();
+    return this.postsEmbeddingService.syncPostEmbeddings();
   }
 
   @Post('generate-metadata')

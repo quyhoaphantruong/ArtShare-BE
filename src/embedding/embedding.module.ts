@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { EmbeddingService } from './embedding.service';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { QdrantService } from './qdrant.service';
 
 @Module({
   providers: [
     EmbeddingService,
+    QdrantService,
     {
       provide: QdrantClient,
       useFactory: () => {
@@ -16,6 +18,6 @@ import { QdrantClient } from '@qdrant/js-client-rest';
       },
     },
   ],
-  exports: [EmbeddingService, QdrantClient],
+  exports: [EmbeddingService, QdrantClient, QdrantService],
 })
 export class EmbeddingModule {}

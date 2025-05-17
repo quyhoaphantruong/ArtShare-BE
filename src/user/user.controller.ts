@@ -47,6 +47,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from 'src/storage/storage.service';
 import { Readable } from 'stream';
+import { FollowerDto } from './dto/follower.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -348,6 +349,22 @@ export class UserController {
     return this.userService.deleteUserById(userId);
   }
 
+  @Get('profile/:userId')
+  async getProfile(
+    @Param('userId') userId: string,
+    @CurrentUser() currentUser: CurrentUserType,
+  ): Promise<UserProfileDTO> {
+    return this.userService.getUserProfile(userId, currentUser);
+  }
+
+  @Get('profile/username/:username')
+  async getProfileByUsername(
+    @Param('username') username: string,
+    @CurrentUser() currentUser: CurrentUserType,
+  ): Promise<UserProfileDTO> {
+    return this.userService.getUserProfileByUsername(username, currentUser);
+  }
+
   @Get('profile')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get current logged-in user profile' })
@@ -367,7 +384,7 @@ export class UserController {
   async getCurrentUserProfile(
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<UserProfileDTO> {
-    return this.userService.getUserProfile(currentUser.id);
+    return this.userService.getUserProfileForMe(currentUser);
   }
 
   @Patch('profile')
@@ -398,7 +415,7 @@ export class UserController {
   async updateCurrentUserProfile(
     @CurrentUser() currentUser: CurrentUserType,
     @Body() updateUserDto: UpdateUserDTO,
-  ): Promise<UserProfileDTO> {
+  ) {
     return this.userService.updateUserProfile(currentUser.id, updateUserDto);
   }
 
@@ -464,5 +481,19 @@ export class UserController {
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<UnfollowUserResponseDto> {
     return this.userService.unfollowUser(currentUser.id, userIdToUnfollow);
+  }
+
+  @Get(':userId/followers')
+  async getFollowersList(
+    @Param('userId') userId: string,
+  ): Promise<FollowerDto[]> {
+    return this.userService.getFollowersListByUserId(userId);
+  }
+
+  @Get(':userId/followings')
+  async getFollowingsList(
+    @Param('userId') userId: string,
+  ): Promise<FollowerDto[]> {
+    return this.userService.getFollowingsListByUserId(userId);
   }
 }

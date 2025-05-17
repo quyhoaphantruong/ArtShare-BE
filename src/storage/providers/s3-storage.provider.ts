@@ -75,7 +75,7 @@ export class S3StorageProvider implements IStorageProvider {
     await this.s3.deleteObjects(params).promise();
   }
 
-  @TryCatch()
+  @TryCatch('Failed to upload images')
   async uploadFiles(
     files: Express.Multer.File[],
     directory: string,

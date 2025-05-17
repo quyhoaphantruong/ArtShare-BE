@@ -1,7 +1,4 @@
-export enum SharePlatform {
-  FACEBOOK = 'FACEBOOK',
-  GOOGLE = 'GOOGLE',
-}
+import { SharePlatform } from "src/common/enum/share-platform.enum";
 
 export class ShareDetailsDto {
   id: number;

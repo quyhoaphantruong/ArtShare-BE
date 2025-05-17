@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { MediaResponseDto } from './media.dto';
 import { UserResponseDto } from './user.dto';
-import { CategoryResponseDto } from './category.dto';
+import { PostCategoryResponseDto } from './category.dto';
 
 export class PostDetailsResponseDto {
   id: number;
@@ -22,6 +22,6 @@ export class PostDetailsResponseDto {
   @Type(() => UserResponseDto)
   user: UserResponseDto;
 
-  @Type(() => CategoryResponseDto)
-  categories: CategoryResponseDto[];
+  @Type(() => PostCategoryResponseDto)
+  categories: PostCategoryResponseDto[];
 }

@@ -1,5 +1,6 @@
 import { Role } from "src/auth/enums/role.enum";
-export class UserProfileDTO {
+
+export class UserProfileMeDTO {
   id: string; // It's good practice to return the ID as well
   username: string;
   email: string;
@@ -9,7 +10,7 @@ export class UserProfileDTO {
   followers_count: number;
   followings_count: number;
   birthday?: Date | null;
-  roles: Role[]; // Or string[] if you prefer simple strings from backend
+  roles: Role[];
   isFollowing: boolean;
   is_onboard: boolean;
 }
