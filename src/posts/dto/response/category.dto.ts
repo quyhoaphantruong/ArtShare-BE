@@ -1,6 +1,11 @@
-export class CategoryResponseDto {
-  cate_id: number;
-  cate_name: string;
-  url: string | null;
-  created_at: Date;
+import { Expose } from 'class-transformer';
+import { CategoryType } from 'src/categories/dto/request/create-category.dto';
+
+export class PostCategoryResponseDto {
+  @Expose()
+  id: number;
+  @Expose()
+  name: string;
+  @Expose()
+  type: CategoryType;
 }

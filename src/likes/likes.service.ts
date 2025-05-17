@@ -5,11 +5,13 @@ import { TargetType } from '@prisma/client';
 import { plainToClass } from 'class-transformer';
 import { LikeDetailsDto } from './dto/response/like-details.dto';
 import { RemoveLikeDto } from './dto/request/remove-like.dto';
+import { TryCatch } from 'src/common/try-catch.decorator';
 
 @Injectable()
 export class LikesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  @TryCatch('create like failed')
   async createLike(
     dto: CreateLikeDto,
     userId: string,
@@ -45,6 +47,7 @@ export class LikesService {
     return plainToClass(LikeDetailsDto, like);
   }
 
+  @TryCatch('remove like failed')
   async removeLike(
     dto: RemoveLikeDto,
     userId: string,

@@ -1,5 +1,5 @@
 import { IsInt, IsEnum } from 'class-validator';
-import { TargetType } from '@prisma/client';
+import { TargetType } from 'src/common/enum/target-type.enum';
 
 export class CreateLikeDto {
   @IsInt()

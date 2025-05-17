@@ -6,8 +6,9 @@ import {
     IsOptional,
     MinLength,
   } from 'class-validator';
-  import { TargetType } from '@prisma/client';
   import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+  import { TargetType } from 'src/common/enum/target-type.enum';
+
   
   export class CreateCommentDto {
     @ApiProperty({
@@ -43,5 +44,5 @@ import {
     })
     @IsInt()
     @IsOptional()
-    parent_comment_id?: number;
+    parent_comment_id?: number; // Only for replies
   }
