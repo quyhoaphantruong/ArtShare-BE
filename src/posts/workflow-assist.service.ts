@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { plainToInstance } from 'class-transformer';
+import { PostCategoryResponseDto } from './dto/response/category.dto';
 
 const PostMetadata = z.object({
   title: z.string(),
@@ -35,15 +37,24 @@ export class WorkflowAssistService {
       throw new BadRequestException('No images provided');
     }
 
-    const [{ title, description }, categories] = await Promise.all([
+    const [{ title, description }, matchedCategories] = await Promise.all([
       this.generateTitleAndDescription(imageFiles),
       this.generateCategories(imageFiles),
     ]);
 
+    // query categories based on the categories returned from generating
+    const categories = await this.prismaService.category.findMany({
+      where: {
+        id: {
+          in: matchedCategories.map((c) => c.id),
+        },
+      },
+    });
+    
     return {
       title: title,
       description: description,
-      categories: categories,
+      categories: plainToInstance(PostCategoryResponseDto, categories, {excludeExtraneousValues: true}),
     };
   }
 
