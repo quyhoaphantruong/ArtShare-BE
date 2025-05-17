@@ -1,7 +1,6 @@
 // src/reports/dto/create-report.dto.ts
 
 import { ApiProperty } from '@nestjs/swagger'; // Optional: For Swagger documentation
-import { ReportTargetType } from '@prisma/client'; // Import enum from Prisma Client
 import {
   IsEnum,
   IsNotEmpty,
@@ -9,13 +8,14 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { ReportTargetType } from '../enum/report-target-type.enum';
 
 export class CreateReportDto {
   @ApiProperty({
     description: 'The ID of the entity being reported (Post, Blog, Comment)',
   })
   @IsNotEmpty()
-  target_id: number; 
+  target_id: number;
 
   @ApiProperty({
     description: 'The type of entity being reported',
@@ -35,6 +35,6 @@ export class CreateReportDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(1)
-  @MaxLength(1000) 
+  @MaxLength(1000)
   reason: string;
 }

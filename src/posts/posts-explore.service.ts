@@ -46,10 +46,25 @@ export class PostsExploreService {
         medias: true,
         user: true,
         categories: true,
+        likes: {
+          where: { user_id: userId },
+          take: 1,
+          select: { id: true }, // only need existence
+        },
       },
     });
 
-    return plainToInstance(PostListItemResponseDto, posts);
+    // 2. Map to DTO shape
+    const postDto = posts.map((p) => {
+      const { likes, ...post } = p;
+      return {
+        ...post,
+        isLikedByCurrentUser: likes.length > 0,
+      };
+    });
+
+
+    return plainToInstance(PostListItemResponseDto, postDto);
   }
 
   async getFollowingPosts(
@@ -179,7 +194,7 @@ export class PostsExploreService {
 
     const pointIds: number[] = searchResponse.points
       .map((point) => Number(point.id))
-      .filter((pointId) => !isNaN(pointId))
+      .filter((pointId) => !isNaN(pointId));
 
     const posts: PostDetails[] = await this.prisma.post.findMany({
       where: { id: { in: pointIds } },

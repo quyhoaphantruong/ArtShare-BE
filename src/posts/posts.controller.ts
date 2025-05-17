@@ -13,7 +13,6 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { CreatePostDto } from './dto/request/create-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
@@ -29,6 +28,8 @@ import { SearchPostDto } from './dto/request/search-post.dto';
 import { WorkflowAssistService } from './workflow-assist.service';
 import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-metadata.dto';
 import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
+import { CreatePostRequestDto } from './dto/request/create-post.dto';
+import { PostsEmbeddingService } from './posts-embedding.service';
 
 @Controller('posts')
 export class PostsController {
@@ -36,18 +37,19 @@ export class PostsController {
     private readonly postsManagementService: PostsManagementService,
     private readonly postsExploreService: PostsExploreService,
     private readonly workflowAssistService: WorkflowAssistService,
+    private readonly postsEmbeddingService: PostsEmbeddingService,
   ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('images'))
   async createPost(
-    @Body() createPostDto: CreatePostDto,
+    @Body() request: CreatePostRequestDto,
     @UploadedFiles() images: Express.Multer.File[],
     @CurrentUser() user: CurrentUserType,
   ): Promise<any> {
     return this.postsManagementService.createPost(
-      createPostDto,
+      request,
       images,
       user.id,
     );
@@ -167,7 +169,7 @@ export class PostsController {
 
   @Post('sync-embeddings')
   async syncPostsEmbedding(): Promise<SyncEmbeddingResponseDto> {
-    return this.postsManagementService.syncPostEmbeddings();
+    return this.postsEmbeddingService.syncPostEmbeddings();
   }
 
   @Post('generate-metadata')

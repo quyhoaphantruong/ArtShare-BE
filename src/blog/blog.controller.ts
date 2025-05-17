@@ -12,8 +12,8 @@ import {
   NotFoundException,
   HttpCode,
   HttpStatus,
+  DefaultValuePipe,
 } from '@nestjs/common';
-import { BlogService } from './blog.service';
 import { CreateBlogDto } from './dto/request/create-blog.dto';
 import { UpdateBlogDto } from './dto/request/update-blog.dto';
 import { GetBlogsQueryDto } from './dto/request/get-blogs-query.dto';
@@ -29,11 +29,16 @@ import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { PaginationDto } from './dto/request/pagination.dto';
+import { BlogManagementService } from './blog-management.service';
+import { BlogExploreService } from './blog-explore.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('blogs')
 export class BlogController {
-  constructor(private readonly blogService: BlogService) {}
+  constructor(
+    private readonly blogManagementService: BlogManagementService,
+    private readonly blogExploreService: BlogExploreService,
+  ) {}
 
   /**
    * GET /blogs - Get list of published blogs (paginated, searchable)
@@ -45,7 +50,7 @@ export class BlogController {
     const { take, skip, search } = query;
     const finalTake = take ?? 10;
     const finalSkip = skip ?? 0;
-    return this.blogService.getBlogs(finalTake, finalSkip, search);
+    return this.blogExploreService.getBlogs(finalTake, finalSkip, search);
   }
 
   /**
@@ -60,7 +65,7 @@ export class BlogController {
     const finalTake = take ?? 10;
     const finalSkip = skip ?? 0;
 
-    return this.blogService.getTrendingBlogs(
+    return this.blogExploreService.getTrendingBlogs(
       finalTake,
       finalSkip,
       categories,
@@ -81,7 +86,7 @@ export class BlogController {
     const finalTake = take ?? 10;
     const finalSkip = skip ?? 0;
 
-    return this.blogService.getFollowingBlogs(
+    return this.blogExploreService.getFollowingBlogs(
       user.id,
       finalTake,
       finalSkip,
@@ -94,14 +99,13 @@ export class BlogController {
    */
   @Get('search')
   async searchBlogs(
-    @Query('q') searchQuery: string,
     @Query() queryDto: GetBlogsQueryDto,
   ): Promise<BlogListItemResponseDto[]> {
-    const { take, skip } = queryDto;
+    const { take, skip, search } = queryDto;
     const finalTake = take ?? 10;
     const finalSkip = skip ?? 0;
 
-    return this.blogService.getBlogs(finalTake, finalSkip, searchQuery);
+    return this.blogExploreService.getBlogs(finalTake, finalSkip, search);
   }
 
   /**
@@ -112,7 +116,7 @@ export class BlogController {
   async findMyBlogs(
     @CurrentUser() user: CurrentUserType,
   ): Promise<BlogListItemResponseDto[]> {
-    return this.blogService.findMyBlogs(user.id);
+    return this.blogExploreService.findMyBlogs(user.id);
   }
 
   /**
@@ -123,7 +127,7 @@ export class BlogController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user?: CurrentUserType,
   ): Promise<BlogDetailsResponseDto> {
-    const blog = await this.blogService.findBlogById(id, user?.id);
+    const blog = await this.blogExploreService.findBlogById(id, user?.id);
     if (!blog) {
       throw new NotFoundException(
         `Blog with ID ${id} not found or access denied.`,
@@ -142,7 +146,7 @@ export class BlogController {
     @Body() createBlogDto: CreateBlogDto,
     @CurrentUser() user: CurrentUserType,
   ): Promise<BlogDetailsResponseDto> {
-    return this.blogService.createBlog(createBlogDto, user.id);
+    return this.blogManagementService.createBlog(createBlogDto, user.id);
   }
 
   /**
@@ -155,7 +159,7 @@ export class BlogController {
     @Body() updateBlogDto: UpdateBlogDto,
     @CurrentUser() user: CurrentUserType,
   ): Promise<BlogDetailsResponseDto> {
-    return this.blogService.updateBlog(id, updateBlogDto, user.id);
+    return this.blogManagementService.updateBlog(id, updateBlogDto, user.id);
   }
 
   /**
@@ -168,7 +172,7 @@ export class BlogController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: CurrentUserType,
   ): Promise<{ message: string }> {
-    await this.blogService.deleteBlog(id, user.id);
+    await this.blogManagementService.deleteBlog(id, user.id);
     return { message: `Blog with ID ${id} successfully deleted.` };
   }
 
@@ -182,7 +186,7 @@ export class BlogController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: CurrentUserType,
   ): Promise<BookmarkResponseDto> {
-    return this.blogService.toggleBookmark(id, user.id);
+    return this.blogManagementService.toggleBookmark(id, user.id);
   }
 
   /**
@@ -195,7 +199,10 @@ export class BlogController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: CurrentUserType,
   ): Promise<ProtectResponseDto> {
-    return this.blogService.protectBlog(id, user.id /*, protectDto? */);
+    return this.blogManagementService.protectBlog(
+      id,
+      user.id /*, protectDto? */,
+    );
   }
 
   /**
@@ -209,7 +216,7 @@ export class BlogController {
     @Body() rateBlogDto: RateBlogDto,
     @CurrentUser() user: CurrentUserType,
   ): Promise<RatingResponseDto> {
-    return this.blogService.rateBlog(id, user.id, rateBlogDto.rating);
+    return this.blogManagementService.rateBlog(id, user.id, rateBlogDto.rating);
   }
 
   /**
@@ -218,13 +225,18 @@ export class BlogController {
   @Get('user/:username')
   async getBlogsByUsername(
     @Param('username') username: string,
-    @Query() paging: PaginationDto
+    @Query() paging: PaginationDto,
   ): Promise<BlogListItemResponseDto[]> {
     const { take, skip } = paging;
-    return this.blogService.getBlogsByUsername(
-      username,
-      take,
-      skip,
-    );
+    return this.blogExploreService.getBlogsByUsername(username, take, skip);
+  }
+
+  @Get(':blogId/relevant')
+  async getRelevantBlogs(
+    @Param('blogId', ParseIntPipe) blogId: number,
+    @Query('take', new DefaultValuePipe(10), ParseIntPipe) take: number,
+    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+  ): Promise<BlogListItemResponseDto[]> {
+    return this.blogExploreService.getRelevantBlogs(blogId, take, skip);
   }
 }

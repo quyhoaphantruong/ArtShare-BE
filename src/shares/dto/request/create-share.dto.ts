@@ -1,5 +1,6 @@
 import { IsEnum, IsInt } from 'class-validator';
-import { TargetType, SharePlatform } from '@prisma/client';
+import { SharePlatform } from 'src/common/enum/share-platform.enum';
+import { TargetType } from 'src/common/enum/target-type.enum';
 
 export class CreateShareDto {
   @IsInt()
