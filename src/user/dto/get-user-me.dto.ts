@@ -10,6 +10,7 @@ export class UserProfileMeDTO {
   followers_count: number;
   followings_count: number;
   birthday?: Date | null;
-  roles: Role[]; // Or string[] if you prefer simple strings from backend
+  roles: Role[];
   isFollowing: boolean;
+  is_onboard: boolean;
 }

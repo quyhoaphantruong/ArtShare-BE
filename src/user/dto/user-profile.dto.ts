@@ -11,4 +11,5 @@ export class UserProfileDTO {
   birthday?: Date | null;
   roles: Role[]; // Or string[] if you prefer simple strings from backend
   isFollowing: boolean;
+  is_onboard: boolean;
 }
