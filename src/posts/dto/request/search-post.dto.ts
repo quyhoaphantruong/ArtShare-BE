@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString } from "class-validator";
+import { IsArray, IsNumber, IsOptional, IsString } from "class-validator";
 
 export class SearchPostDto {
   @IsString()
@@ -14,5 +14,6 @@ export class SearchPostDto {
 
   @IsString({ each: true })
   @IsOptional()
+  @IsArray()
   filter?: string[];
 }

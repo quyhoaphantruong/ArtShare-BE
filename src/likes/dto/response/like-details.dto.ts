@@ -1,4 +1,4 @@
-import { TargetType } from '@prisma/client';
+import { TargetType } from "src/common/enum/target-type.enum";
 
 export class LikeDetailsDto {
   user_id: string;

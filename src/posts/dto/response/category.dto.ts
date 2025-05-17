@@ -1,6 +1,7 @@
-export class CategoryResponseDto {
-  cate_id: number;
-  cate_name: string;
-  url: string | null;
-  created_at: Date;
+import { CategoryType } from 'src/categories/dto/request/create-category.dto';
+
+export class PostCategoryResponseDto {
+  id: number;
+  name: string;
+  type: CategoryType;
 }
