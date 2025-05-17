@@ -172,7 +172,7 @@ export class CommentService {
       likedByCurrentUser: likedSet.has(c.id),
       replies: c.replies.map((r) => ({
         ...r,
-        likedByCurrentUser: likedSet.has(c.id),
+        likedByCurrentUser: likedSet.has(r.id),
       })),
     })) as CommentDto[];
   }
