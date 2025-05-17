@@ -62,16 +62,16 @@ export class BlogManagementService {
       );
     }
 
-    await this.saveBlogEmbeddings(
-      mappedBlog.id,
-      mappedBlog.title,
-      mappedBlog.content,
+    void this.upsertBlogEmbeddings(
+      newBlog.id,
+      newBlog.title,
+      newBlog.content,
     );
     return mappedBlog;
   }
 
   @TryCatch()
-  private async saveBlogEmbeddings(
+  private async upsertBlogEmbeddings(
     blogId: number,
     title: string,
     content: string,
@@ -139,45 +139,12 @@ export class BlogManagementService {
       );
     }
 
-    await this.updateBlogEmbeddings(
-      mappedBlog.id,
-      mappedBlog.title,
-      mappedBlog.content,
+    void this.upsertBlogEmbeddings(
+      updatedBlog.id,
+      updatedBlog.title,
+      updatedBlog.content,
     );
     return mappedBlog;
-  }
-
-  @TryCatch()
-  private async updateBlogEmbeddings(
-    postId: number,
-    title: string | undefined,
-    content: string | undefined,
-  ): Promise<void> {
-    const [titleEmbedding, contentEmbedding] = await Promise.all([
-      title
-        ? this.embeddingService.generateEmbeddingFromText(title)
-        : undefined,
-      content
-        ? this.embeddingService.generateEmbeddingFromText(content)
-        : undefined,
-    ]);
-
-    const operationInfo = await this.qdrantClient.updateVectors(
-      this.qdrantCollectionName,
-      {
-        points: [
-          {
-            id: postId,
-            vector: {
-              title: titleEmbedding,
-              content: contentEmbedding,
-            },
-          },
-        ],
-      },
-    );
-
-    console.log('Update operation info:', operationInfo);
   }
 
   async deleteBlog(id: number, userId: string): Promise<void> {
