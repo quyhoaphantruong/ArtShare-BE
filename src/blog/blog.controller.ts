@@ -12,6 +12,7 @@ import {
   NotFoundException,
   HttpCode,
   HttpStatus,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { CreateBlogDto } from './dto/request/create-blog.dto';
 import { UpdateBlogDto } from './dto/request/update-blog.dto';
@@ -37,7 +38,7 @@ export class BlogController {
   constructor(
     private readonly blogManagementService: BlogManagementService,
     private readonly blogExploreService: BlogExploreService,
-  ) { }
+  ) {}
 
   /**
    * GET /blogs - Get list of published blogs (paginated, searchable)
@@ -198,7 +199,10 @@ export class BlogController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: CurrentUserType,
   ): Promise<ProtectResponseDto> {
-    return this.blogManagementService.protectBlog(id, user.id /*, protectDto? */);
+    return this.blogManagementService.protectBlog(
+      id,
+      user.id /*, protectDto? */,
+    );
   }
 
   /**
@@ -221,13 +225,18 @@ export class BlogController {
   @Get('user/:username')
   async getBlogsByUsername(
     @Param('username') username: string,
-    @Query() paging: PaginationDto
+    @Query() paging: PaginationDto,
   ): Promise<BlogListItemResponseDto[]> {
     const { take, skip } = paging;
-    return this.blogExploreService.getBlogsByUsername(
-      username,
-      take,
-      skip,
-    );
+    return this.blogExploreService.getBlogsByUsername(username, take, skip);
+  }
+
+  @Get(':blogId/relevant')
+  async getRelevantBlogs(
+    @Param('blogId', ParseIntPipe) blogId: number,
+    @Query('take', new DefaultValuePipe(10), ParseIntPipe) take: number,
+    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+  ): Promise<BlogListItemResponseDto[]> {
+    return this.blogExploreService.getRelevantBlogs(blogId, take, skip);
   }
 }

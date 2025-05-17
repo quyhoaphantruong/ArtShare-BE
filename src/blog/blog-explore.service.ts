@@ -60,47 +60,8 @@ export class BlogExploreService {
       //   { title: { contains: search, mode: 'insensitive' } },
       //   { content: { contains: search, mode: 'insensitive' } },
       // ];
-      const queryEmbedding =
-        await this.embeddingService.generateEmbeddingFromText(search);
-      const searchResponse = await this.qdrantClient.query(
-        this.qdrantCollectionName,
-        {
-          prefetch: [
-            {
-              query: queryEmbedding,
-              using: 'title',
-            },
-            {
-              query: queryEmbedding,
-              using: 'content',
-            },
-          ],
-          query: {
-            fusion: 'dbsf',
-          },
-          offset: skip,
-          limit: take,
-          // with_payload: true,
-        },
-      );
 
-      const pointIds: number[] = searchResponse.points.map((point) =>
-        Number(point.id),
-      );
-
-      const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
-        where: { id: { in: pointIds } },
-        select: blogListItemSelect,
-      });
-
-      // Sort posts in the same order as returned by Qdrant
-      const sortedBlogs: BlogForListItemPayload[] = pointIds
-        .map((id) => blogs.find((blog) => blog.id === id))
-        .filter((blog) => blog !== undefined);
-
-      return sortedBlogs
-        .map(mapBlogToListItemDto)
-        .filter((b): b is BlogListItemResponseDto => b !== null);
+      return this.getBlogsByQueryEmbedding(search, take, skip);
     }
 
     const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
@@ -250,6 +211,71 @@ export class BlogExploreService {
     });
 
     return blogs
+      .map(mapBlogToListItemDto)
+      .filter((b): b is BlogListItemResponseDto => b !== null);
+  }
+
+  @TryCatch()
+  async getRelevantBlogs(
+    blogId: number,
+    take: number,
+    skip: number,
+  ): Promise<BlogListItemResponseDto[]> {
+    const blog = await this.prisma.blog.findUnique({
+      where: { id: blogId },
+    });
+    if (!blog) {
+      throw new NotFoundException(`Blog with ID ${blogId} not found.`);
+    }
+
+    const relevantQueryText = blog.title + ' ' + blog.content;
+    return await this.getBlogsByQueryEmbedding(relevantQueryText, take, skip);
+  }
+
+  private async getBlogsByQueryEmbedding(
+    searchQuery: string,
+    take: number,
+    skip: number,
+  ): Promise<BlogListItemResponseDto[]> {
+    const queryEmbedding =
+      await this.embeddingService.generateEmbeddingFromText(searchQuery);
+    const searchResponse = await this.qdrantClient.query(
+      this.qdrantCollectionName,
+      {
+        prefetch: [
+          {
+            query: queryEmbedding,
+            using: 'title',
+          },
+          {
+            query: queryEmbedding,
+            using: 'content',
+          },
+        ],
+        query: {
+          fusion: 'dbsf',
+        },
+        offset: skip,
+        limit: take,
+        // with_payload: true,
+      },
+    );
+
+    const pointIds: number[] = searchResponse.points.map((point) =>
+      Number(point.id),
+    );
+
+    const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
+      where: { id: { in: pointIds } },
+      select: blogListItemSelect,
+    });
+
+    // Sort posts in the same order as returned by Qdrant
+    const sortedBlogs: BlogForListItemPayload[] = pointIds
+      .map((id) => blogs.find((blog) => blog.id === id))
+      .filter((blog) => blog !== undefined);
+
+    return sortedBlogs
       .map(mapBlogToListItemDto)
       .filter((b): b is BlogListItemResponseDto => b !== null);
   }
