@@ -212,6 +212,7 @@ export class PostsExploreService {
     postId: number,
     page: number,
     page_size: number,
+    userId: string,
   ): Promise<PostListItemResponseDto[]> {
     const post: Post | null = await this.prisma.post.findUnique({
       where: { id: postId },
@@ -257,7 +258,7 @@ export class PostsExploreService {
 
     const posts: PostWithRelations[] = await this.prisma.post.findMany({
       where: { id: { in: pointIds } },
-      include: this.buildPostIncludes(post.user_id),
+      include: this.buildPostIncludes(userId),
     });
 
     const sortedPosts = pointIds

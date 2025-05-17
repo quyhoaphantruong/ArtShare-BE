@@ -154,14 +154,16 @@ export class PostsController {
     );
   }
 
+  @Public()
   @Get(':post_id/relevant')
   async getRelevantPosts(
     @Param('post_id', ParseIntPipe) postId: number,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
     pageSize: number,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.getRelevantPosts(postId, page, pageSize);
+    return this.postsExploreService.getRelevantPosts(postId, page, pageSize, user?.id ?? '');
   }
 
   @Post('sync-embeddings')
