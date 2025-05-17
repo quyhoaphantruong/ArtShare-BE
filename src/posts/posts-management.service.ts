@@ -413,26 +413,8 @@ export class PostsManagementService {
 
   @TryCatch()
   async syncPostEmbeddings(): Promise<SyncEmbeddingResponseDto> {
-    // Check if the collection exists
-    const collectionInfo = await this.qdrantClient.collectionExists(
-      this.qdrantCollectionName,
-    );
-    if (!collectionInfo.exists) {
-      throw new BadRequestException(
-        `Collection '${this.qdrantCollectionName}' does not exist.`,
-      );
-    }
-
-    // delete all points in the collection by using empty filter
-    await this.qdrantClient.delete(this.qdrantCollectionName, {
-      filter: {
-        must: [],
-      },
-    });
-    console.log(
-      `Deleted all points in collection '${this.qdrantCollectionName}'.`,
-    );
-
+    await this.qdrantService.deleteAllPoints(this.qdrantCollectionName);
+  
     const posts = await this.prisma.post.findMany({
       include: { medias: true },
     });

@@ -42,7 +42,7 @@ export class CategoriesManagementService {
   async create(
     createCategoryDto: CreateCategoryDto,
   ): Promise<CategoryResponseDto> {
-    await this.verifyCreateRequest(createCategoryDto);
+    await this.validateCreateRequest(createCategoryDto);
 
     await this.ensureCategoriesCollectionExists();
 
@@ -60,7 +60,7 @@ export class CategoriesManagementService {
     id: number,
     updateCategoryDto: UpdateCategoryDto,
   ): Promise<CategoryResponseDto> {
-    await this.verifyUpdateRequest(updateCategoryDto);
+    await this.validateUpdateRequest(updateCategoryDto);
 
     await this.checkCategoryExists(id);
 
@@ -74,7 +74,7 @@ export class CategoriesManagementService {
     return plainToInstance(CategoryResponseDto, updatedCategory);
   }
 
-  private async verifyCreateRequest(
+  private async validateCreateRequest(
     createCategoryDto: CreateCategoryDto,
   ): Promise<void> {
     if (this.isInvalidDescription(createCategoryDto.description)) {
@@ -82,7 +82,7 @@ export class CategoriesManagementService {
     }
   }
 
-  private async verifyUpdateRequest(
+  private async validateUpdateRequest(
     updateCategoryDto: UpdateCategoryDto,
   ): Promise<void> {
     if (
@@ -121,22 +121,7 @@ export class CategoriesManagementService {
 
   @TryCatch()
   async syncEmbeddings(): Promise<SyncEmbeddingResponseDto> {
-    // Check if the collection exists
-    const collectionInfo = await this.qdrantClient.collectionExists(
-      this.categoriesCollectionName,
-    );
-    console.log('Collection info:', collectionInfo);
-    if (collectionInfo.exists === false) {
-      throw new BadRequestException(
-        `Collection ${this.categoriesCollectionName} does not exist`,
-      );
-    }
-
-    await this.qdrantClient.delete(this.categoriesCollectionName, {
-      filter: {
-        must: [],
-      },
-    });
+    await this.qdrantService.deleteAllPoints(this.categoriesCollectionName);
 
     const categories: Category[] = await this.prisma.category.findMany();
     if (categories.length === 0) {
