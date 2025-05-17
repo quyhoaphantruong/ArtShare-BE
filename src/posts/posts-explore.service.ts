@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
-import { plainToInstance } from 'class-transformer';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { PrismaService } from 'src/prisma.service';
 import { Post, Prisma } from '@prisma/client';
@@ -8,10 +7,11 @@ import { EmbeddingService } from 'src/embedding/embedding.service';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { SearchPostDto } from './dto/request/search-post.dto';
-
-type PostDetails = Prisma.PostGetPayload<{
-  include: { categories: true; user: true; medias: true };
-}>;
+import {
+  mapPostListToDto,
+  mapPostToDto,
+  PostWithRelations,
+} from './mapper/posts-explore.mapper';
 
 @Injectable()
 export class PostsExploreService {
@@ -22,6 +22,19 @@ export class PostsExploreService {
   ) {}
 
   private readonly qdrantCollectionName = 'posts';
+
+  private buildPostIncludes = (userId: string): Prisma.PostInclude => {
+    return {
+      medias: true,
+      user: true,
+      categories: true,
+      likes: {
+        where: { user_id: userId },
+        take: 1,
+        select: { id: true }, // only need existence
+      },
+    };
+  };
 
   @TryCatch()
   async getForYouPosts(
@@ -42,29 +55,10 @@ export class PostsExploreService {
       orderBy: { share_count: 'desc' },
       take: page_size,
       skip,
-      include: {
-        medias: true,
-        user: true,
-        categories: true,
-        likes: {
-          where: { user_id: userId },
-          take: 1,
-          select: { id: true }, // only need existence
-        },
-      },
+      include: this.buildPostIncludes(userId),
     });
 
-    // 2. Map to DTO shape
-    const postDto = posts.map((p) => {
-      const { likes, ...post } = p;
-      return {
-        ...post,
-        isLikedByCurrentUser: likes.length > 0,
-      };
-    });
-
-
-    return plainToInstance(PostListItemResponseDto, postDto);
+    return mapPostListToDto(posts);
   }
 
   async getFollowingPosts(
@@ -94,24 +88,23 @@ export class PostsExploreService {
       where: whereClause,
       skip,
       take: page_size,
-      include: {
-        medias: true,
-        user: true,
-        categories: true,
-      },
+      include: this.buildPostIncludes(userId),
       orderBy: {
         created_at: 'desc',
       },
     });
 
-    return plainToInstance(PostListItemResponseDto, posts);
+    return mapPostListToDto(posts);
   }
 
   @TryCatch()
-  async getPostDetails(postId: number): Promise<PostDetailsResponseDto> {
+  async getPostDetails(
+    postId: number,
+    userId: string,
+  ): Promise<PostDetailsResponseDto> {
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
-      include: { medias: true, user: true, categories: true },
+      include: this.buildPostIncludes(userId),
     });
 
     if (!post) {
@@ -123,7 +116,7 @@ export class PostsExploreService {
       where: { id: postId },
       data: { view_count: { increment: 1 } },
     });
-    return plainToInstance(PostDetailsResponseDto, post);
+    return mapPostToDto(post);
   }
 
   @TryCatch()
@@ -131,6 +124,7 @@ export class PostsExploreService {
     username: string,
     page: number,
     page_size: number,
+    userId: string = '',
   ): Promise<PostListItemResponseDto[]> {
     const user = await this.prisma.user.findUnique({
       where: { username: username },
@@ -147,21 +141,20 @@ export class PostsExploreService {
       where: { user_id: user.id },
       skip,
       take: page_size,
-      include: {
-        medias: true,
-        user: true,
-        categories: true,
-      },
+      include: this.buildPostIncludes(userId),
       orderBy: {
         created_at: 'desc',
       },
     });
 
-    return plainToInstance(PostListItemResponseDto, posts);
+    return mapPostListToDto(posts);
   }
 
   @TryCatch()
-  async searchPosts(body: SearchPostDto): Promise<PostListItemResponseDto[]> {
+  async searchPosts(
+    body: SearchPostDto,
+    userId: string,
+  ): Promise<PostListItemResponseDto[]> {
     const { q, page = 1, page_size = 25, filter } = body;
 
     const queryEmbedding =
@@ -196,22 +189,22 @@ export class PostsExploreService {
       .map((point) => Number(point.id))
       .filter((pointId) => !isNaN(pointId));
 
-    const posts: PostDetails[] = await this.prisma.post.findMany({
+    const posts: PostWithRelations[] = await this.prisma.post.findMany({
       where: { id: { in: pointIds } },
-      include: { medias: true, user: true, categories: true },
+      include: this.buildPostIncludes(userId),
     });
 
     // Sort posts in the same order as returned by Qdrant
-    let sortedPosts: PostDetails[] = pointIds
-      .map((id) => posts.find((post: PostDetails) => post.id === id))
-      .filter((post): post is PostDetails => post !== undefined);
+    let sortedPosts: PostWithRelations[] = pointIds
+      .map((id) => posts.find((post: PostWithRelations) => post.id === id))
+      .filter((post): post is PostWithRelations => post !== undefined);
 
     if (filter && filter.length > 0) {
       sortedPosts = sortedPosts.filter((post) =>
         post.categories.some((category) => filter.includes(category.name)),
       );
     }
-    return plainToInstance(PostListItemResponseDto, sortedPosts);
+    return mapPostListToDto(sortedPosts);
   }
 
   @TryCatch()
@@ -219,6 +212,7 @@ export class PostsExploreService {
     postId: number,
     page: number,
     page_size: number,
+    userId: string,
   ): Promise<PostListItemResponseDto[]> {
     const post: Post | null = await this.prisma.post.findUnique({
       where: { id: postId },
@@ -262,14 +256,15 @@ export class PostsExploreService {
       .filter((pointId) => !isNaN(pointId))
       .filter((pointId) => pointId !== postId);
 
-    const posts: Post[] = await this.prisma.post.findMany({
+    const posts: PostWithRelations[] = await this.prisma.post.findMany({
       where: { id: { in: pointIds } },
+      include: this.buildPostIncludes(userId),
     });
 
     const sortedPosts = pointIds
       .map((id) => posts.find((post) => post.id === id))
       .filter((post) => post !== undefined);
 
-    return plainToInstance(PostListItemResponseDto, sortedPosts);
+    return mapPostListToDto(sortedPosts);
   }
 }
