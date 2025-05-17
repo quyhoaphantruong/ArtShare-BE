@@ -10,7 +10,6 @@ import { UpdateBlogDto } from './dto/request/update-blog.dto';
 import { BlogDetailsResponseDto } from './dto/response/blog-details.dto';
 import {
   mapBlogToDetailsDto,
-  BlogWithUser,
   BlogWithRelations,
 } from './helpers/blog-mapping.helper';
 import { BookmarkResponseDto } from './dto/response/bookmark-response.dto';

@@ -46,14 +46,14 @@ export type BlogWithRelations = Prisma.BlogGetPayload<{
 }>;
 
 export const mapBlogToDetailsDto = (
-  blog: BlogWithRelations | null,
+  blog: BlogWithUser | BlogWithRelations | null,
 ): BlogDetailsResponseDto | null => {
-  if (!blog || !blog.user) {
-    console.warn(
-      `Blog with ID ${blog?.id ?? 'unknown'} is missing expected user relation for DTO mapping.`,
-    );
-    return null;
-  }
+  if (!blog || !blog.user) return null;
+
+  const likeArray = Array.isArray((blog as any).likes)
+    ? (blog as BlogWithRelations).likes
+    : [];
+
   return {
     id: blog.id,
     title: blog.title,
@@ -72,7 +72,7 @@ export const mapBlogToDetailsDto = (
       username: blog.user.username,
       profile_picture_url: blog.user.profile_picture_url,
     },
-    isLikedByCurrentUser: blog.likes.length > 0,
+    isLikedByCurrentUser: likeArray.length > 0,
   };
 };
 
