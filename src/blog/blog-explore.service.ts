@@ -98,6 +98,11 @@ export class BlogExploreService {
         user: {
           select: { id: true, username: true, profile_picture_url: true },
         },
+        likes: {
+          where: { user_id: requestingUserId ?? '' },
+          select: { id: true },
+          take: 1,
+        }
       },
     });
 
