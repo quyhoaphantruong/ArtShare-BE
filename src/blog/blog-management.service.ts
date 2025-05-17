@@ -11,6 +11,7 @@ import { BlogDetailsResponseDto } from './dto/response/blog-details.dto';
 import {
   mapBlogToDetailsDto,
   BlogWithUser,
+  BlogWithRelations,
 } from './helpers/blog-mapping.helper';
 import { BookmarkResponseDto } from './dto/response/bookmark-response.dto';
 import { ProtectResponseDto } from './dto/response/protect-response.dto';
@@ -86,12 +87,17 @@ export class BlogManagementService {
       );
     }
 
-    const updatedBlog: BlogWithUser = await this.prisma.blog.update({
+    const updatedBlog: BlogWithRelations = await this.prisma.blog.update({
       where: { id },
       data: { ...updateBlogDto, updated_at: new Date() },
       include: {
         user: {
           select: { id: true, username: true, profile_picture_url: true },
+        },
+        likes: {
+          where: { user_id: userId ?? '' },
+          select: { id: true },
+          take: 1,
         },
       },
     });

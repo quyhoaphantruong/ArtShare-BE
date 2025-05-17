@@ -32,8 +32,21 @@ export type BlogWithUser = Prisma.BlogGetPayload<{
   };
 }>;
 
+export type BlogWithRelations = Prisma.BlogGetPayload<{
+  include: {
+    user: {
+      select: { id: true; username: true; profile_picture_url: true };
+    };
+    likes: {
+      where: { user_id: string };
+      select: { id: true };
+      take: 1;
+    };
+  };
+}>;
+
 export const mapBlogToDetailsDto = (
-  blog: BlogWithUser | null,
+  blog: BlogWithRelations | null,
 ): BlogDetailsResponseDto | null => {
   if (!blog || !blog.user) {
     console.warn(
@@ -59,6 +72,7 @@ export const mapBlogToDetailsDto = (
       username: blog.user.username,
       profile_picture_url: blog.user.profile_picture_url,
     },
+    isLikedByCurrentUser: blog.likes.length > 0,
   };
 };
 
