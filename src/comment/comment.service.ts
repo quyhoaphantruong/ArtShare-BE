@@ -168,12 +168,12 @@ export class CommentService {
     const likedSet = new Set(likedRows.map((l) => l.comment_id));
 
     return comments.map((c) => ({
-        ...c,
-        likedByCurrentUser: false,
-        replies: c.replies.map((r) => ({
-          ...r,
-          likedByCurrentUser: likedSet.has(c.id),
-        })),
+      ...c,
+      likedByCurrentUser: likedSet.has(c.id),
+      replies: c.replies.map((r) => ({
+        ...r,
+        likedByCurrentUser: likedSet.has(c.id),
+      })),
     })) as CommentDto[];
   }
 
@@ -257,9 +257,7 @@ export class CommentService {
         throw new NotFoundException(`Comment ${commentId} no longer exists.`);
       }
       console.error('Error deleting comment', { commentId, err });
-      throw new InternalServerErrorException(
-        'Could not delete the comment.',
-      );
+      throw new InternalServerErrorException('Could not delete the comment.');
     }
   }
 
