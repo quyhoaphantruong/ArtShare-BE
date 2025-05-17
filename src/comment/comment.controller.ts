@@ -3,8 +3,6 @@ import {
   Post,
   Body,
   UseGuards,
-  UsePipes,
-  ValidationPipe,
   HttpStatus,
   Get,
   Query,
