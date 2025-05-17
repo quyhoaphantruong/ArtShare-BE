@@ -30,9 +30,6 @@ export class CommentReplyDto {
   @ApiProperty({ example: '2025-05-14T20:15:22.000Z' })
   created_at: Date;
 
-  @ApiProperty({ example: 3 })
-  like_count: number;
-
   @ApiProperty({ example: true })
   likedByCurrentUser: boolean;
 
@@ -50,9 +47,6 @@ export class CommentDto {
 
   @ApiProperty({ example: '2025-05-14T20:00:00.000Z' })
   created_at: Date;
-
-  @ApiProperty({ example: 5 })
-  like_count: number;
 
   @ApiProperty({ example: false })
   likedByCurrentUser: boolean;

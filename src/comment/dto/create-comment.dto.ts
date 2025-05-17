@@ -43,5 +43,5 @@ import {
     })
     @IsInt()
     @IsOptional()
-    parent_comment_id?: number; // Only for replies
+    parent_comment_id?: number;
   }

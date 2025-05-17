@@ -59,7 +59,6 @@ export class CommentService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // ① create the comment
         const newComment = await tx.comment.create({
           data: {
             content,
@@ -148,7 +147,14 @@ export class CommentService {
 
     /* ────────── 2. if guest, return immediately ────────── */
     if (!currentUserId || comments.length === 0) {
-      return comments.map((c) => ({ ...c, likedByCurrentUser: false }));
+      return comments.map((c) => ({
+        ...c,
+        likedByCurrentUser: false,
+        replies: c.replies.map((r) => ({
+          ...r,
+          likedByCurrentUser: false,
+        })),
+      })) as CommentDto[];
     }
 
     /* ────────── 3. fetch the user's likes in one query ─── */
@@ -161,11 +167,14 @@ export class CommentService {
     });
     const likedSet = new Set(likedRows.map((l) => l.comment_id));
 
-    /* ────────── 4. merge & return ──────────────────────── */
     return comments.map((c) => ({
-      ...c,
-      likedByCurrentUser: likedSet.has(c.id),
-    }));
+        ...c,
+        likedByCurrentUser: false,
+        replies: c.replies.map((r) => ({
+          ...r,
+          likedByCurrentUser: likedSet.has(c.id),
+        })),
+    })) as CommentDto[];
   }
 
   async update(
@@ -185,7 +194,6 @@ export class CommentService {
       throw new ForbiddenException(`You cannot edit someone else's comment.`);
     }
 
-    // 3) Perform the update
     try {
       return await this.prisma.comment.update({
         where: { id: commentId },
@@ -206,33 +214,55 @@ export class CommentService {
   }
 
   async remove(commentId: number, userId: string): Promise<void> {
-    // 1) Verify the comment exists and belongs to the user
     const existing = await this.prisma.comment.findUnique({
       where: { id: commentId },
-      select: { id: true, user_id: true },
+      select: {
+        id: true,
+        user_id: true,
+        target_id: true,
+        target_type: true,
+      },
     });
-    if (!existing)
+    if (!existing) {
       throw new NotFoundException(`Comment ${commentId} not found.`);
-    if (existing.user_id !== userId)
-      throw new ForbiddenException(`Not your comment.`);
+    }
+    if (existing.user_id !== userId) {
+      throw new ForbiddenException(`You cannot delete someone else's comment.`);
+    }
 
-    // 2) Delete (or detach) any replies first
-    await this.prisma.comment.deleteMany({
-      where: { parent_comment_id: commentId },
-    });
-    // 3) Now delete the comment itself
     try {
-      await this.prisma.comment.delete({ where: { id: commentId } });
+      await this.prisma.$transaction(async (tx) => {
+        const deleteResult = await tx.comment.deleteMany({
+          where: { parent_comment_id: commentId },
+        });
+        const repliesRemoved = deleteResult.count;
+        await tx.comment.delete({ where: { id: commentId } });
+
+        const totalToDecrement = 1 + repliesRemoved;
+        if (existing.target_type === TargetType.POST) {
+          await tx.post.update({
+            where: { id: existing.target_id },
+            data: { comment_count: { decrement: totalToDecrement } },
+          });
+        } else {
+          await tx.blog.update({
+            where: { id: existing.target_id },
+            data: { comment_count: { decrement: totalToDecrement } },
+          });
+        }
+      });
     } catch (err: any) {
-      if (err.code === 'P2025') {
+      // If deleteMany / delete missed, Prisma throws P2025
+      if (err?.code === 'P2025') {
         throw new NotFoundException(`Comment ${commentId} no longer exists.`);
       }
       console.error('Error deleting comment', { commentId, err });
-      throw new InternalServerErrorException('Could not delete the comment.');
+      throw new InternalServerErrorException(
+        'Could not delete the comment.',
+      );
     }
   }
 
-  // comment.service.ts
   async likeComment(userId: string, commentId: number) {
     return this.prisma.$transaction(async (tx) => {
       await tx.commentLike.create({

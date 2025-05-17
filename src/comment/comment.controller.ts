@@ -17,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Comment, TargetType } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
@@ -91,12 +91,11 @@ export class CommentController {
   @Delete('/:id')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete your own comment' })
   async deleteComment(
     @Param('id', ParseIntPipe) commentId: number,
     @CurrentUser() user: CurrentUserType,
   ): Promise<void> {
-    console.log('user comment', user);
+    console.log('remove user comment', user);
     await this.commentService.remove(commentId, user.id);
   }
 

@@ -17,6 +17,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { Role } from 'src/auth/enums/role.enum';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { UserProfileMeDTO } from './dto/get-user-me.dto';
+import { FollowerDto } from './dto/follower.dto';
 
 @Injectable()
 export class UserService {
@@ -351,5 +352,51 @@ export class UserService {
         { cause: error },
       );
     }
+  }
+
+  async getFollowersListByUserId(userId: string): Promise<FollowerDto[]> {
+    const follows = await this.prisma.follow.findMany({
+      where: { following_id: userId },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            username: true,
+            full_name: true,
+            profile_picture_url: true,
+          },
+        },
+      },
+    });
+
+    return follows.map((f) => ({
+      id: f.follower.id,
+      username: f.follower.username,
+      full_name: f.follower.full_name,
+      profile_picture_url: f.follower.profile_picture_url,
+    }));
+  }
+
+  async getFollowingsListByUserId(userId: string): Promise<FollowerDto[]> {
+    const follows = await this.prisma.follow.findMany({
+      where: { follower_id: userId },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            username: true,
+            full_name: true,
+            profile_picture_url: true,
+          },
+        },
+      },
+    });
+
+    return follows.map((f) => ({
+      id: f.follower.id,
+      username: f.follower.username,
+      full_name: f.follower.full_name,
+      profile_picture_url: f.follower.profile_picture_url,
+    }));
   }
 }

@@ -192,8 +192,6 @@ model Comment {
   replies               Comment[]     @relation("CommentReplies")
   user                  User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
   CommentLike           CommentLike[]
-  commentLikeUser_id    String?
-  commentLikeComment_id Int?
 
   @@index([target_id, target_type])
   @@index([parent_comment_id])

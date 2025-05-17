@@ -19,6 +19,7 @@ import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { Roles } from 'src/auth/decorators/roles.decorators';
 import { Role } from 'src/auth/enums/role.enum';
 import { ApiResponse } from 'src/common/api-response';
+import { FollowerDto } from './dto/follower.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -88,5 +89,19 @@ export class UserController {
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<ApiResponse<any>> {
     return this.userService.unfollowUser(currentUser.id, userIdToUnfollow);
+  }
+
+  @Get(':userId/followers')
+  async getFollowersList(
+    @Param('userId') userId: string,
+  ): Promise<FollowerDto[]> {
+    return this.userService.getFollowersListByUserId(userId);
+  }
+
+   @Get(':userId/followings')
+  async getFollowingsList(
+    @Param('userId') userId: string,
+  ): Promise<FollowerDto[]> {
+    return this.userService.getFollowingsListByUserId(userId);
   }
 }
