@@ -48,11 +48,7 @@ export class PostsController {
     @UploadedFiles() images: Express.Multer.File[],
     @CurrentUser() user: CurrentUserType,
   ): Promise<any> {
-    return this.postsManagementService.createPost(
-      request,
-      images,
-      user.id,
-    );
+    return this.postsManagementService.createPost(request, images, user.id);
   }
 
   @Patch(':post_id')
@@ -79,10 +75,12 @@ export class PostsController {
   }
 
   @Post('search')
+  @Public()
   async searchPosts(
     @Body() body: SearchPostDto,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.searchPosts(body);
+    return this.postsExploreService.searchPosts(body, user?.id ?? '');
   }
 
   @Post('for-you')
@@ -120,9 +118,10 @@ export class PostsController {
   @Public()
   @Get(':post_id')
   async getPostDetails(
-    @Param('post_id') postId: number,
+    @Param('post_id', ParseIntPipe) postId: number,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostDetailsResponseDto> {
-    return this.postsExploreService.getPostDetails(Number(postId));
+    return this.postsExploreService.getPostDetails(postId, user?.id ?? '');
   }
 
   @Public()
@@ -132,11 +131,13 @@ export class PostsController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
     pageSize: number,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
     return this.postsExploreService.findPostsByUsername(
       username,
       page,
       pageSize,
+      user?.id ?? '',
     );
   }
 
@@ -160,11 +161,7 @@ export class PostsController {
     @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
     pageSize: number,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.getRelevantPosts(
-      postId,
-      page,
-      pageSize,
-    );
+    return this.postsExploreService.getRelevantPosts(postId, page, pageSize);
   }
 
   @Post('sync-embeddings')
