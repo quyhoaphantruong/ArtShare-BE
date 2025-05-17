@@ -75,7 +75,6 @@ export class CommentController {
     @Param('id', ParseIntPipe) commentId: number,
     @CurrentUser() user: CurrentUserType,
   ): Promise<void> {
-    console.log('remove user comment', user);
     await this.commentService.remove(commentId, user.id);
   }
 
