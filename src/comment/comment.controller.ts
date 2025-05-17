@@ -25,52 +25,34 @@ import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 
 @ApiTags('comments')
+@UseGuards(JwtAuthGuard)
 @Controller('comments')
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 
   @Post('create')
-  @UseGuards(JwtAuthGuard)
-  @UsePipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true, // Throw error if non-whitelisted properties are present
-      transform: true, // Automatically transform payloads to DTO instances (e.g., string numbers to numbers)
-      transformOptions: { enableImplicitConversion: true }, // Helps with query/param auto-conversion if needed elsewhere
-    }),
-  )
   async create(
     @Body() createCommentDto: CreateCommentDto,
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<Comment> {
     const userId = currentUser.id;
-    if (!userId) {
-      console.error('UserID not found on request object after JwtAuthGuard.');
-      throw new Error('Authentication error: User ID missing.');
-    }
-
     return this.commentService.create(createCommentDto, userId);
   }
 
   @Get()
   @UseGuards(JwtAuthGuard)
   async getComments(
-    @Query('target_id') targetId: string,
+    @Query('target_id', ParseIntPipe) targetId: number,
     @Query('target_type') targetType: TargetType,
     @CurrentUser() currentUser: CurrentUserType,
     @Query('parent_comment_id') parentCommentId?: string,
   ) {
-    const id = parseInt(targetId);
-    if (isNaN(id)) {
-      throw new BadRequestException('Invalid target_id');
-    }
-
     if (!Object.values(TargetType).includes(targetType)) {
       throw new BadRequestException('Invalid target_type');
     }
 
     return this.commentService.getComments(
-      id,
+      targetId,
       targetType,
       currentUser.id,
       parentCommentId ? parseInt(parentCommentId) : undefined,
@@ -78,7 +60,6 @@ export class CommentController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Edit your own comment' })
   async updateComment(
     @Param('id', ParseIntPipe) commentId: number,
@@ -89,7 +70,6 @@ export class CommentController {
   }
 
   @Delete('/:id')
-  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteComment(
     @Param('id', ParseIntPipe) commentId: number,
@@ -100,7 +80,6 @@ export class CommentController {
   }
 
   @Post(':commentId/like')
-  @UseGuards(JwtAuthGuard)
   async like(
     @Param('commentId', ParseIntPipe) commentId: number,
     @CurrentUser() user: CurrentUserType,
@@ -110,7 +89,6 @@ export class CommentController {
   }
 
   @Post(':commentId/unlike')
-  @UseGuards(JwtAuthGuard)
   async unlike(
     @Param('commentId', ParseIntPipe) commentId: number,
     @CurrentUser() user: CurrentUserType,

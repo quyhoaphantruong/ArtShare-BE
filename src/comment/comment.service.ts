@@ -132,30 +132,8 @@ export class CommentService {
         user: {
           select: { id: true, username: true, profile_picture_url: true },
         },
-        replies: {
-          select: {
-            id: true,
-            content: true,
-            created_at: true,
-            user: {
-              select: { id: true, username: true, profile_picture_url: true },
-            },
-          },
-        },
       },
     });
-
-    /* ────────── 2. if guest, return immediately ────────── */
-    if (!currentUserId || comments.length === 0) {
-      return comments.map((c) => ({
-        ...c,
-        likedByCurrentUser: false,
-        replies: c.replies.map((r) => ({
-          ...r,
-          likedByCurrentUser: false,
-        })),
-      })) as CommentDto[];
-    }
 
     /* ────────── 3. fetch the user's likes in one query ─── */
     const likedRows = await this.prisma.commentLike.findMany({
@@ -169,11 +147,8 @@ export class CommentService {
 
     return comments.map((c) => ({
         ...c,
-        likedByCurrentUser: false,
-        replies: c.replies.map((r) => ({
-          ...r,
-          likedByCurrentUser: likedSet.has(c.id),
-        })),
+        likedByCurrentUser: likedSet.has(c.id),
+        replies: []
     })) as CommentDto[];
   }
 
