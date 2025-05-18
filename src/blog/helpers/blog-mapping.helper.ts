@@ -66,6 +66,10 @@ export const mapBlogToDetailsDto = (
   const likeArray = Array.isArray((blog as any).likes)
     ? (blog as BlogWithRelations).likes
     : [];
+  
+  const isFollowedByCurrentUser = (blog.user as any).followers
+    ? (blog.user as any).followers.length > 0
+    : false;
 
   return {
     id: blog.id,
@@ -86,7 +90,7 @@ export const mapBlogToDetailsDto = (
       profile_picture_url: blog.user.profile_picture_url,
       full_name: blog.user.full_name,
       followers_count: blog.user.followers_count,
-      is_following: (blog.user as any).is_following ?? false,
+      is_following: isFollowedByCurrentUser,
     },
     isLikedByCurrentUser: likeArray.length > 0,
   };
