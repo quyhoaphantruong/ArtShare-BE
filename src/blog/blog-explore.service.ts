@@ -102,11 +102,7 @@ export class BlogExploreService {
             profile_picture_url: true,
             full_name: true,
             followers_count: true,
-            followers: {
-              where: { follower_id: requestingUserId ?? '' },
-              select: { follower_id: true },
-              take: 1,
-            }
+            followers: true
           },
         },
         likes: {
@@ -117,6 +113,8 @@ export class BlogExploreService {
       },
     });
 
+    console.log("@@ blog user", blog?.user)
+    console.log("@@ blog", blog?.user.followers)
     if (!blog) return null;
 
     if (blog.is_protected && blog.user_id !== requestingUserId) {

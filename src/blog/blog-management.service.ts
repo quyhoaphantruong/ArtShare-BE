@@ -45,14 +45,21 @@ export class BlogManagementService {
       },
       include: {
         user: {
-          select: { id: true, username: true, profile_picture_url: true, full_name: true,   followers_count: true,   },
+          select: {
+            id: true,
+            username: true,
+            profile_picture_url: true,
+            full_name: true,
+            followers_count: true,
+          },
         },
-        likes: {                      // ✨ include to keep DTO happy
+        likes: {
+          // ✨ include to keep DTO happy
           select: { id: true },
-          where:  { user_id: userId }, 
+          where: { user_id: userId },
           take: 1,
         },
-      },      
+      },
     });
 
     const mappedBlog = mapBlogToDetailsDto(newBlog);
@@ -96,7 +103,13 @@ export class BlogManagementService {
       data: { ...updateBlogDto, updated_at: new Date() },
       include: {
         user: {
-          select: { id: true, username: true, profile_picture_url: true, full_name: true,  followers_count: true,  },
+          select: {
+            id: true,
+            username: true,
+            profile_picture_url: true,
+            full_name: true,
+            followers_count: true,
+          },
         },
         likes: {
           where: { user_id: userId ?? '' },
