@@ -8,7 +8,6 @@ import {
   MinLength,
   MaxLength,
   IsDateString,
-  ValidateIf,
 } from 'class-validator';
 import { Role } from 'src/auth/enums/role.enum';
 
@@ -32,16 +31,21 @@ export class UpdateUserAdminDTO {
   fullName?: string;
 
   @ApiProperty({
-    example: 'https://example.com/new_avatar.jpg',
-    description:
-      'User\'s profile picture URL. Send an empty string ("") or null to clear.',
+    type: 'string',
+    format: 'binary',
     required: false,
+    description: 'New profile picture file to upload.',
+  })
+  profilePictureFile?: any;
+
+  @ApiProperty({
     type: String,
     nullable: true,
+    required: false,
+    description: 'URL of the profile picture, or data URI, or null to remove.',
   })
   @IsOptional()
   @IsString()
-  @ValidateIf((object, value) => value !== null && value !== '')
   profilePictureUrl?: string | null;
 
   @ApiProperty({

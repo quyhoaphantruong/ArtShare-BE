@@ -51,7 +51,7 @@ model User {
   likes               Like[]
   posts               Post[]
   ratings             Rating[]
-  report              Report[]     @relation("UserReports")
+  report              Report[]      @relation("UserReports")
   shares              Share[]
   userAccess          UserAccess?
   roles               UserRole[]
@@ -170,8 +170,8 @@ model CommentLike {
   comment_id Int
   created_at DateTime @default(now())
 
-  user    User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  comment Comment   @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [comment_id], references: [id], onDelete: Cascade)
 
   @@id([user_id, comment_id])
   @@index([comment_id])
@@ -179,19 +179,19 @@ model CommentLike {
 }
 
 model Comment {
-  id                    Int           @id @default(autoincrement())
-  user_id               String
-  parent_comment_id     Int?
-  content               String
-  created_at            DateTime      @default(now())
-  updated_at            DateTime?     @updatedAt
-  target_id             Int
-  like_count            Int           @default(0)
-  target_type           TargetType
-  parent_comment        Comment?      @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
-  replies               Comment[]     @relation("CommentReplies")
-  user                  User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  CommentLike           CommentLike[]
+  id                Int           @id @default(autoincrement())
+  user_id           String
+  parent_comment_id Int?
+  content           String
+  created_at        DateTime      @default(now())
+  updated_at        DateTime?     @updatedAt
+  target_id         Int
+  like_count        Int           @default(0)
+  target_type       TargetType
+  parent_comment    Comment?      @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
+  replies           Comment[]     @relation("CommentReplies")
+  user              User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  commentLike       CommentLike[]
 
   @@index([target_id, target_type])
   @@index([parent_comment_id])

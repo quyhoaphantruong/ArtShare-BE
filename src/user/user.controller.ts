@@ -4,27 +4,19 @@ import {
   Post,
   Body,
   Param,
-  Delete,
   UseGuards,
   Patch,
   HttpCode,
   HttpStatus,
-  NotFoundException,
   Logger,
-  UseInterceptors,
   BadRequestException,
-  UploadedFile,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserProfileDTO } from './dto/user-profile.dto';
-import { DeleteUsersDTO } from './dto/delete-users.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { UpdateUserDTO } from './dto/update-users.dto';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
-import { Roles } from 'src/auth/decorators/roles.decorators';
-import { Role } from 'src/auth/enums/role.enum';
 import {
   ApiBody,
   ApiOperation,
@@ -33,21 +25,14 @@ import {
   ApiResponse as SwaggerApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { UpdateUserAdminDTO } from './dto/update-user-admin.dto';
-import { CreateUserAdminDTO } from './dto/create-user-admin.dto';
-import {
-  DeleteMultipleUsersResponseDto,
-  DeleteUserByIdResponseDto,
-  UserResponseDto,
-} from './dto/user-response.dto';
 import {
   FollowUserResponseDto,
   UnfollowUserResponseDto,
 } from 'src/common/response/api-response.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { StorageService } from 'src/storage/storage.service';
-import { Readable } from 'stream';
+
 import { FollowerDto } from './dto/follower.dto';
+import { UserFollowService } from './user.follow.service';
+import { UserProfileMeDTO } from './dto/get-user-me.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -58,299 +43,31 @@ export class UserController {
 
   constructor(
     private readonly userService: UserService,
-    private readonly storageService: StorageService,
+    private readonly userFollowService: UserFollowService,
   ) {}
 
-  @Get('admin/all')
-  @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'ADMIN - Get all users with details' })
-  @SwaggerApiResponse({
-    status: HttpStatus.OK,
-    description: 'List of all users with their details.',
-    type: [UserResponseDto],
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'Forbidden resource. Admin role required.',
-  })
-  async adminFindAllUsers(): Promise<UserResponseDto[]> {
-    return this.userService.findAllWithDetails();
-  }
-
-  @Post('admin/create')
-  @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'ADMIN - Create a new user (expects Firebase UID)' })
-  @ApiBody({ type: CreateUserAdminDTO })
-  @SwaggerApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'User created successfully by admin.',
-    type: UserResponseDto,
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Bad Request (e.g., validation error, missing roles).',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'Forbidden resource. Admin role required.',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Conflict (e.g., user ID, email, or username already exists).',
-  })
-  async adminCreateUser(
-    @Body() createUserAdminDto: CreateUserAdminDTO,
-  ): Promise<UserResponseDto> {
-    return this.userService.createUserByAdmin(createUserAdminDto);
-  }
-
-  @Get('admin/:userId')
-  @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'ADMIN - Get user by ID with details' })
-  @ApiParam({
-    name: 'userId',
-    description: 'The ID of the user to retrieve',
-    type: String,
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.OK,
-    description: 'User details.',
-    type: UserResponseDto,
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'User not found.',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'Forbidden resource. Admin role required.',
-  })
-  async adminFindOneUser(
-    @Param('userId') userId: string,
-  ): Promise<UserResponseDto> {
-    const user = await this.userService.findOneByIdWithDetails(userId);
-    if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found.`);
-    }
-    return user;
-  }
-
-  @Patch('admin/:userId')
-  @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary:
-      "ADMIN - Update user's profile or roles (does NOT update UserAccess/subscription)",
-  })
-  @ApiParam({
-    name: 'userId',
-    description: 'The ID of the user to update',
-    type: String,
-  })
-  @ApiBody({ type: UpdateUserAdminDTO })
-  @SwaggerApiResponse({
-    status: HttpStatus.OK,
-    description: 'User updated successfully by admin.',
-    type: UserResponseDto,
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'User not found.',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Bad Request (e.g., invalid roles, validation error).',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'Forbidden resource. Admin role required.',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Conflict (e.g., email or username taken by another user).',
-  })
-  @UseInterceptors(
-    FileInterceptor('profilePictureFile', {
-      fileFilter: (req, file, callback) => {
-        if (!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-          return callback(
-            new BadRequestException(
-              'Only image files (jpg, jpeg, png, gif, webp) are allowed!',
-            ),
-            false,
-          );
-        }
-        callback(null, true);
-      },
-      limits: {
-        fileSize: 1024 * 1024 * 5,
-      },
-    }),
-  )
-  async adminUpdateUser(
-    @Param('userId') userId: string,
-    @Body() updateUserAdminDto: UpdateUserAdminDTO,
-    @UploadedFile() profilePictureFile?: Express.Multer.File,
-  ): Promise<UserResponseDto> {
-    let finalProfilePictureUrl: string | null | undefined = undefined;
-
-    if (profilePictureFile) {
-      const uploadResults = await this.storageService.uploadFiles(
-        [profilePictureFile],
-        `users/${userId}/profile-pictures`,
-      );
-      if (uploadResults && uploadResults.length > 0 && uploadResults[0].url) {
-        finalProfilePictureUrl = uploadResults[0].url;
-      }
-    } else if (
-      updateUserAdminDto.profilePictureUrl &&
-      updateUserAdminDto.profilePictureUrl.startsWith('data:image')
-    ) {
-      this.logger.log(
-        `Processing Data URI for profile picture for user ${userId}`,
-      );
-      const parts = updateUserAdminDto.profilePictureUrl.split(',');
-      if (parts.length !== 2 || !parts[0].startsWith('data:image')) {
-        throw new BadRequestException(
-          'Invalid Data URI format for profile picture.',
-        );
-      }
-      const meta = parts[0];
-      const base64Data = parts[1];
-
-      const buffer = Buffer.from(base64Data, 'base64');
-
-      let mimetype = 'application/octet-stream';
-      let extension = 'bin';
-      const mimeMatch = meta.match(/^data:(image\/[a-zA-Z+]+);base64$/);
-      if (mimeMatch && mimeMatch[1]) {
-        mimetype = mimeMatch[1];
-        extension = mimetype.split('/')[1] || extension;
-        if (extension === 'svg+xml') extension = 'svg';
-      }
-
-      const stream = new Readable();
-      stream.push(buffer);
-      stream.push(null);
-
-      const tempFileObject: Express.Multer.File = {
-        fieldname: 'profilePictureFromDataUri',
-        originalname: `profile-${userId}-${Date.now()}.${extension}`,
-        encoding: 'base64',
-        mimetype: mimetype,
-        buffer: buffer,
-        size: buffer.length,
-        stream: stream,
-        destination: '',
-        filename: '',
-        path: '',
-      };
-
-      try {
-        const uploadResults = await this.storageService.uploadFiles(
-          [tempFileObject],
-          `users/${userId}/profile-pictures`,
-        );
-        if (uploadResults && uploadResults.length > 0 && uploadResults[0].url) {
-          finalProfilePictureUrl = uploadResults[0].url;
-
-          this.logger.log(
-            `Data URI uploaded for user ${userId}. URL: ${finalProfilePictureUrl}`,
-          );
-        } else {
-          this.logger.error(
-            `Failed to upload Data URI for user ${userId} or no URL returned.`,
-          );
-        }
-      } catch (uploadError) {
-        this.logger.error(
-          `Error uploading Data URI for user ${userId}:`,
-          uploadError,
-        );
-        throw new InternalServerErrorException(
-          'Failed to process profile picture from Data URI.',
-        );
-      }
-    } else if (
-      updateUserAdminDto.hasOwnProperty('profilePictureUrl') &&
-      updateUserAdminDto.profilePictureUrl === null
-    ) {
-      finalProfilePictureUrl = null;
-    }
-
-    return this.userService.updateUserByAdmin(
-      userId,
-      updateUserAdminDto,
-      finalProfilePictureUrl,
-    );
-  }
-
-  @Delete('admin/multiple')
-  @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'ADMIN - Delete multiple users by IDs' })
-  @ApiBody({ type: DeleteUsersDTO })
-  @SwaggerApiResponse({
-    status: HttpStatus.OK,
-    description:
-      'Users deletion process completed. Check response for details.',
-    type: DeleteMultipleUsersResponseDto,
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid input data (e.g., empty userIds array).',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'Forbidden resource. Admin role required.',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Internal server error during deletion.',
-  })
-  async adminDeleteMultipleUsers(
-    @Body() deleteUsersDTO: DeleteUsersDTO,
-  ): Promise<DeleteMultipleUsersResponseDto> {
-    return this.userService.deleteMultipleUsers(deleteUsersDTO);
-  }
-
-  @Delete('admin/:userId')
-  @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'ADMIN - Delete user by ID' })
-  @ApiParam({
-    name: 'userId',
-    description: 'The ID of the user to delete',
-    type: String,
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.OK,
-    description: 'User deletion status.',
-    type: DeleteUserByIdResponseDto,
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'User not found in either Firebase or Database.',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'Forbidden resource. Admin role required.',
-  })
-  @SwaggerApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Internal server error during deletion.',
-  })
-  async adminDeleteUserById(
-    @Param('userId' /*, new ParseUUIDPipe() */) userId: string,
-  ): Promise<DeleteUserByIdResponseDto> {
-    return this.userService.deleteUserById(userId);
-  }
-
   @Get('profile/:userId')
-  async getProfile(
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Get another user's public profile by ID" })
+  @ApiParam({
+    name: 'userId',
+    description: "The ID of the user's profile to retrieve",
+    type: String,
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.OK,
+    description: "User's public profile.",
+    type: UserProfileDTO,
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'User not found.',
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized. User not logged in.',
+  })
+  async getPublicUserProfile(
     @Param('userId') userId: string,
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<UserProfileDTO> {
@@ -358,7 +75,27 @@ export class UserController {
   }
 
   @Get('profile/username/:username')
-  async getProfileByUsername(
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Get another user's public profile by username" })
+  @ApiParam({
+    name: 'username',
+    description: "The username of the user's profile to retrieve",
+    type: String,
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.OK,
+    description: "User's public profile.",
+    type: UserProfileDTO,
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'User not found.',
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized. User not logged in.',
+  })
+  async getPublicUserProfileByUsername(
     @Param('username') username: string,
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<UserProfileDTO> {
@@ -371,7 +108,7 @@ export class UserController {
   @SwaggerApiResponse({
     status: HttpStatus.OK,
     description: 'Profile of the current user.',
-    type: UserProfileDTO,
+    type: UserProfileMeDTO,
   })
   @SwaggerApiResponse({
     status: HttpStatus.UNAUTHORIZED,
@@ -383,7 +120,7 @@ export class UserController {
   })
   async getCurrentUserProfile(
     @CurrentUser() currentUser: CurrentUserType,
-  ): Promise<UserProfileDTO> {
+  ): Promise<UserProfileMeDTO> {
     return this.userService.getUserProfileForMe(currentUser);
   }
 
@@ -394,7 +131,7 @@ export class UserController {
   @SwaggerApiResponse({
     status: HttpStatus.OK,
     description: 'Current user profile updated successfully.',
-    type: UserProfileDTO,
+    type: UpdateUserDTO,
   })
   @SwaggerApiResponse({
     status: HttpStatus.BAD_REQUEST,
@@ -452,7 +189,10 @@ export class UserController {
     @Param('userIdToFollow') userIdToFollow: string,
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<FollowUserResponseDto> {
-    return this.userService.followUser(currentUser.id, userIdToFollow);
+    if (userIdToFollow === currentUser.id) {
+      throw new BadRequestException('You cannot follow yourself.');
+    }
+    return this.userFollowService.followUser(currentUser.id, userIdToFollow);
   }
 
   @Post(':userIdToUnfollow/unfollow')
@@ -480,20 +220,66 @@ export class UserController {
     @Param('userIdToUnfollow') userIdToUnfollow: string,
     @CurrentUser() currentUser: CurrentUserType,
   ): Promise<UnfollowUserResponseDto> {
-    return this.userService.unfollowUser(currentUser.id, userIdToUnfollow);
+    if (userIdToUnfollow === currentUser.id) {
+      throw new BadRequestException('You cannot unfollow yourself.');
+    }
+    return this.userFollowService.unfollowUser(
+      currentUser.id,
+      userIdToUnfollow,
+    );
   }
 
   @Get(':userId/followers')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Get a user's followers list" })
+  @ApiParam({
+    name: 'userId',
+    description: 'The ID of the user whose followers are to be listed',
+    type: String,
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.OK,
+    description: "List of user's followers.",
+    type: [FollowerDto],
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'User not found.',
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized. User not logged in.',
+  })
   async getFollowersList(
     @Param('userId') userId: string,
   ): Promise<FollowerDto[]> {
-    return this.userService.getFollowersListByUserId(userId);
+    return this.userFollowService.getFollowersListByUserId(userId);
   }
 
   @Get(':userId/followings')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get a list of users someone is following' })
+  @ApiParam({
+    name: 'userId',
+    description: 'The ID of the user whose followings are to be listed',
+    type: String,
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of users being followed.',
+    type: [FollowerDto],
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'User not found.',
+  })
+  @SwaggerApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Unauthorized. User not logged in.',
+  })
   async getFollowingsList(
     @Param('userId') userId: string,
   ): Promise<FollowerDto[]> {
-    return this.userService.getFollowingsListByUserId(userId);
+    return this.userFollowService.getFollowingsListByUserId(userId);
   }
 }
