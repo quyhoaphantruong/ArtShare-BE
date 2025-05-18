@@ -123,6 +123,7 @@ export class BlogController {
   /**
    * GET /blogs/{id} - Get blog details by ID
    */
+  @Public()
   @Get(':id')
   @Public()
   async findBlogById(
