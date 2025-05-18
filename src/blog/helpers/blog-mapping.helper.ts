@@ -8,7 +8,6 @@ type UserSelect = {
   profile_picture_url: true;
   full_name: true;
   followers_count: true;
-  is_following: true;  
 };
 
 
@@ -28,7 +27,6 @@ export const blogListItemSelect = {
       profile_picture_url: true,
       full_name: true,
       followers_count: true,
-      is_following: true,
     }
   },
 };
@@ -48,13 +46,15 @@ export type BlogWithUser = Prisma.BlogGetPayload<{
 export type BlogWithRelations = Prisma.BlogGetPayload<{
   include: {
     user: {
-      select: UserSelect;
+      select: {
+        id: true;
+        username: true;
+        full_name: true;
+        profile_picture_url: true;
+        followers_count: true;
+      };
     };
-    likes: {
-      where: { user_id: string };
-      select: { id: true };
-      take: 1;
-    };
+    likes: { select: { id: true } };
   };
 }>;
 
@@ -86,7 +86,7 @@ export const mapBlogToDetailsDto = (
       profile_picture_url: blog.user.profile_picture_url,
       full_name: blog.user.full_name,
       followers_count: blog.user.followers_count,
-      is_following: blog.user.is_following, 
+      is_following: (blog.user as any).is_following ?? false,
     },
     isLikedByCurrentUser: likeArray.length > 0,
   };
@@ -120,7 +120,7 @@ export const mapBlogToListItemDto = (
       profile_picture_url: blog.user.profile_picture_url,
       full_name: blog.user.full_name,
       followers_count: blog.user.followers_count,
-      is_following: blog.user.is_following, 
+      is_following: (blog.user as any).is_following ?? false,
     },
   };
 };
