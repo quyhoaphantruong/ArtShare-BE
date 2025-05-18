@@ -102,6 +102,11 @@ export class BlogExploreService {
             profile_picture_url: true,
             full_name: true,
             followers_count: true,
+            followers: {
+              where: { follower_id: requestingUserId ?? '' },
+              select: { follower_id: true },
+              take: 1,
+            }
           },
         },
         likes: {
@@ -114,36 +119,18 @@ export class BlogExploreService {
 
     if (!blog) return null;
 
-    // compute follow status
-    let isFollowing = false;
-if (requestingUserId && requestingUserId !== blog.user.id) {
-  isFollowing =
-    (await this.prisma.follow.count({
-      where: {
-        follower_id: requestingUserId,
-        following_id: blog.user.id,
-      },
-    })) > 0;
-}
-
     if (blog.is_protected && blog.user_id !== requestingUserId) {
       return null;
     }
     if (!blog.is_published && blog.user_id !== requestingUserId) {
       return null;
     }
-
-    const blogWithFollowFlag = {
-      ...blog,
-      user: { ...blog.user, is_following: isFollowing },
-    };
-
     // update view count
     await this.prisma.blog.update({
       where: { id },
       data: { view_count: { increment: 1 } },
     });
-    return mapBlogToDetailsDto(blogWithFollowFlag as any);
+    return mapBlogToDetailsDto(blog);
   }
 
   async getTrendingBlogs(
