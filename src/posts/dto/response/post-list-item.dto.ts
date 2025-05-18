@@ -1,8 +1,7 @@
-import { Exclude, Transform } from 'class-transformer';
+import { Exclude } from 'class-transformer';
 import { MediaResponseDto } from './media.dto';
 import { UserResponseDto } from './user.dto';
 import { PostCategoryResponseDto } from './category.dto';
-import { Like } from '@prisma/client';
 
 export class PostListItemResponseDto {
   id: number;
@@ -23,10 +22,5 @@ export class PostListItemResponseDto {
 
   @Exclude() categories: PostCategoryResponseDto[];
 
-  @Exclude()
-  likes: Like[];
-
-  // 2) We add our computed flag, reading from the private `likes`:
-  @Transform(({ obj }) => (obj.likes?.length ?? 0) > 0)
   isLikedByCurrentUser: boolean;
 }

@@ -28,13 +28,17 @@ export class JwtAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) return true;
+    // if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
 
-    if (!token) {
+    if (!token && !isPublic) {
       throw new UnauthorizedException('No authentication token provided');
+    }
+
+    if (!token && isPublic) {
+      return true; // Allow access to public routes even without a token
     }
 
     const secret = this.configService.get<string>('AT_SECRET');
@@ -49,7 +53,7 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const payload: JwtPayload = await this.jwtService.verifyAsync(token, {
+      const payload: JwtPayload = await this.jwtService.verifyAsync(token!, {
         secret: secret,
       });
       request['user'] = {

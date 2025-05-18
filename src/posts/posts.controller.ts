@@ -32,6 +32,7 @@ import { CreatePostRequestDto } from './dto/request/create-post.dto';
 import { PostsEmbeddingService } from './posts-embedding.service';
 
 @Controller('posts')
+@UseGuards(JwtAuthGuard)
 export class PostsController {
   constructor(
     private readonly postsManagementService: PostsManagementService,
@@ -41,7 +42,6 @@ export class PostsController {
   ) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('images'))
   async createPost(
     @Body() request: CreatePostRequestDto,
@@ -52,7 +52,6 @@ export class PostsController {
   }
 
   @Patch(':post_id')
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('images'))
   async updatePost(
     @Param('post_id', ParseIntPipe) postId: number,
@@ -69,7 +68,6 @@ export class PostsController {
   }
 
   @Delete(':post_id')
-  @UseGuards(JwtAuthGuard)
   async deletePost(@Param('post_id', ParseIntPipe) postId: number) {
     return this.postsManagementService.deletePost(postId);
   }
@@ -84,7 +82,6 @@ export class PostsController {
   }
 
   @Post('for-you')
-  @UseGuards(JwtAuthGuard)
   async getForYouPosts(
     @Body() body: { page: number; page_size: number; filter: string[] },
     @CurrentUser() user: CurrentUserType,
@@ -100,7 +97,6 @@ export class PostsController {
   }
 
   @Post('following')
-  @UseGuards(JwtAuthGuard)
   async getFollowingPosts(
     @Body() body: { page: number; page_size: number; filter: string[] },
     @CurrentUser() user: CurrentUserType,
@@ -163,7 +159,12 @@ export class PostsController {
     pageSize: number,
     @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.getRelevantPosts(postId, page, pageSize, user?.id ?? '');
+    return this.postsExploreService.getRelevantPosts(
+      postId,
+      page,
+      pageSize,
+      user?.id ?? '',
+    );
   }
 
   @Post('sync-embeddings')
