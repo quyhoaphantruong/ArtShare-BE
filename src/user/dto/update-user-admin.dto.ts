@@ -16,7 +16,7 @@ export class UpdateUserAdminDTO {
   @IsOptional()
   @IsString()
   @MinLength(3)
-  @MaxLength(30)
+  @MaxLength(50)
   username?: string;
 
   @ApiProperty({ example: 'new.email@example.com', required: false })
