@@ -8,6 +8,7 @@ type UserSelect = {
   profile_picture_url: true;
   full_name: true;
   followers_count: true;
+  is_following: true;  
 };
 
 
@@ -27,6 +28,7 @@ export const blogListItemSelect = {
       profile_picture_url: true,
       full_name: true,
       followers_count: true,
+      is_following: true,
     }
   },
 };
@@ -84,6 +86,7 @@ export const mapBlogToDetailsDto = (
       profile_picture_url: blog.user.profile_picture_url,
       full_name: blog.user.full_name,
       followers_count: blog.user.followers_count,
+      is_following: blog.user.is_following, 
     },
     isLikedByCurrentUser: likeArray.length > 0,
   };
@@ -117,6 +120,7 @@ export const mapBlogToListItemDto = (
       profile_picture_url: blog.user.profile_picture_url,
       full_name: blog.user.full_name,
       followers_count: blog.user.followers_count,
+      is_following: blog.user.is_following, 
     },
   };
 };
