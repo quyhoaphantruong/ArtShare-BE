@@ -14,7 +14,7 @@ import {
   FollowUserResponseDto,
   FollowUnfollowDataDto,
   UnfollowUserResponseDto,
-} from 'src/common/response/api-response.dto';
+} from 'src/common/dto/api-response.dto';
 import { FollowerDto } from './dto/follower.dto';
 
 @Injectable()

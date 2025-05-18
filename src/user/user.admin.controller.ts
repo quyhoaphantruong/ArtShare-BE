@@ -15,6 +15,7 @@ import {
   BadRequestException,
   UploadedFile,
   InternalServerErrorException,
+  Query,
 } from '@nestjs/common';
 import { DeleteUsersDTO } from './dto/delete-users.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -40,6 +41,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from 'src/storage/storage.service';
 import { Readable } from 'stream';
 import { UserAdminService } from './user.admin.service';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { PaginatedUsersResponseDto } from './dto/paginated-users-response.dto';
 
 @ApiTags('Users (Admin)')
 @Controller('admin/users')
@@ -56,18 +59,21 @@ export class UserAdminController {
 
   @Get('all')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'ADMIN - Get all users with details' })
+  @ApiOperation({ summary: 'ADMIN - Get all users with details (paginated)' })
   @SwaggerApiResponse({
     status: HttpStatus.OK,
-    description: 'List of all users with their details.',
-    type: [UserResponseDto],
+    description: 'Paginated list of users with their details.',
+    type: PaginatedUsersResponseDto, // Use the new paginated DTO
   })
   @SwaggerApiResponse({
     status: HttpStatus.FORBIDDEN,
     description: 'Forbidden resource. Admin role required.',
   })
-  async adminFindAllUsers(): Promise<UserResponseDto[]> {
-    return this.userAdminService.findAllWithDetails();
+  async adminFindAllUsers(
+    @Query() paginationQuery: PaginationQueryDto,
+  ): Promise<PaginatedUsersResponseDto> {
+    // Return the paginated DTO
+    return this.userAdminService.findAllWithDetailsPaginated(paginationQuery);
   }
 
   @Post('create')

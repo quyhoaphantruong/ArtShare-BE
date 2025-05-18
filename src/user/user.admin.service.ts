@@ -17,6 +17,8 @@ import { Auth } from 'firebase-admin/auth';
 import * as admin from 'firebase-admin';
 import { FirebaseError } from 'firebase-admin';
 import { UserResponseDto } from './dto/user-response.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { PaginatedUsersResponseDto } from './dto/paginated-users-response.dto';
 
 @Injectable()
 export class UserAdminService {
@@ -46,6 +48,66 @@ export class UserAdminService {
       followersCount: userWithRelations.followers_count,
       followingsCount: userWithRelations.followings_count,
       roles: userWithRelations.roles.map((ur) => ur.role.role_name as Role),
+    };
+  }
+
+  async findAllWithDetailsPaginated(
+    query: PaginationQueryDto,
+  ): Promise<PaginatedUsersResponseDto> {
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'created_at',
+      sortOrder = 'desc',
+      search,
+    } = query;
+
+    const skip = (page - 1) * limit;
+
+    const whereClause: any = {};
+    if (search) {
+      whereClause.OR = [
+        { username: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { full_name: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    let prismaSortBy = sortBy;
+    if (sortBy === 'createdAt') {
+      prismaSortBy = 'created_at';
+    } else if (sortBy === 'updatedAt') {
+      prismaSortBy = 'updated_at';
+    } else if (sortBy === 'fullName') {
+      prismaSortBy = 'full_name';
+    }
+
+    const users = await this.prisma.user.findMany({
+      skip,
+      take: limit,
+      where: whereClause,
+      include: {
+        roles: { include: { role: true } },
+        userAccess: true,
+      },
+      orderBy: {
+        [prismaSortBy]: sortOrder,
+      },
+    });
+
+    const totalUsers = await this.prisma.user.count({
+      where: whereClause,
+    });
+
+    const mappedUsers = users
+      .map((user) => this.mapUserToUserResponseDto(user))
+      .filter((dto) => dto !== null) as UserResponseDto[];
+
+    return {
+      data: mappedUsers,
+      total: totalUsers,
+      page: Number(page),
+      limit: Number(limit),
     };
   }
 
