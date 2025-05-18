@@ -46,8 +46,8 @@ model User {
   blogs               Blog[]
   bookmarks           Bookmark[]
   comments            Comment[]
-  followers           Follow[]      @relation("Follower")
-  followings          Follow[]      @relation("Following")
+  followers           Follow[]      @relation("followers_of_user")
+  followings          Follow[]      @relation("users_following")
   likes               Like[]
   posts               Post[]
   ratings             Rating[]
@@ -219,8 +219,8 @@ model Follow {
   following_id  String
   created_at    DateTime @default(now())
   is_subscribed Boolean  @default(false)
-  follower      User     @relation("Follower", fields: [follower_id], references: [id], onDelete: Cascade)
-  following     User     @relation("Following", fields: [following_id], references: [id], onDelete: Cascade)
+  follower      User     @relation("users_following", fields: [follower_id], references: [id], onDelete: Cascade)
+  following     User     @relation("followers_of_user", fields: [following_id], references: [id], onDelete: Cascade)
 
   @@id([follower_id, following_id])
   @@index([follower_id])
