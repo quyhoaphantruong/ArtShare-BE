@@ -96,13 +96,19 @@ export class BlogExploreService {
       where: { id },
       include: {
         user: {
-          select: { id: true, username: true, profile_picture_url: true },
+          select: {
+            id: true,
+            username: true,
+            profile_picture_url: true,
+            full_name: true,
+            followers_count: true,
+          },
         },
         likes: {
           where: { user_id: requestingUserId ?? '' },
           select: { id: true },
           take: 1,
-        }
+        },
       },
     });
 

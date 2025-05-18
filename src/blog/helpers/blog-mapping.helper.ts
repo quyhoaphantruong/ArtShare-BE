@@ -2,6 +2,15 @@ import { Prisma } from '@prisma/client';
 import { BlogDetailsResponseDto } from '../dto/response/blog-details.dto';
 import { BlogListItemResponseDto } from '../dto/response/blog-list-item.dto';
 
+type UserSelect = {
+  id: true;
+  username: true;
+  profile_picture_url: true;
+  full_name: true;
+  followers_count: true;
+};
+
+
 export const blogListItemSelect = {
   id: true,
   title: true,
@@ -16,7 +25,9 @@ export const blogListItemSelect = {
       id: true,
       username: true,
       profile_picture_url: true,
-    },
+      full_name: true,
+      followers_count: true,
+    }
   },
 };
 
@@ -27,7 +38,7 @@ export type BlogForListItemPayload = Prisma.BlogGetPayload<{
 export type BlogWithUser = Prisma.BlogGetPayload<{
   include: {
     user: {
-      select: { id: true; username: true; profile_picture_url: true };
+      select: UserSelect;
     };
   };
 }>;
@@ -35,7 +46,7 @@ export type BlogWithUser = Prisma.BlogGetPayload<{
 export type BlogWithRelations = Prisma.BlogGetPayload<{
   include: {
     user: {
-      select: { id: true; username: true; profile_picture_url: true };
+      select: UserSelect;
     };
     likes: {
       where: { user_id: string };
@@ -71,6 +82,8 @@ export const mapBlogToDetailsDto = (
       id: blog.user.id,
       username: blog.user.username,
       profile_picture_url: blog.user.profile_picture_url,
+      full_name: blog.user.full_name,
+      followers_count: blog.user.followers_count,
     },
     isLikedByCurrentUser: likeArray.length > 0,
   };
@@ -102,6 +115,8 @@ export const mapBlogToListItemDto = (
       id: blog.user.id,
       username: blog.user.username,
       profile_picture_url: blog.user.profile_picture_url,
+      full_name: blog.user.full_name,
+      followers_count: blog.user.followers_count,
     },
   };
 };
