@@ -52,7 +52,7 @@ export class PostsExploreService {
 
     const posts = await this.prisma.post.findMany({
       where: whereClause,
-      orderBy: { share_count: 'desc' },
+      orderBy: [{ share_count: 'desc' }, { id: 'desc' }],
       take: page_size,
       skip,
       include: this.buildPostIncludes(userId),
