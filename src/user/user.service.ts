@@ -31,7 +31,10 @@ export class UserService {
     });
   }
 
-  async getUserProfile(userId: string, currentUser: CurrentUserType): Promise<UserProfileDTO> {
+  async getUserProfile(
+    userId: string,
+    currentUser: CurrentUserType,
+  ): Promise<UserProfileDTO> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -61,15 +64,18 @@ export class UserService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    const roleNames = user.roles.map(userRole => userRole.role.role_name as Role);
+    const roleNames = user.roles.map(
+      (userRole) => userRole.role.role_name as Role,
+    );
     let isFollowing = false;
     if (currentUser.id !== user.id) {
-      isFollowing = await this.prisma.follow.count({
-        where: {
-          follower_id: currentUser.id,
-          following_id: user.id
-        }
-      }) > 0;
+      isFollowing =
+        (await this.prisma.follow.count({
+          where: {
+            follower_id: currentUser.id,
+            following_id: user.id,
+          },
+        })) > 0;
     }
 
     return {
@@ -84,12 +90,12 @@ export class UserService {
       birthday: user.birthday ?? null,
       roles: roleNames,
       isFollowing,
-      is_onboard: user.is_onboard
+      is_onboard: user.is_onboard,
     };
   }
 
   async getUserProfileForMe(
-    currentUser: CurrentUserType
+    currentUser: CurrentUserType,
   ): Promise<UserProfileMeDTO> {
     const user = await this.prisma.user.findUnique({
       where: { id: currentUser.id },
@@ -113,15 +119,13 @@ export class UserService {
         },
       },
     });
-  
+
     if (!user) {
       throw new NotFoundException(`User with ID ${currentUser.id} not found`);
     }
-  
-    const roleNames = user.roles.map(
-      (ur) => ur.role.role_name as Role
-    );
-  
+
+    const roleNames = user.roles.map((ur) => ur.role.role_name as Role);
+
     return {
       id: user.id,
       username: user.username,
@@ -135,10 +139,8 @@ export class UserService {
       roles: roleNames,
       isFollowing: false,
       is_onboard: user.is_onboard,
-
     };
   }
-  
 
   async getUserProfileByUsername(
     username: string,
@@ -161,7 +163,17 @@ export class UserService {
   async updateUserProfile(
     userId: string,
     updateUserDto: UpdateUserDTO,
-  ): Promise<Pick<User, 'username' | 'email' | 'full_name' | 'profile_picture_url' | 'bio' | 'birthday'>> {
+  ): Promise<
+    Pick<
+      User,
+      | 'username'
+      | 'email'
+      | 'full_name'
+      | 'profile_picture_url'
+      | 'bio'
+      | 'birthday'
+    >
+  > {
     try {
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
@@ -187,7 +199,9 @@ export class UserService {
         }
         if (error.code === 'P2002') {
           const target = (error.meta?.target as string[]).join(', ');
-          throw new ConflictException(`Duplicate value for field(s): ${target}.`);
+          throw new ConflictException(
+            `Duplicate value for field(s): ${target}.`,
+          );
         }
       }
       throw new InternalServerErrorException('Could not update user profile.');

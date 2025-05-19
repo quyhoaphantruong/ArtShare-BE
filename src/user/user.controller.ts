@@ -48,12 +48,8 @@ export class UserController {
     return this.userService.getUserProfileByUsername(username, currentUser);
   }
 
-  
-
   @Get('profile')
-  async getUserProfile(
-    @CurrentUser() currentUser: CurrentUserType,
-  ) {
+  async getUserProfile(@CurrentUser() currentUser: CurrentUserType) {
     return this.userService.getUserProfileForMe(currentUser);
   }
 
@@ -98,7 +94,7 @@ export class UserController {
     return this.userService.getFollowersListByUserId(userId);
   }
 
-   @Get(':userId/followings')
+  @Get(':userId/followings')
   async getFollowingsList(
     @Param('userId') userId: string,
   ): Promise<FollowerDto[]> {
