@@ -32,7 +32,7 @@ jobs:
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.6.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSHKEY }}
 
       # 4) rsync the dist folder (preserves .env and other files)
       - name: Sync dist/ to droplet
