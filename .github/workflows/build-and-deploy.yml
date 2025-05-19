@@ -35,6 +35,14 @@ jobs:
           ssh-private-key: ${{ secrets.SSHKEY }}
           ssh-passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }}
 
+      - name: Start SSH agent and add key with passphrase
+        run: |
+          eval "$(ssh-agent -s)"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > key.pem
+          chmod 600 key.pem
+          # Feed the passphrase into ssh-add via here-string
+          ssh-add key.pem <<< "${{ secrets.SSH_KEY_PASSPHRASE }}"
+
       # 4) rsync the dist folder (preserves .env and other files)
       - name: Sync dist/ to droplet
         run: |
