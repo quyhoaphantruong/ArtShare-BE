@@ -33,6 +33,7 @@ jobs:
         uses: webfactory/ssh-agent@v0.6.0
         with:
           ssh-private-key: ${{ secrets.SSHKEY }}
+          ssh-passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }}
 
       # 4) rsync the dist folder (preserves .env and other files)
       - name: Sync dist/ to droplet
