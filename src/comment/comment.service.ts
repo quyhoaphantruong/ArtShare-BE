@@ -101,6 +101,10 @@ export class CommentService {
         }
 
         return newComment;
+      },
+      {
+        maxWait: 5000,   // wait up to 5 s to acquire a connection (default 2 s)
+        timeout: 15000,  // allow up to 15 s for the transaction to complete
       });
     } catch (err: any) {
       if (err instanceof PrismaClientKnownRequestError) {
