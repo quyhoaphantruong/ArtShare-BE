@@ -8,10 +8,12 @@ import { EmbeddingModule } from 'src/embedding/embedding.module';
 import { PostsExploreService } from './posts-explore.service';
 import { WorkflowAssistService } from './workflow-assist.service';
 import { PostsEmbeddingService } from './posts-embedding.service';
+import { LikesModule } from 'src/likes/likes.module';
+import { LikesService } from 'src/likes/likes.service';
 import { PostsManagementValidator } from './validator/posts-management.validator';
 
 @Module({
-  imports: [AuthModule, EmbeddingModule],
+  imports: [AuthModule, EmbeddingModule, LikesModule],
   providers: [
     PostsExploreService,
     PostsManagementService,
@@ -19,6 +21,7 @@ import { PostsManagementValidator } from './validator/posts-management.validator
     S3StorageProvider,
     WorkflowAssistService,
     PostsEmbeddingService,
+    LikesService,
     PostsManagementValidator,
   ],
   controllers: [PostsController],

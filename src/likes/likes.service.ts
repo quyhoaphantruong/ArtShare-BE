@@ -6,6 +6,7 @@ import { plainToClass } from 'class-transformer';
 import { LikeDetailsDto } from './dto/response/like-details.dto';
 import { RemoveLikeDto } from './dto/request/remove-like.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
+import { LikingUserResponseDto } from './dto/response/liking-user-response.dto';
 
 @Injectable()
 export class LikesService {
@@ -129,4 +130,70 @@ export class LikesService {
       });
     }
   }
-}
+
+    /** 
+   * Fetch a page of users who liked a given target (post or blog),
+   * and also return the total number of likes for paging. 
+   */
+  public async getLikingUsers(
+      targetId: number,
+      targetType: TargetType,
+      requestingUserId: string | null,
+      skip = 0,
+      take = 20,
+    ): Promise<{ items: LikingUserResponseDto[]; total: number }> {
+      // 1) Total count
+      const total = await this.prisma.like.count({
+        where:
+          targetType === TargetType.BLOG
+            ? { blog_id: targetId }
+            : { post_id: targetId },
+      });
+  
+      // 2) Page of likes + user payload
+      const likes = await this.prisma.like.findMany({
+        where:
+          targetType === TargetType.BLOG
+            ? { blog_id: targetId }
+            : { post_id: targetId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              full_name: true,
+              profile_picture_url: true,
+            },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+        skip,
+        take,
+      });
+  
+      // 3) If logged in, compute follow‐status for this batch
+      const followMap: Record<string, boolean> = {};
+      if (requestingUserId) {
+        const rows = await this.prisma.follow.findMany({
+          where: {
+            follower_id: requestingUserId,
+            following_id: { in: likes.map((l) => l.user.id) },
+          },
+          select: { following_id: true },
+        });
+        rows.forEach((r) => (followMap[r.following_id] = true));
+      }
+  
+      // 4) Map into DTO
+      const items: LikingUserResponseDto[] = likes.map((l) => ({
+        id:                l.user.id,
+        username:          l.user.username,
+        full_name: l.user.full_name ?? l.user.username,
+        profile_picture_url: l.user.profile_picture_url,
+        is_following:      !!followMap[l.user.id],
+      }));
+  
+      return { items, total };
+    }
+  }
+
