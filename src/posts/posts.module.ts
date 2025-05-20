@@ -10,6 +10,7 @@ import { WorkflowAssistService } from './workflow-assist.service';
 import { PostsEmbeddingService } from './posts-embedding.service';
 import { LikesModule } from 'src/likes/likes.module';
 import { LikesService } from 'src/likes/likes.service';
+import { PostsManagementValidator } from './validator/posts-management.validator';
 
 @Module({
   imports: [AuthModule, EmbeddingModule, LikesModule],
@@ -21,6 +22,7 @@ import { LikesService } from 'src/likes/likes.service';
     WorkflowAssistService,
     PostsEmbeddingService,
     LikesService,
+    PostsManagementValidator,
   ],
   controllers: [PostsController],
 })
