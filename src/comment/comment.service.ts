@@ -58,7 +58,7 @@ export class CommentService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const created = await this.prisma.$transaction(async (tx) => {
         const newComment = await tx.comment.create({
           data: {
             content,
@@ -88,6 +88,7 @@ export class CommentService {
             },
           },
         });
+
         if (target_type === TargetType.POST) {
           await tx.post.update({
             where: { id: target_id },
@@ -106,7 +107,10 @@ export class CommentService {
         maxWait: 5000,   // wait up to 5 s to acquire a connection (default 2 s)
         timeout: 15000,  // allow up to 15 s for the transaction to complete
       });
-    } catch (err: any) {
+
+   
+       return created; 
+          } catch (err: any) {
       if (err instanceof PrismaClientKnownRequestError) {
         if (err.code === 'P2003') {
           throw new NotFoundException(
@@ -125,36 +129,54 @@ export class CommentService {
     currentUserId?: string,
     parentCommentId?: number,
   ): Promise<CommentDto[]> {
+    const isTopLevel = parentCommentId == null;
     const comments = await this.prisma.comment.findMany({
       where: {
         target_id: targetId,
         target_type: targetType,
-        ...(parentCommentId != null && { parent_comment_id: parentCommentId }),
-      },
-      orderBy: { created_at: 'desc' },
+        ...(isTopLevel
+                    ? { parent_comment_id: null }
+                    : { parent_comment_id: parentCommentId }),
+                },
+                orderBy: { created_at: isTopLevel ? 'desc' : 'asc' },
       include: {
         user: {
           select: { id: true, username: true, profile_picture_url: true },
         },
+        ...(isTopLevel && {
+                   replies: {
+                     orderBy: { created_at: 'asc' },
+                     include: {
+                       user: { select: { id: true, username: true, profile_picture_url: true } },
+                     },
+                   },
+                 }),
       },
     });
 
-    /* ────────── 3. fetch the user's likes in one query ─── */
+    //* gather IDs of comments **and** their included replies */
+        const ids: number[] = [];
+        comments.forEach((c: any) => {
+          ids.push(c.id);
+          c.replies?.forEach((r: any) => ids.push(r.id));
+        });
+    
     const likedRows = await this.prisma.commentLike.findMany({
-      where: {
-        user_id: currentUserId,
-        comment_id: { in: comments.map((c) => c.id) },
-      },
+            where: { user_id: currentUserId, comment_id: { in: ids } },
       select: { comment_id: true },
     });
     const likedSet = new Set(likedRows.map((l) => l.comment_id));
 
-    return comments.map((c) => ({
-        ...c,
-        likedByCurrentUser: likedSet.has(c.id),
-        replies: []
-    })) as CommentDto[];
-  }
+    return comments.map((c: any): CommentDto => ({
+           ...c,
+           likedByCurrentUser: likedSet.has(c.id),
+           replies: (c.replies ?? []).map((r: any): CommentDto => ({
+             ...r,
+             likedByCurrentUser: likedSet.has(r.id),
+             replies: [],          // deeper levels lazily-loaded
+           })),
+         }));
+        }
 
   async update(
     commentId: number,
