@@ -11,6 +11,7 @@ import { PostsEmbeddingService } from './posts-embedding.service';
 import { LikesModule } from 'src/likes/likes.module';
 import { LikesService } from 'src/likes/likes.service';
 import { PostsManagementValidator } from './validator/posts-management.validator';
+import { PostsAdminService } from './posts-admin.service';
 
 @Module({
   imports: [AuthModule, EmbeddingModule, LikesModule],
@@ -23,6 +24,7 @@ import { PostsManagementValidator } from './validator/posts-management.validator
     PostsEmbeddingService,
     LikesService,
     PostsManagementValidator,
+    PostsAdminService,
   ],
   controllers: [PostsController],
 })
