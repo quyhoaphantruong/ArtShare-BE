@@ -167,14 +167,20 @@ export class AuthService {
 
   async loginAdmin(token: string) {
     const decoded = await admin.auth().verifyIdToken(token);
-    const user = await this.prisma.user.findUnique({ where:{id:decoded.uid}, include:{roles:{include:{role:true}}}});
+    const user = await this.prisma.user.findUnique({
+      where: { id: decoded.uid },
+      include: { roles: { include: { role: true } } },
+    });
     if (!user) throw new UnauthorizedException('User not found');
-    const roleNames = user.roles.map(r=>r.role.role_name);
+    const roleNames = user.roles.map((r) => r.role.role_name);
     if (!roleNames.includes(Role.ADMIN)) {
       throw new ForbiddenException('Admin access required');
     }
     const tokens = await this.getTokens(user.id, decoded.email!, roleNames);
-    await this.prisma.user.update({ where:{id:user.id}, data:{refresh_token:tokens.refresh_token} });
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refresh_token: tokens.refresh_token },
+    });
     return tokens;
   }
 
