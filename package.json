@@ -46,6 +46,7 @@
     "class-validator": "^0.14.1",
     "connect-redis": "^8.0.1",
     "csurf": "^1.11.0",
+    "date-fns": "^4.1.0",
     "express-rate-limit": "^7.5.0",
     "express-session": "^1.18.1",
     "firebase": "^11.4.0",
