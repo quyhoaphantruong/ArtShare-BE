@@ -51,6 +51,9 @@ export class CommentDto {
   @ApiProperty({ example: false })
   likedByCurrentUser: boolean;
 
+  @ApiProperty({ example: 5 })
+  reply_count: number;
+
   @ApiProperty({ type: () => UserBriefDto })
   @Type(() => UserBriefDto)
   user: UserBriefDto;
