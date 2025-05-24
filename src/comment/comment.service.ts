@@ -158,10 +158,10 @@ export class CommentService {
     ids.push(c.id);
           c.replies?.forEach((r: any) => ids.push(r.id));
     });
-  const likedRows = await this.prisma.commentLike.findMany({
-    where: { user_id: currentUserId, comment_id: { in: ids } },
-          select: { comment_id: true },
-  });
+  const likedRows = currentUserId ? await this.prisma.commentLike.findMany({
+  where: { user_id: currentUserId, comment_id: { in: ids } },
+  select: { comment_id: true },
+}) : [];
     const likedSet = new Set(likedRows.map((l) => l.comment_id));
 
      /* ❷ map every record to DTO, surfacing `reply_count` ---------- */
