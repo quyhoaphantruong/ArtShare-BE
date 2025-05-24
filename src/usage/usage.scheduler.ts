@@ -1,6 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { PaidAccessLevel } from '@prisma/client';
+import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
+import {
+  getEndOfLocalDay,
+  getStartOfLocalDay,
+} from 'src/common/utils/date.utils';
 import { PrismaService } from 'src/prisma.service';
 import Stripe from 'stripe';
 
@@ -24,6 +30,7 @@ export class UsageScheduler {
     }
   }
 
+  /**
   @Cron(CronExpression.EVERY_DAY_AT_1AM, {
     name: 'monthlyQuotaReset',
     timeZone: 'UTC',
@@ -170,6 +177,81 @@ export class UsageScheduler {
         `DB error upserting usage record for user ${userId}, feature ${featureKey}:`,
         dbError,
       );
+    }
+  }
+  */
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, {
+    name: 'dailyQuotaReset',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  })
+  async handleDailyQuotaReset(): Promise<void> {
+    this.logger.log('Running scheduled task: handleDailyQuotaReset…');
+    const now = new Date();
+
+    // Only users on the Artist Pro plan get a daily reset
+    const dailyAccesses = await this.prisma.userAccess.findMany({
+      where: {
+        expiresAt: { gt: now },
+        plan: { id: PaidAccessLevel.ARTIST_PRO },
+      },
+    });
+
+    this.logger.log(
+      `Found ${dailyAccesses.length} Artist Pro subscriptions to reset.`,
+    );
+
+    for (const access of dailyAccesses) {
+      await this.resetDailyFeatureUsage(
+        access.userId,
+        FeatureKey.AI_CREDITS,
+        access.expiresAt,
+      );
+    }
+
+    this.logger.log('Finished scheduled task: handleDailyQuotaReset.');
+  }
+
+  /**
+   * Zeroes out (or creates) today’s usage record so that
+   * availableCredits = dailyQuotaCredits - usedAmount = 100 - 0 = 100.
+   */
+  private async resetDailyFeatureUsage(
+    userId: string,
+    featureKey: FeatureKey,
+    subscriptionEnd: Date,
+  ): Promise<void> {
+    const cycleStart = getStartOfLocalDay();
+
+    const cycleEnd = getEndOfLocalDay();
+    const effectiveEnd =
+      cycleEnd > subscriptionEnd ? subscriptionEnd : cycleEnd;
+
+    try {
+      await this.prisma.userUsage.upsert({
+        where: {
+          userId_featureKey_cycleStartedAt: {
+            userId,
+            featureKey,
+            cycleStartedAt: cycleStart,
+          },
+        },
+        update: { usedAmount: 0, cycleEndsAt: effectiveEnd },
+        create: {
+          userId,
+          featureKey,
+          usedAmount: 0,
+          cycleStartedAt: cycleStart,
+          cycleEndsAt: effectiveEnd,
+        },
+      });
+
+      this.logger.debug(
+        `Daily credits reset for user ${userId} – ` +
+          `window ${cycleStart.toISOString()} → ${effectiveEnd.toISOString()}`,
+      );
+    } catch (err) {
+      this.logger.error(`DB error during daily reset for user ${userId}:`, err);
     }
   }
 }

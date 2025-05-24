@@ -1,13 +1,14 @@
-import { PrismaClient, Prisma, ImageQuality } from '@prisma/client';
+import { PrismaClient, Prisma, ImageQuality, PaidAccessLevel } from '@prisma/client';
 import { CategoryType } from 'src/categories/dto/request/create-category.dto';
 
 const planData: Prisma.PlanCreateInput[] = [
   {
-    id: 'free',
+    id: PaidAccessLevel.FREE,
     name: 'Individuals',
     stripeProductId: null,
     description: 'Used by art lovers',
     imageQualityAllowed: ImageQuality.LOW,
+    dailyQuotaCredits: 50,
     monthlyQuotaCredits: null,
     storageQuotaMB: 500,
     maxTeamSeats: 1,
@@ -18,11 +19,12 @@ const planData: Prisma.PlanCreateInput[] = [
     smartSuggestionsEnabled: false,
   },
   {
-    id: 'artist_pro',
+    id: PaidAccessLevel.ARTIST_PRO,
     name: 'Pro Artists',
     stripeProductId: process.env.STRIPE_ARTIST_PRODUCT_ID,
     description: 'Great for small businesses',
     imageQualityAllowed: ImageQuality.HIGH,
+    dailyQuotaCredits: 50,
     monthlyQuotaCredits: 5000,
     storageQuotaMB: 50000,
     maxTeamSeats: 1,
@@ -33,12 +35,13 @@ const planData: Prisma.PlanCreateInput[] = [
     smartSuggestionsEnabled: true,
   },
   {
-    id: 'studio',
+    id: PaidAccessLevel.STUDIO,
     name: 'Studios',
     stripeProductId: process.env.STRIPE_STUDIO_PRODUCT_ID,
     description: 'Great for large businesses',
 
     imageQualityAllowed: ImageQuality.HIGH,
+    dailyQuotaCredits: 5000,
     monthlyQuotaCredits: 25000,
     storageQuotaMB: 250000,
     maxTeamSeats: 5,

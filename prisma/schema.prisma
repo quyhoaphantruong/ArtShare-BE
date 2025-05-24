@@ -300,15 +300,15 @@ model Report {
 }
 
 model UserAccess {
-  userId               String   @id
-  planId               String
-  expiresAt            DateTime @map("expires_at")
-  stripeSubscriptionId String   @unique @map("stripe_subscription_id")
-  stripePriceId        String   @map("stripe_price_id")
-  stripeCustomerId     String   @map("stripe_customer_id")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-  cancelAtPeriodEnd    Boolean  @default(false) @map("cancel_at_period_end")
+  userId               String          @id
+  planId               PaidAccessLevel
+  expiresAt            DateTime        @map("expires_at")
+  stripeSubscriptionId String          @unique @map("stripe_subscription_id")
+  stripePriceId        String          @map("stripe_price_id")
+  stripeCustomerId     String          @map("stripe_customer_id")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+  cancelAtPeriodEnd    Boolean         @default(false) @map("cancel_at_period_end")
 
   plan Plan @relation(fields: [planId], references: [id])
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -318,21 +318,22 @@ model UserAccess {
 }
 
 model Plan {
-  id                      String       @id
+  id                      PaidAccessLevel @id
   name                    String
   description             String?
-  stripeProductId         String?      @unique
-  imageQualityAllowed     ImageQuality @default(LOW) @map("image_quality_allowed")
-  monthlyQuotaCredits     Int?         @map("monthly_quota_credits")
-  storageQuotaMB          Int?         @map("storage_quota_mb")
-  maxTeamSeats            Int          @default(1) @map("max_team_seats")
-  allowHighResolution     Boolean      @default(false) @map("allow_high_resolution")
-  maxResolutionWidth      Int?         @map("max_resolution_width")
-  maxResolutionHeight     Int?         @map("max_resolution_height")
-  removeWatermark         Boolean      @default(false) @map("remove_watermark")
-  smartSuggestionsEnabled Boolean      @default(false) @map("smart_suggestions_enabled")
-  createdAt               DateTime     @default(now())
-  updatedAt               DateTime     @updatedAt
+  stripeProductId         String?         @unique
+  imageQualityAllowed     ImageQuality    @default(LOW) @map("image_quality_allowed")
+  monthlyQuotaCredits     Int?            @map("monthly_quota_credits")
+  dailyQuotaCredits       Int?
+  storageQuotaMB          Int?            @map("storage_quota_mb")
+  maxTeamSeats            Int             @default(1) @map("max_team_seats")
+  allowHighResolution     Boolean         @default(false) @map("allow_high_resolution")
+  maxResolutionWidth      Int?            @map("max_resolution_width")
+  maxResolutionHeight     Int?            @map("max_resolution_height")
+  removeWatermark         Boolean         @default(false) @map("remove_watermark")
+  smartSuggestionsEnabled Boolean         @default(false) @map("smart_suggestions_enabled")
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
 
   userAccess UserAccess[]
 
