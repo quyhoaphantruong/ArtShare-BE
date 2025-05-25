@@ -8,6 +8,9 @@ import { EmbeddingService } from 'src/embedding/embedding.service';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { plainToInstance } from 'class-transformer';
 import { PostCategoryResponseDto } from './dto/response/category.dto';
+import { UsageService } from 'src/usage/usage.service';
+import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
+import { TryCatch } from 'src/common/try-catch.decorator';
 
 const PostMetadata = z.object({
   title: z.string(),
@@ -17,11 +20,13 @@ const PostMetadata = z.object({
 @Injectable()
 export class WorkflowAssistService {
   private readonly openai: OpenAI;
+  aiCreditCost = 2;
 
   constructor(
     private readonly prismaService: PrismaService,
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
+    private readonly usageService: UsageService,
   ) {
     this.openai = new OpenAI({
       apiKey: process.env.OPEN_AI_SECRET_KEY,
@@ -30,12 +35,16 @@ export class WorkflowAssistService {
 
   private readonly categoriesCollectionName = 'categories';
 
+  @TryCatch()
   async generatePostMetadata(
     imageFiles: Express.Multer.File[],
+    userId: string,
   ): Promise<GeneratePostMetadataResponseDto> {
     if (!imageFiles || imageFiles.length === 0) {
       throw new BadRequestException('No images provided');
     }
+    
+    await this.usageService.handleCreditUsage(userId, FeatureKey.AI_CREDITS, this.aiCreditCost);
 
     const [{ title, description }, matchedCategories] = await Promise.all([
       this.generateTitleAndDescription(imageFiles),
@@ -50,11 +59,13 @@ export class WorkflowAssistService {
         },
       },
     });
-    
+
     return {
       title: title,
       description: description,
-      categories: plainToInstance(PostCategoryResponseDto, categories, {excludeExtraneousValues: true}),
+      categories: plainToInstance(PostCategoryResponseDto, categories, {
+        excludeExtraneousValues: true,
+      }),
     };
   }
 

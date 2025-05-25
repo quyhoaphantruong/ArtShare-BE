@@ -111,8 +111,6 @@ export class AuthService {
 
   async login(token: string) {
     try {
-      this.logger.log('Received token for verification', token); // Log a message for debugging
-
       // Verify the Firebase ID Token
       const decodedToken = await admin.auth().verifyIdToken(token);
       this.logger.log(

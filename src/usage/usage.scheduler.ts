@@ -2,11 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PaidAccessLevel } from '@prisma/client';
+import { endOfDay, startOfDay } from 'date-fns';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
-import {
-  getEndOfLocalDay,
-  getStartOfLocalDay,
-} from 'src/common/utils/date.utils';
+import { TryCatch } from 'src/common/try-catch.decorator';
 import { PrismaService } from 'src/prisma.service';
 import Stripe from 'stripe';
 
@@ -185,8 +183,10 @@ export class UsageScheduler {
     name: 'dailyQuotaReset',
     timeZone: 'Asia/Ho_Chi_Minh',
   })
+  @TryCatch()
   async handleDailyQuotaReset(): Promise<void> {
     this.logger.log('Running scheduled task: handleDailyQuotaReset…');
+    // console.log('Running scheduled task: handleDailyQuotaReset…');
     const now = new Date();
 
     // Only users on the Artist Pro plan get a daily reset
@@ -221,34 +221,45 @@ export class UsageScheduler {
     featureKey: FeatureKey,
     subscriptionEnd: Date,
   ): Promise<void> {
-    const cycleStart = getStartOfLocalDay();
+    const startOfToday = startOfDay(new Date());
 
-    const cycleEnd = getEndOfLocalDay();
+    const endOfToday = endOfDay(new Date());
     const effectiveEnd =
-      cycleEnd > subscriptionEnd ? subscriptionEnd : cycleEnd;
+      endOfToday > subscriptionEnd ? subscriptionEnd : endOfToday;
 
     try {
-      await this.prisma.userUsage.upsert({
+      // 1. Reset any existing “today” usage
+      const { count } = await this.prisma.userUsage.updateMany({
         where: {
-          userId_featureKey_cycleStartedAt: {
-            userId,
-            featureKey,
-            cycleStartedAt: cycleStart,
-          },
-        },
-        update: { usedAmount: 0, cycleEndsAt: effectiveEnd },
-        create: {
           userId,
           featureKey,
+          cycleStartedAt: {
+            gte: startOfToday,
+            lt: endOfToday,
+          },
+        },
+        data: {
           usedAmount: 0,
-          cycleStartedAt: cycleStart,
           cycleEndsAt: effectiveEnd,
         },
       });
 
+      // 2. If none was updated, create a fresh row
+      if (count === 0) {
+        await this.prisma.userUsage.create({
+          data: {
+            userId,
+            featureKey,
+            usedAmount: 0,
+            cycleStartedAt: startOfToday,
+            cycleEndsAt: effectiveEnd,
+          },
+        });
+      }
+
       this.logger.debug(
         `Daily credits reset for user ${userId} – ` +
-          `window ${cycleStart.toISOString()} → ${effectiveEnd.toISOString()}`,
+          `window ${startOfToday} → ${effectiveEnd.toISOString()}`,
       );
     } catch (err) {
       this.logger.error(`DB error during daily reset for user ${userId}:`, err);

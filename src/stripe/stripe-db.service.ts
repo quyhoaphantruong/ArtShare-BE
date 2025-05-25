@@ -71,7 +71,14 @@ export class StripeDbService {
   }
 
   async findUserAccess(userId: string): Promise<UserAccess | null> {
-    return this.prisma.userAccess.findUnique({ where: { userId } });
+    return this.prisma.userAccess.findFirst({
+    where: {
+      userId,
+      planId: {
+        not: PaidAccessLevel.FREE,
+      },
+    },
+  });
   }
 
   async upsertUserAccess(data: {

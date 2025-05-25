@@ -324,7 +324,7 @@ model Plan {
   stripeProductId         String?         @unique
   imageQualityAllowed     ImageQuality    @default(LOW) @map("image_quality_allowed")
   monthlyQuotaCredits     Int?            @map("monthly_quota_credits")
-  dailyQuotaCredits       Int?
+  dailyQuotaCredits       Int
   storageQuotaMB          Int?            @map("storage_quota_mb")
   maxTeamSeats            Int             @default(1) @map("max_team_seats")
   allowHighResolution     Boolean         @default(false) @map("allow_high_resolution")
