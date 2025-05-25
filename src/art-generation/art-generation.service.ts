@@ -6,16 +6,20 @@ import { FileUploadResponse } from 'src/storage/dto/response.dto';
 import { ImageGenerationDto } from './dto/request/image-generation.dto';
 import { ImageGenerationResponseDto } from './dto/response/image-generation.dto';
 import { PrismaService } from 'src/prisma.service';
+import { UsageService } from 'src/usage/usage.service';
+import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 
 @Injectable()
 export class ArtGenerationService {
   private readonly strategies: Record<ModelKey, ImageGeneratorStrategy>;
+  private creditCostPerImage = 5;
 
   constructor(
     @Inject('IMAGE_GENERATORS')
     private readonly generators: ImageGeneratorStrategy[],
     private readonly storageService: StorageService,
     private readonly prismaService: PrismaService,
+    private readonly usageService: UsageService,
   ) {
     this.strategies = Object.fromEntries(
       this.generators.map(g => [g.modelKey, g] as [ModelKey, ImageGeneratorStrategy])
@@ -27,6 +31,12 @@ export class ArtGenerationService {
     userId: string,
   ): Promise<ImageGenerationResponseDto> {
     const { modelKey, prompt, n, aspectRatio } = dto;
+
+    await this.usageService.handleCreditUsage(
+      userId,
+      FeatureKey.AI_CREDITS,
+      this.creditCostPerImage * n,
+    );
 
     // get the model based on the modelKey
     const strat = this.strategies[modelKey];
