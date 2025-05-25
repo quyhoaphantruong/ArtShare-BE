@@ -129,7 +129,6 @@ export class CommentService {
     currentUserId?: string,
     parentCommentId?: number,
   ): Promise<CommentDto[]> {
-    const isTopLevel = parentCommentId == null;
   const comments = await this.prisma.comment.findMany({
       where: {
         target_id: targetId,
@@ -139,16 +138,7 @@ export class CommentService {
       orderBy: { created_at: 'desc' },
       include: {
         user: { select: { id: true, username: true, profile_picture_url: true } },
-      _count: { select: { replies: true } },        
-      ...(isTopLevel && {
-          replies: {
-            orderBy: { created_at: 'asc' },
-            include: {
-              user: { select: { id: true, username: true, profile_picture_url: true } },
-            _count: { select: { replies: true } },   
-            },
-          },
-        }),
+      _count: { select: { replies: true } },
       },
     });
 
@@ -166,21 +156,12 @@ export class CommentService {
 
      /* ❷ map every record to DTO, surfacing `reply_count` ---------- */
     return comments.map((commentPrisma): CommentDto => {
-      const { _count: prismaCount, replies: prismaRepliesArray, ...restOfCommentFields } = commentPrisma;
+      const { _count: prismaCount, ...restOfCommentFields } = commentPrisma;
 
       return {
         ...restOfCommentFields, 
         likedByCurrentUser: likedSet.has(commentPrisma.id),
         reply_count: prismaCount.replies, 
-        replies: (prismaRepliesArray ?? []).map((replyPrisma: any): CommentDto => {
-          const { _count: replyPrismaCount, ...restOfReplyFields } = replyPrisma;
-          return {
-            ...restOfReplyFields,
-            likedByCurrentUser: likedSet.has(replyPrisma.id),
-            reply_count: replyPrismaCount.replies,
-            replies: isTopLevel ? undefined : [],
-          };
-        }),
       };
     });
   }
