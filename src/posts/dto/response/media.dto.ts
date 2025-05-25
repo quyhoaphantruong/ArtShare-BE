@@ -1,8 +1,8 @@
 import { MediaType } from '@prisma/client';
-import { Exclude } from 'class-transformer';
+import { Expose } from 'class-transformer';
 
 export class MediaResponseDto {
-  @Exclude() id: number;
+  @Expose() id: number;
   media_type: MediaType;
   description?: string;
   url: string;
