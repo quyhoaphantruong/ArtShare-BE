@@ -57,12 +57,4 @@ export class CommentDto {
   @ApiProperty({ type: () => UserBriefDto })
   @Type(() => UserBriefDto)
   user: UserBriefDto;
-
-  @ApiProperty({
-    type: () => CommentReplyDto,
-    isArray: true,
-    description: 'Immediate replies (1 level deep)',
-  })
-  @Type(() => CommentReplyDto)
-  replies: CommentReplyDto[];
 }

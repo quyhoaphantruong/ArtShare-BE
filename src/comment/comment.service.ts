@@ -123,60 +123,49 @@ export class CommentService {
     }
   }
 
-  async getComments(
-  targetId: number,
-  targetType: TargetType,
-  currentUserId?: string,
-  parentCommentId?: number,
-): Promise<CommentDto[]> {
-  const isTopLevel = parentCommentId == null;
+   async getComments(
+    targetId: number,
+    targetType: TargetType,
+    currentUserId?: string,
+    parentCommentId?: number,
+  ): Promise<CommentDto[]> {
   const comments = await this.prisma.comment.findMany({
-    where: {
-      target_id: targetId,
-      target_type: targetType,
-      parent_comment_id: parentCommentId ?? null,
-    },
-    orderBy: { created_at: 'desc' },
-    include: {
-      user: { select: { id: true, username: true, profile_picture_url: true } },
-      _count: { select: { replies: true } },        
-      ...(isTopLevel && {
-        replies: {
-          orderBy: { created_at: 'asc' },
-          include: {
-            user: { select: { id: true, username: true, profile_picture_url: true } },
-            _count: { select: { replies: true } },   
-          },
-        },
-      }),
-    },
-  });
+      where: {
+        target_id: targetId,
+        target_type: targetType,
+        parent_comment_id: parentCommentId ?? null,
+      },
+      orderBy: { created_at: 'desc' },
+      include: {
+        user: { select: { id: true, username: true, profile_picture_url: true } },
+      _count: { select: { replies: true } },
+      },
+    });
 
     //* gather IDs of comments **and** their included replies */
   const ids: number[] = [];
         comments.forEach((c: any) => {
     ids.push(c.id);
           c.replies?.forEach((r: any) => ids.push(r.id));
-  });
-  const likedRows = await this.prisma.commentLike.findMany({
-    where: { user_id: currentUserId, comment_id: { in: ids } },
-    select: { comment_id: true },
-  });
+    });
+  const likedRows = currentUserId ? await this.prisma.commentLike.findMany({
+  where: { user_id: currentUserId, comment_id: { in: ids } },
+  select: { comment_id: true },
+}) : [];
     const likedSet = new Set(likedRows.map((l) => l.comment_id));
 
-  /* ❷ map every record to DTO, surfacing `reply_count` ---------- */
-  return comments.map((c): CommentDto => ({
-    ...c,
-    likedByCurrentUser: likedSet.has(c.id),
-    reply_count: c._count.replies,           //   ← expose it
-    replies: (c.replies ?? []).map((r: any): CommentDto => ({
-      ...r,
-      likedByCurrentUser: likedSet.has(r.id),
-      reply_count: r._count.replies,         //   ← expose on children too
-      replies: isTopLevel ? undefined : [],  // lazy-load deeper levels
-    })),
-  }));
-}
+     /* ❷ map every record to DTO, surfacing `reply_count` ---------- */
+    return comments.map((commentPrisma): CommentDto => {
+      const { _count: prismaCount, ...restOfCommentFields } = commentPrisma;
+
+      return {
+        ...restOfCommentFields, 
+        likedByCurrentUser: likedSet.has(commentPrisma.id),
+        reply_count: prismaCount.replies, 
+      };
+    });
+  }
+
 
   async update(
     commentId: number,
