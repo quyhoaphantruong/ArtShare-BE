@@ -1,13 +1,14 @@
-import { PrismaClient, Prisma, ImageQuality } from '@prisma/client';
+import { PrismaClient, Prisma, ImageQuality, PaidAccessLevel } from '@prisma/client';
 import { CategoryType } from 'src/categories/dto/request/create-category.dto';
 
 const planData: Prisma.PlanCreateInput[] = [
   {
-    id: 'free',
+    id: PaidAccessLevel.FREE,
     name: 'Individuals',
     stripeProductId: null,
     description: 'Used by art lovers',
     imageQualityAllowed: ImageQuality.LOW,
+    dailyQuotaCredits: 50,
     monthlyQuotaCredits: null,
     storageQuotaMB: 500,
     maxTeamSeats: 1,
@@ -18,11 +19,12 @@ const planData: Prisma.PlanCreateInput[] = [
     smartSuggestionsEnabled: false,
   },
   {
-    id: 'artist_pro',
+    id: PaidAccessLevel.ARTIST_PRO,
     name: 'Pro Artists',
     stripeProductId: process.env.STRIPE_ARTIST_PRODUCT_ID,
     description: 'Great for small businesses',
     imageQualityAllowed: ImageQuality.HIGH,
+    dailyQuotaCredits: 50,
     monthlyQuotaCredits: 5000,
     storageQuotaMB: 50000,
     maxTeamSeats: 1,
@@ -33,12 +35,13 @@ const planData: Prisma.PlanCreateInput[] = [
     smartSuggestionsEnabled: true,
   },
   {
-    id: 'studio',
+    id: PaidAccessLevel.STUDIO,
     name: 'Studios',
     stripeProductId: process.env.STRIPE_STUDIO_PRODUCT_ID,
     description: 'Great for large businesses',
 
     imageQualityAllowed: ImageQuality.HIGH,
+    dailyQuotaCredits: 5000,
     monthlyQuotaCredits: 25000,
     storageQuotaMB: 250000,
     maxTeamSeats: 5,
@@ -295,56 +298,56 @@ async function main() {
   console.log('Seeded categories');
 
   // Seed Blogs with upsert by ID
-  const blogSeeds = [
-    {
-      id: 1,
-      userId: 'jris1kLjcEOimrlKjGQexf65kV32',
-      title: 'Exploring the Alps: A Photographic Journey (Tiptap Edition)',
-      content: `<h1>Alps Journey</h1><p>Photos and experiences in the Alps.</p>`,
-      is_published: true,
-      pictures: [
-        'https://example.com/alps1.jpg',
-        'https://example.com/alps2.jpg',
-      ],
-      embedded_videos: [],
-    },
-    {
-      id: 2,
-      userId: 'wlkJWoJiOwV5vDjKfwAqCOB24Iw1',
-      title: 'Urban Exploration: The Hidden Gems (Tiptap)',
-      content: `<h1>Urban Gems</h1><p>Exploring hidden spots in the city.</p>`,
-      is_published: true,
-      pictures: [
-        'https://example.com/urban1.jpg',
-        'https://example.com/urban2.jpg',
-      ],
-      embedded_videos: [],
-    },
-  ];
+  // const blogSeeds = [
+  //   {
+  //     id: 1,
+  //     userId: 'jris1kLjcEOimrlKjGQexf65kV32',
+  //     title: 'Exploring the Alps: A Photographic Journey (Tiptap Edition)',
+  //     content: `<h1>Alps Journey</h1><p>Photos and experiences in the Alps.</p>`,
+  //     is_published: true,
+  //     pictures: [
+  //       'https://example.com/alps1.jpg',
+  //       'https://example.com/alps2.jpg',
+  //     ],
+  //     embedded_videos: [],
+  //   },
+  //   {
+  //     id: 2,
+  //     userId: 'wlkJWoJiOwV5vDjKfwAqCOB24Iw1',
+  //     title: 'Urban Exploration: The Hidden Gems (Tiptap)',
+  //     content: `<h1>Urban Gems</h1><p>Exploring hidden spots in the city.</p>`,
+  //     is_published: true,
+  //     pictures: [
+  //       'https://example.com/urban1.jpg',
+  //       'https://example.com/urban2.jpg',
+  //     ],
+  //     embedded_videos: [],
+  //   },
+  // ];
 
-  for (const b of blogSeeds) {
-    await prisma.blog.upsert({
-      where: { id: b.id }, // upsert by primary key
-      update: {
-        title: b.title,
-        content: b.content,
-        is_published: b.is_published,
-        pictures: b.pictures,
-        embedded_videos: b.embedded_videos,
-        user_id: b.userId, // ← update uses scalar FK too
-      },
-      create: {
-        id: b.id,
-        user_id: b.userId, // ← supply FK scalar here
-        title: b.title,
-        content: b.content,
-        is_published: b.is_published,
-        pictures: b.pictures,
-        embedded_videos: b.embedded_videos,
-      },
-    });
-    console.log(`Upserted blog ${b.id}: ${b.title}`);
-  }
+  // for (const b of blogSeeds) {
+  //   await prisma.blog.upsert({
+  //     where: { id: b.id }, // upsert by primary key
+  //     update: {
+  //       title: b.title,
+  //       content: b.content,
+  //       is_published: b.is_published,
+  //       pictures: b.pictures,
+  //       embedded_videos: b.embedded_videos,
+  //       user_id: b.userId, // ← update uses scalar FK too
+  //     },
+  //     create: {
+  //       id: b.id,
+  //       user_id: b.userId, // ← supply FK scalar here
+  //       title: b.title,
+  //       content: b.content,
+  //       is_published: b.is_published,
+  //       pictures: b.pictures,
+  //       embedded_videos: b.embedded_videos,
+  //     },
+  //   });
+  //   console.log(`Upserted blog ${b.id}: ${b.title}`);
+  // }
 
   console.log('Seeding finished.');
 }
