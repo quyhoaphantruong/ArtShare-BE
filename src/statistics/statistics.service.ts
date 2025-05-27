@@ -28,7 +28,6 @@ export class StatisticsService {
       ORDER BY count DESC;
     `;
 
-    // Convert BigInt to number here to avoid JSON serialization issues
     return rows.map((r) => ({
       key: r[alias] as unknown as string,
       count: Number(r.count),
