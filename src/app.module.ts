@@ -19,6 +19,7 @@ import { CommentModule } from './comment/comment.module';
 import { ArtGenerationModule } from './art-generation/art-generation.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { UsageModule } from './usage/usage.module';
+import { StatisticsModule } from './statistics/statistics.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { UsageModule } from './usage/usage.module';
       isGlobal: true, // ✅ optional but useful
     }),
     ArtGenerationModule,
+    StatisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
