@@ -39,27 +39,28 @@ model User {
   created_at          DateTime  @default(now())
   updated_at          DateTime? @updatedAt
   refresh_token       String?
-  birthday            DateTime? @db.Date
-  followers_count     Int       @default(0)
-  followings_count    Int       @default(0)
-  stripe_customer_id  String?   @unique
-  is_onboard          Boolean   @default(false)
-
-  collections Collection[]
-  blogs       Blog[]
-  bookmarks   Bookmark[]
-  comments    Comment[]
-  followers   Follow[]      @relation("followers_of_user")
-  followings  Follow[]      @relation("users_following")
-  likes       Like[]
-  posts       Post[]
-  ratings     Rating[]
-  Report      Report[]      @relation("UserReports")
-  shares      Share[]
-  userAccess  UserAccess?
-  roles       UserRole[]
-  UserUsage   UserUsage[]
-  CommentLike CommentLike[]
+  birthday            DateTime?     @db.Date
+  followers_count     Int           @default(0)
+  followings_count    Int           @default(0)
+  stripe_customer_id  String?       @unique
+  is_onboard          Boolean       @default(false)
+  
+  collections         Collection[]
+  blogs               Blog[]
+  bookmarks           Bookmark[]
+  comments            Comment[]
+  followers           Follow[]      @relation("followers_of_user")
+  followings          Follow[]      @relation("users_following")
+  likes               Like[]
+  posts               Post[]
+  ratings             Rating[]
+  Report              Report[]      @relation("UserReports")
+  ModeratorReports    Report[]      @relation("ModeratorReports")
+  shares              Share[]
+  userAccess          UserAccess?
+  roles               UserRole[]
+  UserUsage           UserUsage[]
+  CommentLike         CommentLike[]
 
   @@map("user")
 }
@@ -186,20 +187,19 @@ model CommentLike {
 }
 
 model Comment {
-  id                Int        @id @default(autoincrement())
+  id                Int           @id @default(autoincrement())
   user_id           String
   parent_comment_id Int?
   content           String
-  created_at        DateTime   @default(now())
-  updated_at        DateTime?  @updatedAt
+  created_at        DateTime      @default(now())
+  updated_at        DateTime?     @updatedAt
   target_id         Int
-  like_count        Int        @default(0)
+  like_count        Int           @default(0)
   target_type       TargetType
-
-  parent_comment Comment?      @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
-  replies        Comment[]     @relation("CommentReplies")
-  user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  CommentLike    CommentLike[]
+  parent_comment    Comment?      @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
+  replies           Comment[]     @relation("CommentReplies")
+  user              User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  CommentLike       CommentLike[]
 
   @@index([target_id, target_type])
   @@index([parent_comment_id])
@@ -283,15 +283,21 @@ model Collection {
 }
 
 model Report {
-  id          Int              @id @default(autoincrement())
-  reporter_id String
-  target_id   Int
-  target_type ReportTargetType
-  reason      String
-  status      ReportStatus     @default(PENDING)
-  created_at  DateTime         @default(now()) @map("created_at")
+  id                 Int              @id @default(autoincrement())
+  reporter_id        String
+  target_id          Int
+  user_id            String?
+  target_type        ReportTargetType
+  reason             String
+  status             ReportStatus     @default(PENDING)
+  created_at         DateTime         @default(now()) @map("created_at")
+  resolved_at        DateTime?
+  resolution_comment String?
+  moderator_id       String?
+  target_url         String?
 
-  reporter User @relation("UserReports", fields: [reporter_id], references: [id], onDelete: Cascade)
+  reporter  User  @relation("UserReports", fields: [reporter_id], references: [id], onDelete: Cascade)
+  moderator User? @relation("ModeratorReports", fields: [moderator_id], references: [id])
 
   @@index([reporter_id])
   @@index([status])
@@ -432,6 +438,7 @@ enum ReportStatus {
   PENDING
   REVIEWED
   RESOLVED
+  DISMISSED
 }
 
 enum AspectRatio {
