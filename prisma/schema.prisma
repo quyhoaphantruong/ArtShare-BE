@@ -28,37 +28,37 @@ model UserRole {
 }
 
 model User {
-  id                  String        @id
-  username            String        @unique
-  email               String        @unique
+  id                  String    @id
+  username            String    @unique
+  email               String    @unique
   full_name           String?
   profile_picture_url String?
   bio                 String?
-  created_at          DateTime      @default(now())
-  updated_at          DateTime?     @updatedAt
+  created_at          DateTime  @default(now())
+  updated_at          DateTime? @updatedAt
   refresh_token       String?
-  birthday            DateTime?     @db.Date
-  followers_count     Int           @default(0)
-  followings_count    Int           @default(0)
-  stripe_customer_id  String?       @unique
-  is_onboard          Boolean       @default(false)
-  
-  collections         Collection[]
-  blogs               Blog[]
-  bookmarks           Bookmark[]
-  comments            Comment[]
-  followers           Follow[]      @relation("followers_of_user")
-  followings          Follow[]      @relation("users_following")
-  likes               Like[]
-  posts               Post[]
-  ratings             Rating[]
-  Report              Report[]      @relation("UserReports")
-  ModeratorReports    Report[]      @relation("ModeratorReports")
-  shares              Share[]
-  userAccess          UserAccess?
-  roles               UserRole[]
-  UserUsage           UserUsage[]
-  CommentLike         CommentLike[]
+  birthday            DateTime? @db.Date
+  followers_count     Int       @default(0)
+  followings_count    Int       @default(0)
+  stripe_customer_id  String?   @unique
+  is_onboard          Boolean   @default(false)
+
+  collections      Collection[]
+  blogs            Blog[]
+  bookmarks        Bookmark[]
+  comments         Comment[]
+  followers        Follow[]      @relation("followers_of_user")
+  followings       Follow[]      @relation("users_following")
+  likes            Like[]
+  posts            Post[]
+  ratings          Rating[]
+  Report           Report[]      @relation("UserReports")
+  ModeratorReports Report[]      @relation("ModeratorReports")
+  shares           Share[]
+  userAccess       UserAccess?
+  roles            UserRole[]
+  UserUsage        UserUsage[]
+  CommentLike      CommentLike[]
 
   @@map("user")
 }
@@ -295,17 +295,17 @@ model Report {
 }
 
 model UserAccess {
-  userId               String   @id
+  userId               String    @id
   planId               String
-  expiresAt            DateTime @map("expires_at")
-  stripeSubscriptionId String   @unique @map("stripe_subscription_id")
-  stripePriceId        String   @map("stripe_price_id")
-  stripeCustomerId     String   @map("stripe_customer_id")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-  cancelAtPeriodEnd    Boolean  @default(false) @map("cancel_at_period_end")
-  plan                 Plan     @relation(fields: [planId], references: [id])
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt            DateTime? @map("expires_at")
+  stripeSubscriptionId String?   @unique @map("stripe_subscription_id")
+  stripePriceId        String?   @map("stripe_price_id")
+  stripeCustomerId     String?    @map("stripe_customer_id")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  plan                 Plan      @relation(fields: [planId], references: [id])
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([stripeCustomerId])
   @@map("user_access")

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Cron, CronExpression } from '@nestjs/schedule';
+// import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'src/prisma.service';
 import Stripe from 'stripe';
 
@@ -24,60 +24,60 @@ export class UsageScheduler {
     }
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_1AM, {
-    name: 'monthlyQuotaReset',
-    timeZone: 'UTC',
-  })
-  async handleMonthlyQuotaReset() {
-    this.logger.log('Running scheduled task: handleMonthlyQuotaReset...');
-    const now = new Date();
+  // @Cron(CronExpression.EVERY_DAY_AT_1AM, {
+  //   name: 'monthlyQuotaReset',
+  //   timeZone: 'UTC',
+  // })
+  // async handleMonthlyQuotaReset() {
+  //   this.logger.log('Running scheduled task: handleMonthlyQuotaReset...');
+  //   const now = new Date();
 
-    const activeAccessRecords = await this.prisma.userAccess.findMany({
-      where: {
-        expiresAt: { gt: now },
-        plan: {
-          OR: [
-            { monthlyQuotaCredits: { not: null } },
-            { storageQuotaMB: { not: null } },
-          ],
-        },
-      },
-      include: {
-        plan: true,
-        user: { select: { id: true } },
-      },
-    });
+  //   const activeAccessRecords = await this.prisma.userAccess.findMany({
+  //     where: {
+  //       expiresAt: { gt: now },
+  //       plan: {
+  //         OR: [
+  //           { monthlyQuotaCredits: { not: null } },
+  //           { storageQuotaMB: { not: null } },
+  //         ],
+  //       },
+  //     },
+  //     include: {
+  //       plan: true,
+  //       user: { select: { id: true } },
+  //     },
+  //   });
 
-    this.logger.log(
-      `Found ${activeAccessRecords.length} active subscriptions to check for monthly quota resets.`,
-    );
+  //   this.logger.log(
+  //     `Found ${activeAccessRecords.length} active subscriptions to check for monthly quota resets.`,
+  //   );
 
-    for (const access of activeAccessRecords) {
-      const userId = access.userId;
-      const plan = access.plan;
+  //   for (const access of activeAccessRecords) {
+  //     const userId = access.userId;
+  //     const plan = access.plan;
 
-      if (plan.monthlyQuotaCredits !== null) {
-        await this.resetFeatureUsageIfNeeded(
-          userId,
-          'ai_credits',
-          access.stripeSubscriptionId,
-          now,
-          access.expiresAt,
-        );
-      }
+  //     if (plan.monthlyQuotaCredits !== null) {
+  //       await this.resetFeatureUsageIfNeeded(
+  //         userId,
+  //         'ai_credits',
+  //         access.stripeSubscriptionId,
+  //         now,
+  //         access.expiresAt,
+  //       );
+  //     }
 
-      if (plan.storageQuotaMB !== null) {
-        await this.resetFeatureUsageIfNeeded(
-          userId,
-          'storage_mb',
-          access.stripeSubscriptionId,
-          now,
-          access.expiresAt,
-        );
-      }
-    }
-    this.logger.log('Finished scheduled task: handleMonthlyQuotaReset.');
-  }
+  //     if (plan.storageQuotaMB !== null) {
+  //       await this.resetFeatureUsageIfNeeded(
+  //         userId,
+  //         'storage_mb',
+  //         access.stripeSubscriptionId,
+  //         now,
+  //         access.expiresAt,
+  //       );
+  //     }
+  //   }
+  //   this.logger.log('Finished scheduled task: handleMonthlyQuotaReset.');
+  // }
 
   private async resetFeatureUsageIfNeeded(
     userId: string,
