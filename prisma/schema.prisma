@@ -66,31 +66,33 @@ model User {
 }
 
 model Post {
-  id            Int       @id @default(autoincrement())
-  user_id       String
-  title         String
-  description   String?
-  created_at    DateTime  @default(now())
-  is_published  Boolean   @default(false)
-  is_private    Boolean   @default(false)
-  group_id      Int?
-  share_count   Int       @default(0)
-  comment_count Int       @default(0)
-  view_count    Int       @default(0)
-  like_count    Int       @default(0)
-  thumbnail_url String
-  updated_at    DateTime? @updatedAt
-  is_mature     Boolean   @default(false)
-  ai_created    Boolean   @default(false)
+  id                Int       @id @default(autoincrement())
+  user_id           String
+  title             String
+  description       String?
+  created_at        DateTime  @default(now())
+  is_published      Boolean   @default(false)
+  is_private        Boolean   @default(false)
+  group_id          Int?
+  share_count       Int       @default(0)
+  comment_count     Int       @default(0)
+  view_count        Int       @default(0)
+  like_count        Int       @default(0)
+  thumbnail_url     String
+  updated_at        DateTime? @updatedAt
+  is_mature         Boolean   @default(false)
+  ai_created        Boolean   @default(false)
+  art_generation_id Int?
 
   likes               Like[]
   medias              Media[]
-  user                User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user                User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
   shares              Share[]
-  categories          Category[]  @relation("CategoryToPost")
+  categories          Category[]     @relation("CategoryToPost")
   thumbnail_crop_meta Json?
-  Collection          Collection? @relation(fields: [collectionId], references: [id])
+  Collection          Collection?    @relation(fields: [collectionId], references: [id])
   collectionId        Int?
+  art_generation      ArtGeneration? @relation(fields: [art_generation_id], references: [id])
 
   @@index([user_id])
   @@map("post")
@@ -377,6 +379,8 @@ model ArtGeneration {
   camera                     String?
   created_at                 DateTime    @default(now())
   updated_at                 DateTime?   @updatedAt
+
+  Post Post[]
 
   @@map("art_generation")
 }

@@ -59,4 +59,8 @@ export class CreatePostRequestDto {
 
   @IsString()
   thumbnail_crop_meta: string = "{}";
+
+  @IsInt()
+  @IsOptional()
+  prompt_id?: number;
 }
