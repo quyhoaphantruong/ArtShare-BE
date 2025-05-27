@@ -9,6 +9,7 @@ import { PrismaService } from 'src/prisma.service';
 import { UsageService } from 'src/usage/usage.service';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 import { AspectRatio } from './enum/aspect-ratio';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class ArtGenerationService {
@@ -87,7 +88,7 @@ export class ArtGenerationService {
       },
     });
 
-    return generatedArt;
+    return plainToInstance(ImageGenerationResponseDto, generatedArt);;
   }
 
   private getFinalPrompt(prompt: string, style?: string, lighting?: string, camera?: string): string {
