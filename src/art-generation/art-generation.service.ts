@@ -8,6 +8,7 @@ import { ImageGenerationResponseDto } from './dto/response/image-generation.dto'
 import { PrismaService } from 'src/prisma.service';
 import { UsageService } from 'src/usage/usage.service';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
+import { AspectRatio } from './enum/aspect-ratio';
 
 @Injectable()
 export class ArtGenerationService {
@@ -35,7 +36,7 @@ export class ArtGenerationService {
     await this.usageService.handleCreditUsage(
       userId,
       FeatureKey.AI_CREDITS,
-      this.creditCostPerImage * n,
+      this.creditCostPerImage * n + (aspectRatio === AspectRatio.LANDSCAPE || aspectRatio === AspectRatio.PORTRAIT ? 1 : 0), // extra cost for landscape/portrait
     );
 
     // get the model based on the modelKey
@@ -48,7 +49,7 @@ export class ArtGenerationService {
     // generate the image
     const finalPrompt: string = this.getFinalPrompt(prompt, dto.style, dto.lighting, dto.camera);
     const imageGenerationResult: ImageGenerationResult = await strat.generate({ prompt: finalPrompt, n, aspectRatio });
-    
+
     if (!imageGenerationResult || !imageGenerationResult.b64EncodedImages) {
       throw new BadRequestException('Image generation failed');
     }
@@ -71,7 +72,7 @@ export class ArtGenerationService {
     const urls = uploads.map(upload => upload.url);
 
     // save info to the database
-    await this.prismaService.artGeneration.create({
+    const generatedArt = await this.prismaService.artGeneration.create({
       data: {
         user_id: userId,
         user_prompt: prompt,
@@ -86,10 +87,7 @@ export class ArtGenerationService {
       },
     });
 
-    return {
-      prompt: prompt,
-      urls,
-    };
+    return generatedArt;
   }
 
   private getFinalPrompt(prompt: string, style?: string, lighting?: string, camera?: string): string {

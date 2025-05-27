@@ -8,7 +8,7 @@ export const subscriptionInfoResponseMapper = (
 ): SubscriptionInfoResponseDto => {
   return {
     plan: SubscriptionPlan[plan.id],
-    aiCreditUsedAmount: userUsage.usedAmount,
+    aiCreditRemaining: plan.dailyQuotaCredits - userUsage.usedAmount,
     dailyAiCreditLimit: plan.dailyQuotaCredits,
     createdAt: access.createdAt,
     expiresAt: access.expiresAt,

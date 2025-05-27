@@ -1,6 +1,6 @@
 export class SubscriptionInfoResponseDto {
   plan: SubscriptionPlan;
-  aiCreditUsedAmount: number;
+  aiCreditRemaining: number;
   dailyAiCreditLimit: number;
   createdAt: Date;
   expiresAt: Date;
