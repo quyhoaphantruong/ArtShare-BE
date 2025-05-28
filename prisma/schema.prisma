@@ -190,7 +190,7 @@ model Comment {
   target_id         Int
   like_count        Int           @default(0)
   target_type       TargetType
-  parent_comment    Comment?      @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
+  parent_comment    Comment?      @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: Cascade)
   replies           Comment[]     @relation("CommentReplies")
   user              User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
   CommentLike       CommentLike[]
