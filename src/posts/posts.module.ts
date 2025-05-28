@@ -11,9 +11,10 @@ import { PostsEmbeddingService } from './posts-embedding.service';
 import { LikesModule } from 'src/likes/likes.module';
 import { LikesService } from 'src/likes/likes.service';
 import { PostsManagementValidator } from './validator/posts-management.validator';
+import { UsageModule } from 'src/usage/usage.module';
 
 @Module({
-  imports: [AuthModule, EmbeddingModule, LikesModule],
+  imports: [AuthModule, EmbeddingModule, LikesModule, UsageModule],
   providers: [
     PostsExploreService,
     PostsManagementService,

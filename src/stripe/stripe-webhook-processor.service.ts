@@ -55,7 +55,7 @@ export class StripeWebhookProcessorService {
     await this.stripeDbService.upsertUserAccess({
       userId: user.id,
       planId: PaidAccessLevel.FREE,
-      expiresAt: null,
+      expiresAt: new Date('9999-12-31T23:59:59.999Z'),
       stripeSubscriptionId: null,
       stripePriceId: null,
       stripeCustomerId: currentStripeCustomerId,

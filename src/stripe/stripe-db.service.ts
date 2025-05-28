@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { Plan, User, UserAccess } from '@prisma/client';
+import { PaidAccessLevel, Plan, User, UserAccess } from '@prisma/client';
 
 @Injectable()
 export class StripeDbService {
@@ -65,7 +65,14 @@ export class StripeDbService {
   }
 
   async findUserAccess(userId: string): Promise<UserAccess | null> {
-    return this.prisma.userAccess.findUnique({ where: { userId } });
+    return this.prisma.userAccess.findFirst({
+      where: {
+        userId,
+        planId: {
+          not: PaidAccessLevel.FREE,
+        },
+      },
+    });
   }
 
   async findUserAccessBySubscriptionId(
@@ -79,7 +86,7 @@ export class StripeDbService {
   async upsertUserAccess(data: {
     userId: string;
     planId: string;
-    expiresAt: Date | null;
+    expiresAt: Date;
     stripeSubscriptionId: string | null;
     stripePriceId: string | null;
     stripeCustomerId: string | null;
@@ -91,7 +98,7 @@ export class StripeDbService {
     return this.prisma.userAccess.upsert({
       where: { userId: data.userId },
       update: {
-        planId: data.planId,
+        planId: data.planId as PaidAccessLevel,
         expiresAt: data.expiresAt,
         stripeSubscriptionId: data.stripeSubscriptionId,
         stripePriceId: data.stripePriceId,
@@ -100,7 +107,7 @@ export class StripeDbService {
       },
       create: {
         userId: data.userId,
-        planId: data.planId,
+        planId: data.planId as PaidAccessLevel,
         expiresAt: data.expiresAt,
         stripeSubscriptionId: data.stripeSubscriptionId,
         stripePriceId: data.stripePriceId,
