@@ -20,6 +20,7 @@ import { ArtGenerationModule } from './art-generation/art-generation.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { UsageModule } from './usage/usage.module';
 import { StatisticsModule } from './statistics/statistics.module';
+import { TrendingModule } from './trending/trending.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { StatisticsModule } from './statistics/statistics.module';
     }),
     ArtGenerationModule,
     StatisticsModule,
+    TrendingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

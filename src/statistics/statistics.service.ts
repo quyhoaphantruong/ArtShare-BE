@@ -1,5 +1,5 @@
 // src/statistics/statistics.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma.service';
 
@@ -10,6 +10,8 @@ export interface StatCount {
 
 @Injectable()
 export class StatisticsService {
+  private readonly logger = new Logger(StatisticsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   private async rawStats(
@@ -58,6 +60,62 @@ export class StatisticsService {
       this.getStyles(),
     ]);
 
-    return { aspectRatios, lightings, styles};
+    return { aspectRatios, lightings, styles };
+  }
+
+  async getRawTrendingPrompts(): Promise<string[]> {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 50);
+
+    const recentArtGenerations = await this.prisma.artGeneration.findMany({
+      where: {
+        created_at: {
+          gte: sevenDaysAgo,
+        },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+      take: 20,
+    });
+
+    return recentArtGenerations.map((item) => item.user_prompt);
+  }
+
+  async updateTrendingPrompts(
+    key: string,
+    promptsToUpdate: string[],
+  ): Promise<void> {
+    this.logger.log(`Updating trending prompts in DB for key: ${key}`);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.trendingPrompt.deleteMany({
+          where: { prompt_key: key },
+        });
+
+        await tx.trendingPrompt.create({
+          data: {
+            prompt_key: key,
+            prompts: promptsToUpdate,
+          },
+        });
+      });
+      this.logger.log(`Successfully updated prompts for key: ${key}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to update trending prompts for key: ${key}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  async getStoredTrendingPrompts(key: string): Promise<string[] | null> {
+    const result = await this.prisma.trendingPrompt.findUnique({
+      where: { prompt_key: key },
+    });
+
+    return result ? result.prompts : null;
   }
 }

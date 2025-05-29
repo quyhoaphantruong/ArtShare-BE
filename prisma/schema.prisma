@@ -28,37 +28,37 @@ model UserRole {
 }
 
 model User {
-  id                  String        @id
-  username            String        @unique
-  email               String        @unique
+  id                  String    @id
+  username            String    @unique
+  email               String    @unique
   full_name           String?
   profile_picture_url String?
   bio                 String?
-  created_at          DateTime      @default(now())
-  updated_at          DateTime?     @updatedAt
+  created_at          DateTime  @default(now())
+  updated_at          DateTime? @updatedAt
   refresh_token       String?
-  birthday            DateTime?     @db.Date
-  followers_count     Int           @default(0)
-  followings_count    Int           @default(0)
-  stripe_customer_id  String?       @unique
-  is_onboard          Boolean       @default(false)
-  
-  collections         Collection[]
-  blogs               Blog[]
-  bookmarks           Bookmark[]
-  comments            Comment[]
-  followers           Follow[]      @relation("followers_of_user")
-  followings          Follow[]      @relation("users_following")
-  likes               Like[]
-  posts               Post[]
-  ratings             Rating[]
-  Report              Report[]      @relation("UserReports")
-  ModeratorReports    Report[]      @relation("ModeratorReports")
-  shares              Share[]
-  userAccess          UserAccess?
-  roles               UserRole[]
-  UserUsage           UserUsage[]
-  CommentLike         CommentLike[]
+  birthday            DateTime? @db.Date
+  followers_count     Int       @default(0)
+  followings_count    Int       @default(0)
+  stripe_customer_id  String?   @unique
+  is_onboard          Boolean   @default(false)
+
+  collections      Collection[]
+  blogs            Blog[]
+  bookmarks        Bookmark[]
+  comments         Comment[]
+  followers        Follow[]      @relation("followers_of_user")
+  followings       Follow[]      @relation("users_following")
+  likes            Like[]
+  posts            Post[]
+  ratings          Rating[]
+  Report           Report[]      @relation("UserReports")
+  ModeratorReports Report[]      @relation("ModeratorReports")
+  shares           Share[]
+  userAccess       UserAccess?
+  roles            UserRole[]
+  UserUsage        UserUsage[]
+  CommentLike      CommentLike[]
 
   @@map("user")
 }
@@ -364,6 +364,16 @@ model ArtGeneration {
   updated_at                 DateTime?   @updatedAt
 
   @@map("art_generation")
+}
+
+model TrendingPrompt {
+  id         Int      @id @default(autoincrement())
+  prompt_key String   @unique
+  prompts    String[]
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("trending_prompts")
 }
 
 enum PaidAccessLevel {
