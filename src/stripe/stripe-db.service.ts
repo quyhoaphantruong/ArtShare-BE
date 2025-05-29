@@ -4,7 +4,9 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { Plan, User, UserAccess } from '@prisma/client';
+import { PaidAccessLevel, Plan, User, UserAccess } from '@prisma/client';
+import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
+import { getEndOfLocalDay } from 'src/common/utils/date.utils';
 
 @Injectable()
 export class StripeDbService {
@@ -69,7 +71,14 @@ export class StripeDbService {
   }
 
   async findUserAccess(userId: string): Promise<UserAccess | null> {
-    return this.prisma.userAccess.findUnique({ where: { userId } });
+    return this.prisma.userAccess.findFirst({
+    where: {
+      userId,
+      planId: {
+        not: PaidAccessLevel.FREE,
+      },
+    },
+  });
   }
 
   async upsertUserAccess(data: {
@@ -87,7 +96,7 @@ export class StripeDbService {
     return this.prisma.userAccess.upsert({
       where: { userId: data.userId },
       update: {
-        planId: data.planId,
+        planId: data.planId as PaidAccessLevel,
         expiresAt: data.expiresAt,
         stripeSubscriptionId: data.stripeSubscriptionId,
         stripePriceId: data.stripePriceId,
@@ -96,7 +105,7 @@ export class StripeDbService {
       },
       create: {
         userId: data.userId,
-        planId: data.planId,
+        planId: data.planId as PaidAccessLevel,
         expiresAt: data.expiresAt,
         stripeSubscriptionId: data.stripeSubscriptionId,
         stripePriceId: data.stripePriceId,
@@ -169,27 +178,29 @@ export class StripeDbService {
     userId: string,
     plan: Plan,
     cycleStartDate: Date,
-    cycleEndDate: Date,
+    subscriptionExpiryDate: Date,
   ): Promise<void> {
     this.logger.log(
-      `Upserting usage for user ${userId}, plan ${plan.id}, cycle: ${cycleStartDate.toISOString()} - ${cycleEndDate.toISOString()}`,
+      `Upserting usage for user ${userId}, plan ${plan.id}, cycle: ${cycleStartDate.toISOString()} - ${subscriptionExpiryDate.toISOString()}`,
     );
-    if (plan.monthlyQuotaCredits !== null) {
+    if (plan.dailyQuotaCredits !== null) {
+      const dailyCycleEnd = getEndOfLocalDay();
+
       await this.prisma.userUsage.upsert({
         where: {
           userId_featureKey_cycleStartedAt: {
             userId,
-            featureKey: 'ai_credits',
+            featureKey: FeatureKey.AI_CREDITS,
             cycleStartedAt: cycleStartDate,
           },
         },
-        update: { usedAmount: 0, cycleEndsAt: cycleEndDate },
+        update: { usedAmount: 0, cycleEndsAt: dailyCycleEnd },
         create: {
           userId,
-          featureKey: 'ai_credits',
+          featureKey: FeatureKey.AI_CREDITS,
           usedAmount: 0,
           cycleStartedAt: cycleStartDate,
-          cycleEndsAt: cycleEndDate,
+          cycleEndsAt: dailyCycleEnd,
         },
       });
       this.logger.log(`Upserted 'ai_credits' usage for user ${userId}.`);
@@ -203,13 +214,13 @@ export class StripeDbService {
             cycleStartedAt: cycleStartDate,
           },
         },
-        update: { usedAmount: 0, cycleEndsAt: cycleEndDate },
+        update: { usedAmount: 0, cycleEndsAt: subscriptionExpiryDate },
         create: {
           userId,
           featureKey: 'storage_mb',
           usedAmount: 0,
           cycleStartedAt: cycleStartDate,
-          cycleEndsAt: cycleEndDate,
+          cycleEndsAt: subscriptionExpiryDate,
         },
       });
       this.logger.log(`Upserted 'storage_mb' usage for user ${userId}.`);

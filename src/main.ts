@@ -6,7 +6,9 @@ import metadata from './metadata';
 import express from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['log', 'fatal', 'error', 'warn', 'debug', 'verbose'],
+  });
   const port = process.env.PORT ?? 3000;
   const logger = new Logger('Bootstrap');
 

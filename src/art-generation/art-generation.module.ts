@@ -7,9 +7,10 @@ import { StorageService } from 'src/storage/storage.service';
 import { S3StorageProvider } from 'src/storage/providers/s3-storage.provider';
 import { PromptService } from './prompt.service';
 import { AuthModule } from 'src/auth/auth.module';
+import { UsageModule } from 'src/usage/usage.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, UsageModule],
   controllers: [ArtGenerationController],
   providers: [
     ArtGenerationService,
