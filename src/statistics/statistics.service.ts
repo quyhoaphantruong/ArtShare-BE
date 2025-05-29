@@ -45,22 +45,32 @@ export class StatisticsService {
   }
 
   async getStyles(): Promise<StatCount[]> {
-    // replace 'camera_angle' with your actual column name
     return this.rawStats('style');
+  }
+
+  async getPostsByAI(): Promise<StatCount[]> {
+    const rows: Array<{ count: bigint }> = await this.prisma.$queryRaw`
+      SELECT COUNT(id) as count
+      FROM post
+      WHERE ai_created = true
+    `;
+    return [{ key: 'posts_by_ai', count: Number(rows[0]?.count ?? 0) }];
   }
 
   async getAll(): Promise<{
     aspectRatios: StatCount[];
     lightings: StatCount[];
     styles: StatCount[];
+    posts_by_ai: StatCount[];
   }> {
-    const [aspectRatios, lightings, styles] = await Promise.all([
+    const [aspectRatios, lightings, styles, posts_by_ai] = await Promise.all([
       this.getAspectRatioStats(),
       this.getLightingStats(),
       this.getStyles(),
+      this.getPostsByAI(),
     ]);
 
-    return { aspectRatios, lightings, styles };
+    return { aspectRatios, lightings, styles, posts_by_ai };
   }
 
   async getRawTrendingPrompts(): Promise<string[]> {

@@ -10,6 +10,7 @@ export class StatisticsController {
     aspectRatios: StatCount[];
     lightings: StatCount[];
     styles: StatCount[];
+    posts_by_ai: StatCount[];
   }> {
     return this.statisticsService.getAll();
   }
