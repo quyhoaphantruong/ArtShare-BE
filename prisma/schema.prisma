@@ -381,6 +381,16 @@ model ArtGeneration {
   @@map("art_generation")
 }
 
+model TrendingPrompt {
+  id         Int      @id @default(autoincrement())
+  prompt_key String   @unique
+  prompts    String[]
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("trending_prompts")
+}
+
 enum PaidAccessLevel {
   FREE       @map("free")
   ARTIST_PRO @map("artist_pro")
