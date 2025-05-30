@@ -20,6 +20,7 @@ import { ArtGenerationModule } from './art-generation/art-generation.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { UsageModule } from './usage/usage.module';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { SafeSearchModule } from './safe-search/safe-search.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { SubscriptionModule } from './subscription/subscription.module';
     }),
     ArtGenerationModule,
     SubscriptionModule,
+    SafeSearchModule,
   ],
   controllers: [AppController],
   providers: [AppService],
