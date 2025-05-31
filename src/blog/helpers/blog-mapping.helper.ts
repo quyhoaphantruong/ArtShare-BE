@@ -21,6 +21,7 @@ export const blogListItemSelect = {
   share_count: true,
   view_count: true,
   is_published: true,
+  pictures: true,
   user: {
     select: {
       id: true,
@@ -120,6 +121,7 @@ export const mapBlogToListItemDto = (
     share_count: blog.share_count,
     view_count: blog.view_count,
     is_published: blog.is_published,
+    pictures: blog.pictures,
     user: {
       id: blog.user.id,
       username: blog.user.username,

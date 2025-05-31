@@ -31,4 +31,11 @@ export class BlogListItemResponseDto {
 
   @ApiProperty({ example: true })
   is_published: boolean;
+  
+  @ApiProperty({
+    type: [String],
+    example: ['https://cdn.example.com/img1.jpg', 'https://cdn.example.com/img2.png'],
+    description: 'An array of URLs (or file paths) pointing to each picture associated with this blog post',
+  })
+  pictures: string[];
 }
