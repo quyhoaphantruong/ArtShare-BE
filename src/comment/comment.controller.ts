@@ -21,6 +21,7 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { UpdateCommentDto } from './dto/update-comment.dto';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @ApiTags('comments')
 @UseGuards(JwtAuthGuard)
@@ -38,11 +39,11 @@ export class CommentController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @Public() 
   async getComments(
     @Query('target_id', ParseIntPipe) targetId: number,
     @Query('target_type') targetType: TargetType,
-    @CurrentUser() currentUser: CurrentUserType,
+    @CurrentUser() currentUser: CurrentUserType | null, 
     @Query('parent_comment_id') parentCommentId?: string,
   ) {
     if (!Object.values(TargetType).includes(targetType)) {
@@ -52,7 +53,7 @@ export class CommentController {
     return this.commentService.getComments(
       targetId,
       targetType,
-      currentUser.id,
+      currentUser?.id, 
       parentCommentId ? parseInt(parentCommentId) : undefined,
     );
   }

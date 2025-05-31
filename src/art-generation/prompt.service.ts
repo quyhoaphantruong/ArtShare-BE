@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { plainToInstance } from "class-transformer";
 import { PrismaService } from "src/prisma.service";
-import { PromptHistoryDto } from "./dto/response/prompt-history.dto";
 import { UpdatePromptHistoryDto } from "./dto/request/update-prompt-history.dto";
 import { TryCatch } from "src/common/try-catch.decorator";
+import { ImageGenerationResponseDto } from "./dto/response/image-generation.dto";
 
 @Injectable()
 export class PromptService {
@@ -12,7 +12,7 @@ export class PromptService {
   ) {}
 
   @TryCatch()
-  async getPromptHistory(userId: string): Promise<PromptHistoryDto[]> {
+  async getPromptHistory(userId: string): Promise<ImageGenerationResponseDto[]> {
     const promptHistory = await this.prismaService.artGeneration.findMany({
       where: {
         user_id: userId,
@@ -22,14 +22,14 @@ export class PromptService {
       },
     });
 
-    return plainToInstance(PromptHistoryDto, promptHistory);
+    return plainToInstance(ImageGenerationResponseDto, promptHistory);
   }
 
   @TryCatch()
   async updatePromptHistory(
     promptId: number,
     updatePromptHistoryDto: UpdatePromptHistoryDto,
-  ): Promise<PromptHistoryDto> {
+  ): Promise<ImageGenerationResponseDto> {
     const existingPromptHistory = await this.prismaService.artGeneration.findUnique({
       where: {
         id: promptId,
@@ -47,6 +47,6 @@ export class PromptService {
       },
     });
 
-    return plainToInstance(PromptHistoryDto, updatedPromptHistory);
+    return plainToInstance(ImageGenerationResponseDto, updatedPromptHistory);
   }
 }

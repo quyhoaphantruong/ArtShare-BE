@@ -51,15 +51,10 @@ export class CommentDto {
   @ApiProperty({ example: false })
   likedByCurrentUser: boolean;
 
+  @ApiProperty({ example: 5 })
+  reply_count: number;
+
   @ApiProperty({ type: () => UserBriefDto })
   @Type(() => UserBriefDto)
   user: UserBriefDto;
-
-  @ApiProperty({
-    type: () => CommentReplyDto,
-    isArray: true,
-    description: 'Immediate replies (1 level deep)',
-  })
-  @Type(() => CommentReplyDto)
-  replies: CommentReplyDto[];
 }

@@ -20,6 +20,12 @@ import { ArtGenerationModule } from './art-generation/art-generation.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { UsageModule } from './usage/usage.module';
 
+import { StatisticsModule } from './statistics/statistics.module';
+import { TrendingModule } from './trending/trending.module';
+import { SubscriptionModule } from './subscription/subscription.module';
+
+import { FirebaseModule } from './firebase/firebase.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -45,6 +51,10 @@ import { UsageModule } from './usage/usage.module';
       isGlobal: true, // ✅ optional but useful
     }),
     ArtGenerationModule,
+    StatisticsModule,
+    TrendingModule,
+    SubscriptionModule,
+    FirebaseModule,
   ],
   controllers: [AppController],
   providers: [AppService],

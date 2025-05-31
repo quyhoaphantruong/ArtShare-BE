@@ -186,10 +186,12 @@ export class PostsController {
 
   @Post('generate-metadata')
   @UseInterceptors(FilesInterceptor('images'))
+  @UseGuards(JwtAuthGuard)
   async generatePostMetadata(
     @UploadedFiles() images: Express.Multer.File[],
+    @CurrentUser() user: CurrentUserType,
   ): Promise<GeneratePostMetadataResponseDto> {
-    return this.workflowAssistService.generatePostMetadata(images);
+    return this.workflowAssistService.generatePostMetadata(images, user.id);
   }
 
   /** GET /posts/:id/likes?skip=0&take=20 */
