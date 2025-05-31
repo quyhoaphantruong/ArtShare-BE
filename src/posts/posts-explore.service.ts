@@ -267,4 +267,31 @@ export class PostsExploreService {
 
     return mapPostListToDto(sortedPosts);
   }
+
+  @TryCatch()
+  async getAiTrendingPosts(page: number, page_size: number): Promise<PostListItemResponseDto[]> {
+    const skip = (page - 1) * page_size;
+
+    const customIncludes: Prisma.PostInclude = {
+      art_generation: true,
+    };
+
+    // 3. Merge them using spread syntax
+    const finalIncludes: Prisma.PostInclude = {
+      ...this.buildPostIncludes(''),
+      ...customIncludes,
+    };
+
+
+    const posts = await this.prisma.post.findMany({
+      where: { ai_created: true },
+      orderBy: [{ view_count: 'desc'}, { share_count: 'desc' }, { id: 'asc' }],
+      take: page_size,
+      skip,
+      // common includes with custom includes for art generation
+      include: finalIncludes,
+    });
+
+    return mapPostListToDto(posts);
+  }
 }

@@ -43,7 +43,7 @@ export class PostsController {
     private readonly workflowAssistService: WorkflowAssistService,
     private readonly postsEmbeddingService: PostsEmbeddingService,
     private readonly likesService: LikesService
-  ) {}
+  ) { }
 
   @Post()
   @UseInterceptors(FilesInterceptor('images'))
@@ -116,13 +116,18 @@ export class PostsController {
   }
 
   @Public()
-  @Get(':post_id')
-  async getPostDetails(
-    @Param('post_id', ParseIntPipe) postId: number,
-    @CurrentUser() user?: CurrentUserType,
-  ): Promise<PostDetailsResponseDto> {
-    return this.postsExploreService.getPostDetails(postId, user?.id ?? '');
+  @Get('/ai-trending')
+  async getAiTrendingPosts(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
+    pageSize: number,
+  ): Promise<PostListItemResponseDto[]> {
+    return this.postsExploreService.getAiTrendingPosts(
+      page,
+      pageSize,
+    );
   }
+
 
   @Public()
   @Get('user/:username')
@@ -186,21 +191,30 @@ export class PostsController {
     return this.workflowAssistService.generatePostMetadata(images, user.id);
   }
 
-   /** GET /posts/:id/likes?skip=0&take=20 */
-   @Public()
-   @Get(':id/likes')
-   async getPostLikes(
-     @Param('id', ParseIntPipe) id: number,
-     @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
-     @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
-     @CurrentUser() user?: CurrentUserType,
-   ): Promise<{ items: LikingUserResponseDto[]; total: number }> {
-     return this.likesService.getLikingUsers(
-       id,
-       TargetType.POST,
-       user?.id ?? null,
-       skip,
-       take,
-     );
-   }
+  /** GET /posts/:id/likes?skip=0&take=20 */
+  @Public()
+  @Get(':id/likes')
+  async getPostLikes(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+    @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
+    @CurrentUser() user?: CurrentUserType,
+  ): Promise<{ items: LikingUserResponseDto[]; total: number }> {
+    return this.likesService.getLikingUsers(
+      id,
+      TargetType.POST,
+      user?.id ?? null,
+      skip,
+      take,
+    );
+  }
+
+  @Public()
+  @Get(':post_id')
+  async getPostDetails(
+    @Param('post_id', ParseIntPipe) postId: number,
+    @CurrentUser() user?: CurrentUserType,
+  ): Promise<PostDetailsResponseDto> {
+    return this.postsExploreService.getPostDetails(postId, user?.id ?? '');
+  }
 }
