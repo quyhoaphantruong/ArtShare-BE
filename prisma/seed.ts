@@ -1,4 +1,9 @@
-import { PrismaClient, Prisma, ImageQuality, PaidAccessLevel } from '@prisma/client';
+import {
+  PrismaClient,
+  Prisma,
+  ImageQuality,
+  PaidAccessLevel,
+} from '@prisma/client';
 import { CategoryType } from 'src/categories/dto/request/create-category.dto';
 
 const planData: Prisma.PlanCreateInput[] = [
@@ -39,7 +44,6 @@ const planData: Prisma.PlanCreateInput[] = [
     name: 'Studios',
     stripeProductId: process.env.STRIPE_STUDIO_PRODUCT_ID,
     description: 'Great for large businesses',
-
     imageQualityAllowed: ImageQuality.HIGH,
     dailyQuotaCredits: 5000,
     monthlyQuotaCredits: 25000,
