@@ -1,9 +1,4 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsEnum,
-  IsArray,
-} from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum, IsArray } from 'class-validator';
 export enum CategoryType {
   MEDIUM = 'MEDIUM',
   ATTRIBUTE = 'ATTRIBUTE',

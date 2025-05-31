@@ -11,8 +11,10 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { JwtPayload } from './types/jwtPayload.type';
 import { Tokens } from './types/tokens.type';
-import { Prisma } from '@prisma/client';
+import { PaidAccessLevel, Prisma } from '@prisma/client';
 import { Role } from './enums/role.enum';
+import { nanoid } from 'nanoid';
+import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 
 @Injectable()
 export class AuthService {
@@ -73,6 +75,30 @@ export class AuthService {
             },
           });
 
+          // add free plan to user
+          // 2️⃣ create the free‐plan access
+          const access = await tx.userAccess.create({
+            data: {
+              userId: user.id,
+              planId: PaidAccessLevel.FREE,
+              expiresAt: new Date('9999-12-31T23:59:59.999Z'),
+              stripeSubscriptionId: `${user.id}_${nanoid()}`,
+              stripePriceId: 'free',
+              stripeCustomerId: user.id,
+            },
+          });
+
+          // 3️⃣ seed the initial usage record so that it lasts until `access.expiresAt`
+          await tx.userUsage.create({
+            data: {
+              userId: user.id,
+              featureKey: FeatureKey.AI_CREDITS,
+              usedAmount: 0,
+              cycleStartedAt: new Date(),
+              cycleEndsAt: access.expiresAt, // ← bound it to the FREE plan’s expiry
+            },
+          });
+
           return user;
         },
       );
@@ -85,8 +111,6 @@ export class AuthService {
 
   async login(token: string) {
     try {
-      this.logger.log('Received token for verification', token); // Log a message for debugging
-
       // Verify the Firebase ID Token
       const decodedToken = await admin.auth().verifyIdToken(token);
       this.logger.log(
@@ -167,14 +191,20 @@ export class AuthService {
 
   async loginAdmin(token: string) {
     const decoded = await admin.auth().verifyIdToken(token);
-    const user = await this.prisma.user.findUnique({ where:{id:decoded.uid}, include:{roles:{include:{role:true}}}});
+    const user = await this.prisma.user.findUnique({
+      where: { id: decoded.uid },
+      include: { roles: { include: { role: true } } },
+    });
     if (!user) throw new UnauthorizedException('User not found');
-    const roleNames = user.roles.map(r=>r.role.role_name);
+    const roleNames = user.roles.map((r) => r.role.role_name);
     if (!roleNames.includes(Role.ADMIN)) {
       throw new ForbiddenException('Admin access required');
     }
     const tokens = await this.getTokens(user.id, decoded.email!, roleNames);
-    await this.prisma.user.update({ where:{id:user.id}, data:{refresh_token:tokens.refresh_token} });
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refresh_token: tokens.refresh_token },
+    });
     return tokens;
   }
 

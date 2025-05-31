@@ -4,7 +4,6 @@ import { ImageGenerationDto } from './dto/request/image-generation.dto';
 import { ImageGenerationResponseDto } from './dto/response/image-generation.dto';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
-import { PromptHistoryDto } from './dto/response/prompt-history.dto';
 import { PromptService } from './prompt.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { UpdatePromptHistoryDto } from './dto/request/update-prompt-history.dto';
@@ -28,7 +27,7 @@ export class ArtGenerationController {
   @Get('/prompt-history')
   async getPromptHistory(
     @CurrentUser() user: CurrentUserType,
-  ): Promise<PromptHistoryDto[]> {
+  ): Promise<ImageGenerationResponseDto[]> {
     return await this.promptService.getPromptHistory(user.id);
   }
 
@@ -36,7 +35,7 @@ export class ArtGenerationController {
   async updatePromptHistory(
     @Param('promptId', ParseIntPipe) promptId: number,
     @Body() updatePromptHistoryDto: UpdatePromptHistoryDto,
-  ): Promise<PromptHistoryDto> {
+  ): Promise<ImageGenerationResponseDto> {
     return await this.promptService.updatePromptHistory(promptId, updatePromptHistoryDto);
   }
 }
