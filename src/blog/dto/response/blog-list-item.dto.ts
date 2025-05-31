@@ -10,4 +10,5 @@ export class BlogListItemResponseDto {
   view_count: number;
   user: BlogUserInfoResponseDto;
   is_published: boolean;
+  content: string; 
 }
