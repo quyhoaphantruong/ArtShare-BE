@@ -25,6 +25,7 @@ import { TrendingModule } from './trending/trending.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 
 import { FirebaseModule } from './firebase/firebase.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { FirebaseModule } from './firebase/firebase.module';
     TrendingModule,
     SubscriptionModule,
     FirebaseModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
