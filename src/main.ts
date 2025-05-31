@@ -16,7 +16,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       process.env.FRONTEND_URL || 'http://localhost:5173',
-      process.env.ADMIN_FRONTEND_URL || 'http://localhost:5174',
+      process.env.ADMIN_FRONTEND_URL || 'http://localhost:1574',
     ], // List allowed origins
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // List allowed HTTP methods
     allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers
