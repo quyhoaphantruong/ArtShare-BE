@@ -31,6 +31,10 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { PaginationDto } from './dto/request/pagination.dto';
 import { BlogManagementService } from './blog-management.service';
 import { BlogExploreService } from './blog-explore.service';
+import { Public } from 'src/auth/decorators/public.decorator';
+import { LikesService } from 'src/likes/likes.service';
+import { LikingUserResponseDto } from 'src/likes/dto/response/liking-user-response.dto';
+import { TargetType } from 'src/common/enum/target-type.enum';
 
 @UseGuards(JwtAuthGuard)
 @Controller('blogs')
@@ -38,12 +42,14 @@ export class BlogController {
   constructor(
     private readonly blogManagementService: BlogManagementService,
     private readonly blogExploreService: BlogExploreService,
+    private readonly likesService: LikesService
   ) {}
 
   /**
    * GET /blogs - Get list of published blogs (paginated, searchable)
    */
   @Get()
+  @Public()
   async getBlogs(
     @Query() query: GetBlogsQueryDto,
   ): Promise<BlogListItemResponseDto[]> {
@@ -76,7 +82,6 @@ export class BlogController {
   /**
    * GET /blogs/following - Get blogs from followed users, optionally filtered by categories
    */
-  @UseGuards(JwtAuthGuard)
   @Get('following')
   async getFollowingBlogs(
     @Query() query: GetBlogsQueryDto,
@@ -98,6 +103,7 @@ export class BlogController {
    * GET /blogs/search - Search blogs by query param 'q'
    */
   @Get('search')
+  @Public()
   async searchBlogs(
     @Query() queryDto: GetBlogsQueryDto,
   ): Promise<BlogListItemResponseDto[]> {
@@ -111,7 +117,6 @@ export class BlogController {
   /**
    * GET /blogs/me - Get blogs created by the current user
    */
-  @UseGuards(JwtAuthGuard)
   @Get('me')
   async findMyBlogs(
     @CurrentUser() user: CurrentUserType,
@@ -122,7 +127,9 @@ export class BlogController {
   /**
    * GET /blogs/{id} - Get blog details by ID
    */
+  @Public()
   @Get(':id')
+  @Public()
   async findBlogById(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user?: CurrentUserType,
@@ -139,7 +146,6 @@ export class BlogController {
   /**
    * POST /blogs - Create a new blog post (Standard REST, replaces /blogs/create)
    */
-  @UseGuards(JwtAuthGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createBlog(
@@ -152,7 +158,6 @@ export class BlogController {
   /**
    * PATCH /blogs/{id} - Update an existing blog post
    */
-  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateBlog(
     @Param('id', ParseIntPipe) id: number,
@@ -165,7 +170,6 @@ export class BlogController {
   /**
    * DELETE /blogs/{id} - Delete a blog post
    */
-  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteBlog(
@@ -179,7 +183,6 @@ export class BlogController {
   /**
    * POST /blogs/{id}/bookmark - Toggle bookmark status for a blog
    */
-  @UseGuards(JwtAuthGuard)
   @Post(':id/bookmark')
   @HttpCode(HttpStatus.OK)
   async toggleBookmark(
@@ -192,7 +195,6 @@ export class BlogController {
   /**
    * POST /blogs/{id}/protect - Apply protection (details TBD)
    */
-  @UseGuards(JwtAuthGuard)
   @Post(':id/protect')
   @HttpCode(HttpStatus.OK)
   async protectBlog(
@@ -208,7 +210,6 @@ export class BlogController {
   /**
    * POST /blogs/{id}/rate - Rate a blog
    */
-  @UseGuards(JwtAuthGuard)
   @Post(':id/rate')
   @HttpCode(HttpStatus.OK)
   async rateBlog(
@@ -223,6 +224,7 @@ export class BlogController {
    * GET /blogs/user/:username - Get blogs by username
    */
   @Get('user/:username')
+  @Public()
   async getBlogsByUsername(
     @Param('username') username: string,
     @Query() paging: PaginationDto,
@@ -232,11 +234,30 @@ export class BlogController {
   }
 
   @Get(':blogId/relevant')
+  @Public()
   async getRelevantBlogs(
     @Param('blogId', ParseIntPipe) blogId: number,
     @Query('take', new DefaultValuePipe(10), ParseIntPipe) take: number,
     @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
   ): Promise<BlogListItemResponseDto[]> {
     return this.blogExploreService.getRelevantBlogs(blogId, take, skip);
+  }
+
+  /** GET /blogs/:id/likes?skip=0&take=20 */
+  @Public()
+  @Get(':id/likes')
+  async getBlogLikes(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+    @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
+    @CurrentUser() user?: CurrentUserType,
+  ): Promise<{ items: LikingUserResponseDto[]; total: number }> {
+    return this.likesService.getLikingUsers(
+      id,
+      TargetType.BLOG,
+      user?.id ?? null,
+      skip,
+      take,
+    );
   }
 }

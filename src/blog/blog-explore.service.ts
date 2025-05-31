@@ -96,16 +96,25 @@ export class BlogExploreService {
       where: { id },
       include: {
         user: {
-          select: { id: true, username: true, profile_picture_url: true },
+          select: {
+            id: true,
+            username: true,
+            profile_picture_url: true,
+            full_name: true,
+            followers_count: true,
+            followers: true
+          },
         },
         likes: {
           where: { user_id: requestingUserId ?? '' },
           select: { id: true },
           take: 1,
-        }
+        },
       },
     });
 
+    console.log("@@ blog user", blog?.user)
+    console.log("@@ blog", blog?.user.followers)
     if (!blog) return null;
 
     if (blog.is_protected && blog.user_id !== requestingUserId) {
@@ -114,7 +123,6 @@ export class BlogExploreService {
     if (!blog.is_published && blog.user_id !== requestingUserId) {
       return null;
     }
-
     // update view count
     await this.prisma.blog.update({
       where: { id },

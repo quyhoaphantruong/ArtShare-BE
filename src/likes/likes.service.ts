@@ -6,6 +6,7 @@ import { plainToClass } from 'class-transformer';
 import { LikeDetailsDto } from './dto/response/like-details.dto';
 import { RemoveLikeDto } from './dto/request/remove-like.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
+import { LikingUserResponseDto } from './dto/response/liking-user-response.dto';
 
 @Injectable()
 export class LikesService {
@@ -17,34 +18,45 @@ export class LikesService {
     userId: string,
   ): Promise<LikeDetailsDto> {
     await this.verifyTargetExists(dto.target_id, dto.target_type);
-    await this.verifyLikeAlreadyExists(dto, userId);
-
-    const like = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.like.create({
-        data: {
-          user_id: userId,
-          ...(dto.target_type === TargetType.POST
-            ? { post_id: dto.target_id }
-            : { blog_id: dto.target_id }),
-        },
-      });
-
-      if (dto.target_type === TargetType.POST) {
-        await tx.post.update({
-          where: { id: dto.target_id },
-          data: { like_count: { increment: 1 } },
+    return await this.prisma.$transaction(async (tx) => {
+      try {
+        // 1️⃣ attempt to insert – the unique index stops duplicates
+        const like = await tx.like.create({
+          data: {
+            user_id: userId,
+            ...(dto.target_type === TargetType.POST
+              ? { post_id: dto.target_id }
+              : { blog_id: dto.target_id }),
+          },
         });
-      } else {
-        await tx.blog.update({
-          where: { id: dto.target_id },
-          data: { like_count: { increment: 1 } },
-        });
+
+        // 2️⃣ bump counter only on successful insert
+        if (dto.target_type === TargetType.POST) {
+          await tx.post.update({
+            where: { id: dto.target_id },
+            data: { like_count: { increment: 1 } },
+          });
+        } else {
+          await tx.blog.update({
+            where: { id: dto.target_id },
+            data: { like_count: { increment: 1 } },
+          });
+        }
+
+        return plainToClass(LikeDetailsDto, like);
+      } catch (err: any) {
+        // P2002 = duplicate-key (already liked)  ➜  no-op
+        if (err?.code === 'P2002') {
+          const existing = await this.findLike(
+            dto.target_id,
+            dto.target_type,
+            userId,
+          );
+          return plainToClass(LikeDetailsDto, existing);
+        }
+        throw err; // unknown error bubbles up to @TryCatch
       }
-
-      return created;
     });
-
-    return plainToClass(LikeDetailsDto, like);
   }
 
   @TryCatch('remove like failed')
@@ -53,10 +65,10 @@ export class LikesService {
     userId: string,
   ): Promise<{ success: boolean }> {
     await this.verifyTargetExists(dto.target_id, dto.target_type);
-    await this.verifyLikeNotExists(dto, userId);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.like.deleteMany({
+    return await this.prisma.$transaction(async (tx) => {
+      // 1️⃣ delete rows (safe if none exist)
+      const { count } = await tx.like.deleteMany({
         where: {
           user_id: userId,
           ...(dto.target_type === TargetType.POST
@@ -65,20 +77,23 @@ export class LikesService {
         },
       });
 
-      if (dto.target_type === TargetType.POST) {
-        await tx.post.update({
-          where: { id: dto.target_id },
-          data: { like_count: { decrement: 1 } },
-        });
-      } else {
-        await tx.blog.update({
-          where: { id: dto.target_id },
-          data: { like_count: { decrement: 1 } },
-        });
+      // 2️⃣ only decrement if something was actually deleted
+      if (count > 0) {
+        if (dto.target_type === TargetType.POST) {
+          await tx.post.update({
+            where: { id: dto.target_id },
+            data: { like_count: { decrement: 1 } },
+          });
+        } else {
+          await tx.blog.update({
+            where: { id: dto.target_id },
+            data: { like_count: { decrement: 1 } },
+          });
+        }
       }
-    });
 
-    return { success: true };
+      return { success: true };
+    });
   }
 
   private async verifyTargetExists(targetId: number, targetType: TargetType) {
@@ -95,25 +110,6 @@ export class LikesService {
     }
   }
 
-  private async verifyLikeAlreadyExists(dto: CreateLikeDto, userId: string) {
-    const existing = await this.findLike(
-      dto.target_id,
-      dto.target_type,
-      userId,
-    );
-    if (existing) throw new BadRequestException('You have already liked this');
-  }
-
-  private async verifyLikeNotExists(dto: RemoveLikeDto, userId: string) {
-    const existing = await this.findLike(
-      dto.target_id,
-      dto.target_type,
-      userId,
-    );
-    if (!existing)
-      throw new BadRequestException("Can't remove like; none found");
-  }
-
   private async findLike(
     targetId: number,
     targetType: TargetType,
@@ -128,5 +124,70 @@ export class LikesService {
         where: { user_id: userId, blog_id: targetId },
       });
     }
+  }
+
+  /**
+   * Fetch a page of users who liked a given target (post or blog),
+   * and also return the total number of likes for paging.
+   */
+  public async getLikingUsers(
+    targetId: number,
+    targetType: TargetType,
+    requestingUserId: string | null,
+    skip = 0,
+    take = 20,
+  ): Promise<{ items: LikingUserResponseDto[]; total: number }> {
+    // 1) Total count
+    const total = await this.prisma.like.count({
+      where:
+        targetType === TargetType.BLOG
+          ? { blog_id: targetId }
+          : { post_id: targetId },
+    });
+
+    // 2) Page of likes + user payload
+    const likes = await this.prisma.like.findMany({
+      where:
+        targetType === TargetType.BLOG
+          ? { blog_id: targetId }
+          : { post_id: targetId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            full_name: true,
+            profile_picture_url: true,
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+      skip,
+      take,
+    });
+
+    // 3) If logged in, compute follow‐status for this batch
+    const followMap: Record<string, boolean> = {};
+    if (requestingUserId) {
+      const rows = await this.prisma.follow.findMany({
+        where: {
+          follower_id: requestingUserId,
+          following_id: { in: likes.map((l) => l.user.id) },
+        },
+        select: { following_id: true },
+      });
+      rows.forEach((r) => (followMap[r.following_id] = true));
+    }
+
+    // 4) Map into DTO
+    const items: LikingUserResponseDto[] = likes.map((l) => ({
+      id: l.user.id,
+      username: l.user.username,
+      full_name: l.user.full_name ?? l.user.username,
+      profile_picture_url: l.user.profile_picture_url,
+      is_following: !!followMap[l.user.id],
+    }));
+
+    return { items, total };
   }
 }

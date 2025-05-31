@@ -60,3 +60,4 @@ firebase-config.json
 .vercel
 src/metadata.ts
 package-lock.json
+serviceKey.json

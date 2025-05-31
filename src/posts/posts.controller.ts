@@ -30,18 +30,22 @@ import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-me
 import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
 import { CreatePostRequestDto } from './dto/request/create-post.dto';
 import { PostsEmbeddingService } from './posts-embedding.service';
+import { LikingUserResponseDto } from 'src/likes/dto/response/liking-user-response.dto';
+import { TargetType } from 'src/common/enum/target-type.enum';
+import { LikesService } from 'src/likes/likes.service';
 
 @Controller('posts')
+@UseGuards(JwtAuthGuard)
 export class PostsController {
   constructor(
     private readonly postsManagementService: PostsManagementService,
     private readonly postsExploreService: PostsExploreService,
     private readonly workflowAssistService: WorkflowAssistService,
     private readonly postsEmbeddingService: PostsEmbeddingService,
+    private readonly likesService: LikesService
   ) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('images'))
   async createPost(
     @Body() request: CreatePostRequestDto,
@@ -52,7 +56,6 @@ export class PostsController {
   }
 
   @Patch(':post_id')
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('images'))
   async updatePost(
     @Param('post_id', ParseIntPipe) postId: number,
@@ -69,7 +72,6 @@ export class PostsController {
   }
 
   @Delete(':post_id')
-  @UseGuards(JwtAuthGuard)
   async deletePost(@Param('post_id', ParseIntPipe) postId: number) {
     return this.postsManagementService.deletePost(postId);
   }
@@ -84,7 +86,6 @@ export class PostsController {
   }
 
   @Post('for-you')
-  @UseGuards(JwtAuthGuard)
   async getForYouPosts(
     @Body() body: { page: number; page_size: number; filter: string[] },
     @CurrentUser() user: CurrentUserType,
@@ -100,7 +101,6 @@ export class PostsController {
   }
 
   @Post('following')
-  @UseGuards(JwtAuthGuard)
   async getFollowingPosts(
     @Body() body: { page: number; page_size: number; filter: string[] },
     @CurrentUser() user: CurrentUserType,
@@ -163,7 +163,12 @@ export class PostsController {
     pageSize: number,
     @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.getRelevantPosts(postId, page, pageSize, user?.id ?? '');
+    return this.postsExploreService.getRelevantPosts(
+      postId,
+      page,
+      pageSize,
+      user?.id ?? '',
+    );
   }
 
   @Post('sync-embeddings')
@@ -173,9 +178,29 @@ export class PostsController {
 
   @Post('generate-metadata')
   @UseInterceptors(FilesInterceptor('images'))
+  @UseGuards(JwtAuthGuard)
   async generatePostMetadata(
     @UploadedFiles() images: Express.Multer.File[],
+    @CurrentUser() user: CurrentUserType,
   ): Promise<GeneratePostMetadataResponseDto> {
-    return this.workflowAssistService.generatePostMetadata(images);
+    return this.workflowAssistService.generatePostMetadata(images, user.id);
   }
+
+   /** GET /posts/:id/likes?skip=0&take=20 */
+   @Public()
+   @Get(':id/likes')
+   async getPostLikes(
+     @Param('id', ParseIntPipe) id: number,
+     @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+     @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
+     @CurrentUser() user?: CurrentUserType,
+   ): Promise<{ items: LikingUserResponseDto[]; total: number }> {
+     return this.likesService.getLikingUsers(
+       id,
+       TargetType.POST,
+       user?.id ?? null,
+       skip,
+       take,
+     );
+   }
 }

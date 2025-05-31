@@ -7,5 +7,6 @@ import { AuthModule } from 'src/auth/auth.module';
   imports: [AuthModule],
   providers: [LikesService],
   controllers: [LikesController],
+  exports:   [LikesService],
 })
 export class LikesModule {}

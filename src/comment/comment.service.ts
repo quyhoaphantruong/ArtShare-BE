@@ -58,7 +58,7 @@ export class CommentService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const created = await this.prisma.$transaction(async (tx) => {
         const newComment = await tx.comment.create({
           data: {
             content,
@@ -88,6 +88,7 @@ export class CommentService {
             },
           },
         });
+
         if (target_type === TargetType.POST) {
           await tx.post.update({
             where: { id: target_id },
@@ -101,8 +102,15 @@ export class CommentService {
         }
 
         return newComment;
+      },
+      {
+        maxWait: 5000,   // wait up to 5 s to acquire a connection (default 2 s)
+        timeout: 15000,  // allow up to 15 s for the transaction to complete
       });
-    } catch (err: any) {
+
+   
+       return created; 
+          } catch (err: any) {
       if (err instanceof PrismaClientKnownRequestError) {
         if (err.code === 'P2003') {
           throw new NotFoundException(
@@ -115,42 +123,49 @@ export class CommentService {
     }
   }
 
-  async getComments(
+   async getComments(
     targetId: number,
     targetType: TargetType,
     currentUserId?: string,
     parentCommentId?: number,
   ): Promise<CommentDto[]> {
-    const comments = await this.prisma.comment.findMany({
+  const comments = await this.prisma.comment.findMany({
       where: {
         target_id: targetId,
         target_type: targetType,
-        ...(parentCommentId != null && { parent_comment_id: parentCommentId }),
+        parent_comment_id: parentCommentId ?? null,
       },
       orderBy: { created_at: 'desc' },
       include: {
-        user: {
-          select: { id: true, username: true, profile_picture_url: true },
-        },
+        user: { select: { id: true, username: true, profile_picture_url: true } },
+      _count: { select: { replies: true } },
       },
     });
 
-    /* ────────── 3. fetch the user's likes in one query ─── */
-    const likedRows = await this.prisma.commentLike.findMany({
-      where: {
-        user_id: currentUserId,
-        comment_id: { in: comments.map((c) => c.id) },
-      },
-      select: { comment_id: true },
+    //* gather IDs of comments **and** their included replies */
+  const ids: number[] = [];
+        comments.forEach((c: any) => {
+    ids.push(c.id);
+          c.replies?.forEach((r: any) => ids.push(r.id));
     });
+  const likedRows = currentUserId ? await this.prisma.commentLike.findMany({
+  where: { user_id: currentUserId, comment_id: { in: ids } },
+  select: { comment_id: true },
+}) : [];
     const likedSet = new Set(likedRows.map((l) => l.comment_id));
 
-    return comments.map((c) => ({
-        ...c,
-        likedByCurrentUser: likedSet.has(c.id),
-        replies: []
-    })) as CommentDto[];
+     /* ❷ map every record to DTO, surfacing `reply_count` ---------- */
+    return comments.map((commentPrisma): CommentDto => {
+      const { _count: prismaCount, ...restOfCommentFields } = commentPrisma;
+
+      return {
+        ...restOfCommentFields, 
+        likedByCurrentUser: likedSet.has(commentPrisma.id),
+        reply_count: prismaCount.replies, 
+      };
+    });
   }
+
 
   async update(
     commentId: number,
