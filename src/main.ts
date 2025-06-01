@@ -3,7 +3,10 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import metadata from './metadata';
-import express from 'express';
+import * as express from 'express';
+import * as crypto from 'crypto';
+;(global as any).crypto = crypto;
+
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
