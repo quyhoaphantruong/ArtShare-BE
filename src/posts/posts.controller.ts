@@ -51,7 +51,7 @@ export class PostsController {
     private readonly postsEmbeddingService: PostsEmbeddingService,
     private readonly likesService: LikesService,
     private readonly postsAdminService: PostsAdminService,
-  ) {}
+  ) { }
 
   @Post()
   @UseInterceptors(FilesInterceptor('images'))
@@ -124,13 +124,18 @@ export class PostsController {
   }
 
   @Public()
-  @Get(':post_id')
-  async getPostDetails(
-    @Param('post_id', ParseIntPipe) postId: number,
-    @CurrentUser() user?: CurrentUserType,
-  ): Promise<PostDetailsResponseDto> {
-    return this.postsExploreService.getPostDetails(postId, user?.id ?? '');
+  @Get('/ai-trending')
+  async getAiTrendingPosts(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
+    pageSize: number,
+  ): Promise<PostListItemResponseDto[]> {
+    return this.postsExploreService.getAiTrendingPosts(
+      page,
+      pageSize,
+    );
   }
+
 
   @Public()
   @Get('user/:username')
