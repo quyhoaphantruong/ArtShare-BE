@@ -4,6 +4,8 @@ import {
   DefaultValuePipe,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -12,6 +14,7 @@ import {
   UploadedFiles,
   UseGuards,
   UseInterceptors,
+  ValidationPipe,
 } from '@nestjs/common';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
@@ -33,6 +36,10 @@ import { PostsEmbeddingService } from './posts-embedding.service';
 import { LikingUserResponseDto } from 'src/likes/dto/response/liking-user-response.dto';
 import { TargetType } from 'src/common/enum/target-type.enum';
 import { LikesService } from 'src/likes/likes.service';
+import { Roles } from 'src/auth/decorators/roles.decorators';
+import { Role } from 'src/auth/enums/role.enum';
+import { AdminPostListItemDto, PostsAdminService } from './posts-admin.service';
+import { GetAllPostsAdminQueryDto } from './dto/request/get-all-posts-admin.dto';
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard)
@@ -42,7 +49,8 @@ export class PostsController {
     private readonly postsExploreService: PostsExploreService,
     private readonly workflowAssistService: WorkflowAssistService,
     private readonly postsEmbeddingService: PostsEmbeddingService,
-    private readonly likesService: LikesService
+    private readonly likesService: LikesService,
+    private readonly postsAdminService: PostsAdminService,
   ) { }
 
   @Post()
@@ -209,12 +217,76 @@ export class PostsController {
     );
   }
 
-  @Public()
-  @Get(':post_id')
-  async getPostDetails(
+  @Get('admin/all')
+  @Roles(Role.ADMIN)
+  async getAllPostsForAdmin(
+    @Query(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    )
+    queryDto: GetAllPostsAdminQueryDto,
+  ): Promise<{ posts: AdminPostListItemDto[]; total: number }> {
+    const params = {
+      page: queryDto.page ?? 1,
+      pageSize: queryDto.pageSize ?? 10,
+      searchTerm: queryDto.searchTerm,
+      userId: queryDto.userId,
+
+      isPublished:
+        queryDto.isPublished === 'true'
+          ? true
+          : queryDto.isPublished === 'false'
+            ? false
+            : undefined,
+      isPrivate:
+        queryDto.isPrivate === 'true'
+          ? true
+          : queryDto.isPrivate === 'false'
+            ? false
+            : undefined,
+      sortBy: queryDto.sortBy ?? 'created_at',
+      sortOrder: queryDto.sortOrder ?? 'desc',
+    };
+
+    return this.postsAdminService.getAllPostsForAdmin(
+      params /*, adminUser.id */,
+    );
+  }
+
+  @Patch('admin/:post_id')
+  @Roles(Role.ADMIN)
+  async adminUpdatePost(
     @Param('post_id', ParseIntPipe) postId: number,
-    @CurrentUser() user?: CurrentUserType,
+    @Body(ValidationPipe) updatePostDto: UpdatePostDto,
+
+    @CurrentUser() adminUser: CurrentUserType,
   ): Promise<PostDetailsResponseDto> {
-    return this.postsExploreService.getPostDetails(postId, user?.id ?? '');
+    return this.postsAdminService.updatePostByAdmin(
+      postId,
+      updatePostDto,
+      adminUser.id,
+    );
+  }
+
+  @Delete('admin/bulk-delete')
+  @Roles(Role.ADMIN)
+  async bulkDeletePosts(
+    @Body() body: { postIds: number[] },
+    @CurrentUser() adminUser: CurrentUserType,
+  ): Promise<{ count: number }> {
+    return this.postsAdminService.bulkDeletePosts(body.postIds, adminUser.id);
+  }
+
+  @Delete('admin/:post_id')
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async adminDeletePost(
+    @Param('post_id', ParseIntPipe) postId: number,
+    @CurrentUser() adminUser: CurrentUserType,
+  ): Promise<void> {
+    await this.postsAdminService.deletePostByAdmin(postId, adminUser.id);
   }
 }

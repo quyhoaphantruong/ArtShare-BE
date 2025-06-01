@@ -14,6 +14,7 @@ type UserSelect = {
 export const blogListItemSelect = {
   id: true,
   title: true,
+  content: true,   
   created_at: true,
   like_count: true,
   comment_count: true,
@@ -112,6 +113,7 @@ export const mapBlogToListItemDto = (
   return {
     id: blog.id,
     title: blog.title,
+    content: blog.content,
     created_at: blog.created_at,
     like_count: blog.like_count,
     comment_count: blog.comment_count,
