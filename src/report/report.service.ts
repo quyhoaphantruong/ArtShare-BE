@@ -12,6 +12,11 @@ import { Report, ReportTargetType, Prisma, ReportStatus } from '@prisma/client';
 import { ViewTab } from './dto/view-report.dto';
 import { ResolveReportDto } from './dto/resolve-report.dto';
 
+export type ReportWithDetails = Report & {
+  reporter: { id: string; username: string };
+  moderator?: { id: string; username: string } | null; // Moderator can be null
+};
+
 @Injectable()
 export class ReportService {
   constructor(private prisma: PrismaService) {}
@@ -60,83 +65,106 @@ export class ReportService {
     }
   }
 
-  async findPendingReports(options: {
+   async findPendingReports(options: {
     skip?: number;
     take?: number;
-  }): Promise<Report[]> {
+  }): Promise<ReportWithDetails[]> {
     return this.prisma.report.findMany({
       where: { status: ReportStatus.PENDING },
-      include: { reporter: { select: { id: true, username: true } } }, // Example include
+      include: {
+        reporter: { select: { id: true, username: true } },
+        // No moderator needed for PENDING, but if you fetch all statuses, include it
+        // moderator: { select: { id: true, username: true } },
+      },
       orderBy: { created_at: 'asc' },
       skip: options.skip,
       take: options.take,
-    });
+    }) as Promise<ReportWithDetails[]>; // Cast for now, or ensure include always matches
   }
 
   async findReportsByTab(
     tab: ViewTab,
     options: { skip?: number; take?: number },
-  ): Promise<Report[]> {
+  ): Promise<ReportWithDetails[]> {
     const where: Prisma.ReportWhereInput = {};
 
     if (tab !== ViewTab.ALL) {
       if (tab !== ViewTab.USER) {
-        // post/blog/comment
         where.target_type = tab.toUpperCase() as ReportTargetType;
       }
     }
+    // If filtering by status on frontend, you might not need specific status logic here
+    // unless it's for optimization or specific tabs like "Resolved".
 
     return this.prisma.report.findMany({
       where,
       include: {
         reporter: { select: { id: true, username: true } },
+        moderator: { select: { id: true, username: true } }, // <<< INCLUDE MODERATOR
       },
       orderBy: { created_at: 'desc' },
       skip: options.skip,
       take: options.take,
-    });
-  }
+    }) as Promise<ReportWithDetails[]>;
+  } 
 
-  async updateReportStatus(
+   async updateReportStatus(
     reportId: number,
     status: ReportStatus,
-  ): Promise<Report> {
-    const report = await this.prisma.report.findUnique({
+    // Optional: if dismissing should also assign a moderator
+    // moderatorId?: string 
+  ): Promise<ReportWithDetails> {
+    const reportExists = await this.prisma.report.findUnique({
       where: { id: reportId },
     });
-    if (!report)
+    if (!reportExists) {
       throw new NotFoundException(`Report with ID ${reportId} not found.`);
+    }
 
     return this.prisma.report.update({
       where: { id: reportId },
       data: {
         status: status,
-        // moderator_id: moderatorId, // If you add these fields
-        // resolved_at: new Date(),   // If you add these fields
+        // If dismissing and you want to record who:
+        // moderator_id: (status === ReportStatus.DISMISSED && moderatorId) ? moderatorId : reportExists.moderator_id,
+        // resolved_at: (status === ReportStatus.DISMISSED) ? new Date() : reportExists.resolved_at, // Or a new 'dismissed_at' field
       },
-    });
+      include: { // <<< INCLUDE RELATIONS
+        reporter: { select: { id: true, username: true } },
+        moderator: { select: { id: true, username: true } },
+      },
+    }) as Promise<ReportWithDetails>;
   }
+
 
   async resolveReport(
-  reportId: number,
-  dto: ResolveReportDto,
-  moderatorId: string,
-): Promise<Report> {
-  const existing = await this.prisma.report.findUnique({
-    where: { id: reportId },
-  });
-  if (!existing) {
-    throw new NotFoundException(`Report ${reportId} not found.`);
-  }
+    reportId: number,
+    dto: ResolveReportDto,
+    currentModeratorId: string, // Renamed to avoid conflict with relation name
+  ): Promise<ReportWithDetails> {
+    const existingReport = await this.prisma.report.findUnique({
+      where: { id: reportId },
+    });
 
-  return this.prisma.report.update({
-    where: { id: reportId },
-    data: {
-      status: ReportStatus.RESOLVED,
-      resolved_at: new Date(dto.resolve_date),
-      resolution_comment: dto.resolution_comment,
-      moderator_id: moderatorId,
-    },
-  });
-}
+    if (!existingReport) {
+      throw new NotFoundException(`Report ${reportId} not found.`);
+    }
+    if (existingReport.status === ReportStatus.RESOLVED || existingReport.status === ReportStatus.DISMISSED) {
+      throw new ConflictException(`Report ${reportId} has already been ${existingReport.status.toLowerCase()}.`);
+    }
+
+    return this.prisma.report.update({
+      where: { id: reportId },
+      data: {
+        status: ReportStatus.RESOLVED,
+        resolved_at: new Date(dto.resolve_date),
+        resolution_comment: dto.resolution_comment,
+        moderator_id: currentModeratorId, // Set the foreign key
+      },
+      include: { // <<< INCLUDE RELATIONS
+        reporter: { select: { id: true, username: true } },
+        moderator: { select: { id: true, username: true } }, // This will populate the 'moderator' field
+      },
+    }) as Promise<ReportWithDetails>;
+  }
 }

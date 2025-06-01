@@ -55,13 +55,12 @@ model User {
   posts            Post[]
   ratings          Rating[]
   Report           Report[]      @relation("UserReports")
-  ModeratorReports Report[]      @relation("ModeratorReports")
   shares           Share[]
   userAccess       UserAccess?
   roles            UserRole[]
   UserUsage        UserUsage[]
   CommentLike      CommentLike[]
-
+  reportsResolved  Report[] @relation("ModeratorReports") 
   @@map("user")
 }
 
@@ -196,7 +195,7 @@ model Comment {
   target_id         Int
   like_count        Int           @default(0)
   target_type       TargetType
-  parent_comment    Comment?      @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: NoAction)
+  parent_comment    Comment?      @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: Cascade)
   replies           Comment[]     @relation("CommentReplies")
   user              User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
   CommentLike       CommentLike[]
@@ -381,6 +380,16 @@ model ArtGeneration {
   @@map("art_generation")
 }
 
+model TrendingPrompt {
+  id         Int      @id @default(autoincrement())
+  prompt_key String   @unique
+  prompts    String[]
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("trending_prompts")
+}
+
 enum PaidAccessLevel {
   FREE       @map("free")
   ARTIST_PRO @map("artist_pro")
@@ -436,7 +445,6 @@ enum ReportTargetType {
 
 enum ReportStatus {
   PENDING
-  REVIEWED
   RESOLVED
   DISMISSED
 }
