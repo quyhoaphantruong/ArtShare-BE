@@ -23,6 +23,7 @@ import { UsageModule } from './usage/usage.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { TrendingModule } from './trending/trending.module';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { SafeSearchModule } from './safe-search/safe-search.module';
 
 import { FirebaseModule } from './firebase/firebase.module';
 import { AnalyticsModule } from './analytics/analytics.module';
@@ -55,10 +56,11 @@ import { AnalyticsModule } from './analytics/analytics.module';
     StatisticsModule,
     TrendingModule,
     SubscriptionModule,
+    SafeSearchModule,
     FirebaseModule,
     AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
