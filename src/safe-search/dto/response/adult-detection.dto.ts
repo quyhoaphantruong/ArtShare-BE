@@ -1,6 +1,6 @@
 import { ISafeSearchAnnotation } from "src/safe-search/types/safe-search-annotation.type";
 
-export class AdultDetectionReponseDto {
+export class AdultDetectionResponseDto {
   isAdult: boolean;
   annotation: ISafeSearchAnnotation;
 }

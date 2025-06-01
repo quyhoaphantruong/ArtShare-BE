@@ -2,7 +2,7 @@ import { Controller, HttpCode, HttpStatus, Post, UploadedFiles, UseGuards, UseIn
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { SafeSearchService } from './safe-search.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import { AdultDetectionReponseDto } from './dto/response/adult-detection.dto';
+import { AdultDetectionResponseDto } from './dto/response/adult-detection.dto';
 
 @Controller('safe-search')
 @UseGuards(JwtAuthGuard)
@@ -23,7 +23,7 @@ export class SafeSearchController {
   @UseInterceptors(FilesInterceptor('images', 20))
   async detectAdultImages(
     @UploadedFiles() files: Express.Multer.File[],
-  ): Promise<AdultDetectionReponseDto[]> {
+  ): Promise<AdultDetectionResponseDto[]> {
     return await this.safeSearchService.detectAdultImages(files);
   }
 }

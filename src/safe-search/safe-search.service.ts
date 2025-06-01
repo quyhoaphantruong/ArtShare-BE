@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ImageAnnotatorClient, protos } from '@google-cloud/vision';
-import { AdultDetectionReponseDto } from './dto/response/adult-detection.dto';
 import { ISafeSearchAnnotation, Likelihood } from './types/safe-search-annotation.type';
 import { plainToInstance } from 'class-transformer';
 import { TryCatch } from 'src/common/try-catch.decorator';
+import { AdultDetectionResponseDto } from './dto/response/adult-detection.dto';
 
 
 @Injectable()
@@ -38,8 +38,7 @@ export class SafeSearchService {
   @TryCatch()
   async detectAdultImages(
     imageFiles: Express.Multer.File[],
-  ): Promise<AdultDetectionReponseDto[]> {
-    console.log('detectAdultImages called with', imageFiles.length, 'files');
+  ): Promise<AdultDetectionResponseDto[]> {
     const safeSearchAnnotations = await this.detectSafeSearchBatch(imageFiles);
 
     const response = safeSearchAnnotations.map(annotation => {
@@ -52,9 +51,9 @@ export class SafeSearchService {
       return {
         isAdult,
         annotation,
-      } as AdultDetectionReponseDto;
+      } as AdultDetectionResponseDto;
     });
 
-    return plainToInstance(AdultDetectionReponseDto, response)
+    return plainToInstance(AdultDetectionResponseDto, response)
   }
 }
