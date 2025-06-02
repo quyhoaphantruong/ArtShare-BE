@@ -30,12 +30,16 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AutoProjectModule } from './auto-project/auto-project.module';
 import { AutoPostModule } from './auto-post/auto-post.module';
 import { PlatformModule } from './platform/platform.module';
+import { NotificationModule } from './notification/notification.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true, // Makes ConfigService available globally
     }),
+    EventEmitterModule.forRoot(),
     UserModule,
     AuthModule,
     PostsModule,
@@ -62,6 +66,7 @@ import { PlatformModule } from './platform/platform.module';
     AutoProjectModule,
     AutoPostModule,
     PlatformModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
