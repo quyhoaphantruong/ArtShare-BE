@@ -6,6 +6,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AtStrategy } from './strategies/at.strategy';
 import { RtStrategy } from './strategies/rt.strategy';
+import { FacebookController } from './facebook/facebook.controller';
+import { CacheModule } from '@nestjs/cache-manager';
+import { FacebookAuthService } from './facebook/facebook.service';
+import { HttpModule } from '@nestjs/axios';
+import { EncryptionService } from 'src/encryption/encryption.service';
 
 @Module({
   imports: [
@@ -20,9 +25,20 @@ import { RtStrategy } from './strategies/rt.strategy';
       }),
       inject: [ConfigService],
     }),
+    CacheModule.register({
+      ttl: 600,
+      isGlobal: true,
+    }),
+    HttpModule,
   ],
-  providers: [AuthService, AtStrategy, RtStrategy],
-  controllers: [AuthController],
+  providers: [
+    AuthService,
+    AtStrategy,
+    RtStrategy,
+    FacebookAuthService,
+    EncryptionService,
+  ],
+  controllers: [AuthController, FacebookController],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {

@@ -26,6 +26,7 @@ import { SubscriptionModule } from './subscription/subscription.module';
 
 import { FirebaseModule } from './firebase/firebase.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { AutoPostModule } from './auto-post/auto-post.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     SubscriptionModule,
     FirebaseModule,
     AnalyticsModule,
+    AutoPostModule,
   ],
   controllers: [AppController],
   providers: [AppService],

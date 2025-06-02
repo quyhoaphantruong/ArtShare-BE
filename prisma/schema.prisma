@@ -390,6 +390,22 @@ model TrendingPrompt {
   @@map("trending_prompts")
 }
 
+model ScheduledPost {
+  id                           String         @id @default(uuid())
+  content                      String
+  scheduleAt                   DateTime
+  facebookPageId               String
+  encryptedFacebookAccessToken String
+  imageUrls                    String[]
+  status                       AutoPostStatus @default(PENDING)
+  createdAt                    DateTime       @default(now())
+  updatedAt                    DateTime       @updatedAt
+  postedAt                     DateTime?
+  errorMessage                 String?
+  n8nTriggeredAt               DateTime?
+  n8nExecutionId               String?
+}
+
 enum PaidAccessLevel {
   FREE       @map("free")
   ARTIST_PRO @map("artist_pro")
@@ -453,4 +469,12 @@ enum AspectRatio {
   SQUARE
   LANDSCAPE
   PORTRAIT
+}
+
+enum AutoPostStatus {
+  PENDING
+  POSTED
+  CANCELLED
+  ERROR
+  PROCESSING
 }
