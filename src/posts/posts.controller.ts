@@ -136,6 +136,14 @@ export class PostsController {
     );
   }
 
+  @Public()
+  @Get(':post_id')
+  async getPostDetails(
+    @Param('post_id', ParseIntPipe) postId: number,
+    @CurrentUser() user?: CurrentUserType,
+  ): Promise<PostDetailsResponseDto> {
+    return this.postsExploreService.getPostDetails(postId, user?.id ?? '');
+  }
 
   @Public()
   @Get('user/:username')
