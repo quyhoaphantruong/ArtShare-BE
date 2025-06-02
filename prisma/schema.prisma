@@ -61,6 +61,7 @@ model User {
   UserUsage        UserUsage[]
   CommentLike      CommentLike[]
   reportsResolved  Report[] @relation("ModeratorReports") 
+  notifications    Notification[]
   @@map("user")
 }
 
@@ -388,6 +389,19 @@ model TrendingPrompt {
   updated_at DateTime @updatedAt
 
   @@map("trending_prompts")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   
+  type      String
+  payload   Json
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
 enum PaidAccessLevel {

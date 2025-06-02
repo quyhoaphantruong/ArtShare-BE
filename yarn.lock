@@ -1453,6 +1453,13 @@
     path-to-regexp "3.3.0"
     tslib "2.8.1"
 
+"@nestjs/event-emitter@^3.0.1":
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/@nestjs/event-emitter/-/event-emitter-3.0.1.tgz#6c286f3b46a3d22093397a35015de427972bacfb"
+  integrity sha512-0Ln/x+7xkU6AJFOcQI9tIhUMXVF7D5itiaQGOyJbXtlAfAIt8gzDdJm+Im7cFzKoWkiW5nCXCPh6GSvdQd/3Dw==
+  dependencies:
+    eventemitter2 "6.4.9"
+
 "@nestjs/jwt@^11.0.0":
   version "11.0.0"
   resolved "https://registry.yarnpkg.com/@nestjs/jwt/-/jwt-11.0.0.tgz#aef1590e70830c70fba0f59e9b17314dc4d36822"
@@ -1482,10 +1489,10 @@
     multer "1.4.4-lts.1"
     tslib "2.8.1"
 
-"@nestjs/platform-socket.io@^11.1.0":
-  version "11.1.0"
-  resolved "https://registry.npmjs.org/@nestjs/platform-socket.io/-/platform-socket.io-11.1.0.tgz#6ba0ed34a64b8442327f8ffa487c01831812f385"
-  integrity sha512-aCNuHln9RmT/qHkCr0/bcHxUP4rNU9hXK8O1Rd6EpDhJ9UcgMhatjkYDE95Tc7QgSgjLVscQ47pI2J8ik9b0VQ==
+"@nestjs/platform-socket.io@^11.1.2":
+  version "11.1.2"
+  resolved "https://registry.yarnpkg.com/@nestjs/platform-socket.io/-/platform-socket.io-11.1.2.tgz#648273f1131d0572e71eb1f5880948d874fb8274"
+  integrity sha512-IkeDPRRddY0In6lE+5H/DJodtF5cEx+ga+GWehs4Il5Y3kK7MVR2/WgUABAhyRsbJYOhIhZD7Dai0V2t9ref1Q==
   dependencies:
     socket.io "4.8.1"
     tslib "2.8.1"
@@ -1532,10 +1539,10 @@
   resolved "https://registry.yarnpkg.com/@nestjs/typeorm/-/typeorm-11.0.0.tgz#b0f45d6902396db89e0ac1f4e738c2ff3407b794"
   integrity sha512-SOeUQl70Lb2OfhGkvnh4KXWlsd+zA08RuuQgT7kKbzivngxzSo1Oc7Usu5VxCxACQC9wc2l9esOHILSJeK7rJA==
 
-"@nestjs/websockets@^11.1.0":
-  version "11.1.0"
-  resolved "https://registry.npmjs.org/@nestjs/websockets/-/websockets-11.1.0.tgz#30ab7e0809aa1cff16c6fee1a3d346a8a2092f94"
-  integrity sha512-nb96cbmk7u6XIj4yIieezX9qqDshauyQJ4SLtdg2BaxOrkeQSx2j34CQWn/DZHHoYIQimfnAj2ry3RYWET4+zw==
+"@nestjs/websockets@^11.1.2":
+  version "11.1.2"
+  resolved "https://registry.yarnpkg.com/@nestjs/websockets/-/websockets-11.1.2.tgz#d0d6b8ee87013970321820c718d11b26e0176fc9"
+  integrity sha512-Ywl7u0C3+qnKIrk0mD3jHWnowO+GScFT1FeP6cNgarA0ujHEfusph9IIbnUJiEiusfnKVpK9fYMGZRSDwnRGPQ==
   dependencies:
     iterare "1.2.1"
     object-hash "3.0.0"
@@ -4081,6 +4088,11 @@ event-target-shim@^5.0.0:
   version "5.0.1"
   resolved "https://registry.yarnpkg.com/event-target-shim/-/event-target-shim-5.0.1.tgz#5d4d3ebdf9583d63a5333ce2deb7480ab2b05789"
   integrity sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==
+
+eventemitter2@6.4.9:
+  version "6.4.9"
+  resolved "https://registry.yarnpkg.com/eventemitter2/-/eventemitter2-6.4.9.tgz#41f2750781b4230ed58827bc119d293471ecb125"
+  integrity sha512-JEPTiaOt9f04oa6NOkc4aH+nVp5I3wEjpHbIPqfgCdD5v5bUzy7xQqwcVO2aDQgOWhI28da57HksMrzK9HlRxg==
 
 events@1.1.1:
   version "1.1.1"
