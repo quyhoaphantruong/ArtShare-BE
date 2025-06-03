@@ -12,22 +12,19 @@ import {
 import { AutoPostStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
 
-export class SchedulePostDto {
+export class ScheduleAutoPostDto {
+  @IsNotEmpty()
+  @IsInt()
+  @Transform(({ value }) => parseInt(value, 10))
+  autoProjectId: number;
+
   @IsNotEmpty()
   @IsString()
   content: string;
 
   @IsNotEmpty()
   @IsDateString()
-  scheduleAt: string;
-
-  @IsNotEmpty()
-  @IsString()
-  facebookPageId: string;
-
-  @IsNotEmpty()
-  @IsString()
-  facebookAccessToken: string;
+  scheduledAt: string;
 
   @IsArray()
   @IsOptional()
@@ -35,11 +32,11 @@ export class SchedulePostDto {
   imageUrls?: string[];
 }
 
-export class UpdatePostStatusDto {
+export class UpdateAutoPostStatusDto {
   @IsNotEmpty()
   @IsInt()
   @Transform(({ value }) => parseInt(value, 10))
-  scheduleId: number;
+  autoPostId: number;
 
   @IsNotEmpty()
   @IsIn(Object.values(AutoPostStatus))
@@ -52,24 +49,20 @@ export class UpdatePostStatusDto {
   @IsOptional()
   @IsString()
   n8nExecutionId?: string;
+
+  @IsOptional()
+  @IsString()
+  platformPostId?: string;
 }
 
-export class UpdateScheduledPostDto {
+export class UpdateAutoPostDto {
   @IsOptional()
   @IsString()
   content?: string;
 
   @IsOptional()
   @IsDateString()
-  scheduleAt?: string;
-
-  @IsOptional()
-  @IsString()
-  facebookPageId?: string;
-
-  @IsOptional()
-  @IsString()
-  facebookAccessToken?: string;
+  scheduledAt?: string;
 
   @IsOptional()
   @IsArray()
@@ -77,10 +70,11 @@ export class UpdateScheduledPostDto {
   imageUrls?: string[];
 }
 
-export class GetScheduledPostsQueryDto {
+export class GetAutoPostsQueryDto {
   @IsOptional()
-  @IsString()
-  facebookPageId?: string;
+  @IsInt()
+  @Transform(({ value }) => parseInt(value, 10))
+  autoProjectId?: number;
 
   @IsOptional()
   @IsIn(Object.values(AutoPostStatus))
@@ -100,7 +94,7 @@ export class GetScheduledPostsQueryDto {
 
   @IsOptional()
   @IsString()
-  sortBy?: string = 'scheduleAt';
+  sortBy?: string = 'scheduled_at';
 
   @IsOptional()
   @IsIn(['asc', 'desc'])
