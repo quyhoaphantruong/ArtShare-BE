@@ -77,7 +77,7 @@ export class AutoPostGenerateService {
     const response = await this.openai.responses.parse({
       model: 'gpt-4.1-nano-2025-04-14',
       instructions:
-        'Generate a well formatted, concise and engaging social media and post based on the following title and description. Make sure the content quite long, a few hundres words is enough, and is formatted in HTML and CSS',
+        'Generate a well formatted, concise and engaging social media and post based on the following title and description. Make sure the content quite long, a few hundreds words is enough, and is formatted in HTML and CSS',
       input: `Title: ${title}\nDescription: ${description}`,
       text: {
         format: zodTextFormat(AutoPostConent, 'autoPostContent'),
