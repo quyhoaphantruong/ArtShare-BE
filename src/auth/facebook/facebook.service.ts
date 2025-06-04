@@ -1,41 +1,24 @@
 import { HttpService } from '@nestjs/axios';
-import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import {
   Injectable,
   Logger,
   InternalServerErrorException,
   UnauthorizedException,
-  Inject,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { firstValueFrom } from 'rxjs';
 import { EncryptionService } from 'src/encryption/encryption.service';
 import { v4 as uuidv4 } from 'uuid';
-
-interface FacebookUserTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in?: number;
-}
-
-interface AuthorizedFacebookPageData {
-  id: string;
-  name: string;
-  accessToken: string;
-  category: string;
-}
-
-interface FacebookPagesApiResponse {
-  data: Array<{
-    id: string;
-    name: string;
-    access_token: string;
-    category: string;
-    tasks: string[];
-  }>;
-  paging?: any;
-}
+import {
+  FacebookPageApiResponseData,
+  FacebookPagesApiResponse,
+  FacebookUserTokenResponse,
+  PlatformPageConfig,
+  PublicFacebookPageData,
+} from './facebook.type';
+import { Prisma, SharePlatform } from '@prisma/client';
+import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class FacebookAuthService {
@@ -52,7 +35,7 @@ export class FacebookAuthService {
     private readonly configService: ConfigService,
     private readonly encryptionService: EncryptionService,
     private readonly jwtService: JwtService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly prisma: PrismaService,
   ) {
     this.FB_APP_ID = this.configService.get<string>('FACEBOOK_APP_ID');
     this.FB_APP_SECRET = this.configService.get<string>('FACEBOOK_APP_SECRET');
@@ -93,7 +76,7 @@ export class FacebookAuthService {
   async handleFacebookCallback(
     code: string,
     receivedStateJwt: string,
-  ): Promise<AuthorizedFacebookPageData> {
+  ): Promise<PublicFacebookPageData[]> {
     let statePayload: { sub: string; purpose: string };
     try {
       statePayload = await this.jwtService.verifyAsync(receivedStateJwt, {
@@ -171,38 +154,108 @@ export class FacebookAuthService {
       fields: 'id,name,access_token,category,tasks',
     };
 
+    let authorizedPagesFromApi: FacebookPageApiResponseData[];
     try {
       const response = await firstValueFrom(
         this.httpService.get<FacebookPagesApiResponse>(pagesUrl, {
           params: pagesParams,
         }),
       );
-      const authorizedPagesData: AuthorizedFacebookPageData[] =
-        response.data.data.map((p) => ({
-          id: p.id,
-          name: p.name,
-          accessToken: p.access_token,
-          category: p.category,
-        }));
-
-      if (!authorizedPagesData || authorizedPagesData.length === 0) {
-        this.logger.log(
-          `User ${internalUserId} did not authorize any Facebook Pages for this app during the OAuth flow.`,
-        );
-      }
-
-      this.logger.log(
-        `User ${internalUserId} authorized ${authorizedPagesData.length} page(s) via Facebook UI.`,
-      );
-
-      return authorizedPagesData[0];
+      authorizedPagesFromApi = response.data.data || [];
     } catch (error) {
       this.logger.error(
-        `Error fetching or processing user's authorized pages for user ${internalUserId}:`,
+        `Error fetching user's authorized pages for user_id ${internalUserId}:`,
         (error as any).response?.data || (error as any).message,
       );
       throw new InternalServerErrorException(
-        'Failed to process authorized Facebook pages.',
+        'Failed to fetch authorized Facebook pages.',
+      );
+    }
+
+    this.logger.log(
+      `User ${internalUserId} authorized ${authorizedPagesFromApi.length} page(s) via Facebook UI.`,
+    );
+
+    const processedPublicPageData: PublicFacebookPageData[] = [];
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const authorizedApiPageIds = new Set(
+          authorizedPagesFromApi.map((p) => p.id),
+        );
+
+        const existingUserFacebookPlatforms = await tx.platform.findMany({
+          where: {
+            user_id: internalUserId,
+            name: SharePlatform.FACEBOOK,
+          },
+        });
+
+        for (const pageFromApi of authorizedPagesFromApi) {
+          const pageConfig: PlatformPageConfig = {
+            page_name: pageFromApi.name,
+            encrypted_access_token: this.encryptionService.encrypt(
+              pageFromApi.access_token,
+            ),
+            category: pageFromApi.category,
+          };
+
+          const upsertedPlatform = await tx.platform.upsert({
+            where: {
+              user_id_name_external_page_id: {
+                user_id: internalUserId,
+                name: SharePlatform.FACEBOOK,
+                external_page_id: pageFromApi.id,
+              },
+            },
+            create: {
+              user_id: internalUserId,
+              name: SharePlatform.FACEBOOK,
+              external_page_id: pageFromApi.id,
+              config: pageConfig as unknown as Prisma.InputJsonValue,
+            },
+            update: {
+              config: pageConfig as unknown as Prisma.InputJsonValue,
+            },
+          });
+          processedPublicPageData.push({
+            id: upsertedPlatform.external_page_id,
+            name: pageFromApi.name,
+            category: pageFromApi.category,
+            platform_db_id: upsertedPlatform.id,
+          });
+        }
+
+        const platformsToDelete = existingUserFacebookPlatforms.filter(
+          (dbPlatform) =>
+            !authorizedApiPageIds.has(dbPlatform.external_page_id),
+        );
+
+        if (platformsToDelete.length > 0) {
+          this.logger.log(
+            `Removing ${platformsToDelete.length} de-authorized Facebook page connections for user_id ${internalUserId}.`,
+          );
+          await tx.platform.deleteMany({
+            where: {
+              id: {
+                in: platformsToDelete.map((p) => p.id),
+              },
+            },
+          });
+        }
+      });
+
+      this.logger.log(
+        `Successfully synchronized ${processedPublicPageData.length} Facebook page(s) for user_id ${internalUserId}.`,
+      );
+      return processedPublicPageData;
+    } catch (dbError) {
+      this.logger.error(
+        `Database error during Facebook page synchronization for user_id ${internalUserId}:`,
+        dbError,
+      );
+      throw new InternalServerErrorException(
+        'Failed to save/update Facebook page connections.',
       );
     }
   }

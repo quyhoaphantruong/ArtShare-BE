@@ -397,32 +397,33 @@ model TrendingPrompt {
 }
 
 model Platform {
-  id     Int           @id @default(autoincrement())
-  name   SharePlatform @unique
-  config Json
-
-  user_id    String
-  created_at DateTime  @default(now())
-  updated_at DateTime? @updatedAt
+  id               Int           @id @default(autoincrement())
+  name             SharePlatform
+  config           Json
+  user_id          String
+  external_page_id String
+  created_at       DateTime      @default(now())
+  updated_at       DateTime?     @updatedAt
 
   autoProjects AutoProject[]
 
+  @@unique([user_id, name, external_page_id])
   @@map("platform")
 }
 
 model AutoProject {
-  id            Int               @id @default(autoincrement())
-  title         String
-  description   String
-  status        AutoProjectStatus @default(ACTIVE)
-  platform_name SharePlatform
-  created_at    DateTime          @default(now())
-  user_id       String
-  updated_at    DateTime?         @updatedAt
+  id          Int               @id @default(autoincrement())
+  title       String
+  description String
+  status      AutoProjectStatus @default(ACTIVE)
+  created_at  DateTime          @default(now())
+  user_id     String
+  updated_at  DateTime?         @updatedAt
+  platform_id Int
 
   user      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
   autoPosts AutoPost[]
-  platform  Platform   @relation(fields: [platform_name], references: [name], onDelete: Cascade)
+  platform  Platform   @relation(fields: [platform_id], references: [id], onDelete: Cascade)
 
   @@map("auto_project")
 }

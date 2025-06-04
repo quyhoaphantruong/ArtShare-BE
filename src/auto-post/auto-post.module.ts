@@ -9,7 +9,7 @@ import { AutoPostGenerateService } from './auto-post-generate.service';
 
 @Module({
   imports: [ArtGenerationModule, HttpModule, EncryptionModule, AuthModule],
-  controllers: [AutoPostGenerateService, AutoPostController],
-  providers: [AutoPostService],
+  controllers: [AutoPostController],
+  providers: [AutoPostService, AutoPostGenerateService],
 })
 export class AutoPostModule {}

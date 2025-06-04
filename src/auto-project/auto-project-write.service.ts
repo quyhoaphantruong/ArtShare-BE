@@ -1,12 +1,14 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
-  InternalServerErrorException,
+  Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { CreateAutoProjectDto } from './dto/request/create-project.dto';
 import { AutoPostGenerateService } from 'src/auto-post/auto-post-generate.service';
-import { SharePlatform } from '@prisma/client';
+import { Platform } from '@prisma/client';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { plainToInstance } from 'class-transformer';
 import { AutoProjectDetailsDto } from './dto/response/auto-project-details.dto';
@@ -16,6 +18,8 @@ import { UpdateAutoProjectDto } from './dto/request/update-project.dto';
 
 @Injectable()
 export class AutoProjectWriteService {
+  private readonly logger: Logger;
+  
   constructor(
     private readonly prisma: PrismaService,
     private readonly autoPostGenerateService: AutoPostGenerateService,
@@ -30,10 +34,12 @@ export class AutoProjectWriteService {
     createDto: CreateAutoProjectDto,
     userId: string,
   ): Promise<AutoProjectDetailsDto> {
-    const { title, description, platform_name, auto_post_meta_list } =
-      createDto;
+    const { title, description, platform_id, auto_post_meta_list } = createDto;
 
-    await this.validatePlatform(platform_name as SharePlatform, userId);
+    const validatedPlatformRecord = await this.validatePlatform(
+      platform_id,
+      userId,
+    );
 
     await this.usageService.handleCreditUsage(
       userId,
@@ -41,7 +47,6 @@ export class AutoProjectWriteService {
       this.textCost + this.imageCost * auto_post_meta_list.length,
     );
 
-    // generate auto posts
     const generatedAutoPosts =
       await this.autoPostGenerateService.generateAutoPosts(
         auto_post_meta_list,
@@ -49,13 +54,12 @@ export class AutoProjectWriteService {
         userId,
       );
 
-    // save auto project with auto posts to the db
-    const created = await this.prisma.autoProject.create({
+    const createdAutoProject = await this.prisma.autoProject.create({
       data: {
         title,
         description,
-        platform_name: platform_name as SharePlatform,
         user_id: userId,
+        platform_id: validatedPlatformRecord.id,
         autoPosts: {
           create: generatedAutoPosts.map((post) => ({
             content: post.content,
@@ -64,24 +68,53 @@ export class AutoProjectWriteService {
           })),
         },
       },
-      include: { autoPosts: true },
+      include: {
+        autoPosts: true,
+        platform: true,
+      },
     });
 
-    return plainToInstance(AutoProjectDetailsDto, created);
+    const resultDto = plainToInstance(
+      AutoProjectDetailsDto,
+      createdAutoProject,
+    );
+
+    if (createdAutoProject.platform) {
+      resultDto.platform = {
+        id: createdAutoProject.platform.id,
+        name: createdAutoProject.platform.name.toString(),
+        external_page_id: createdAutoProject.platform.external_page_id,
+        config: createdAutoProject.platform.config,
+      };
+    }
+
+    return resultDto;
   }
 
   private async validatePlatform(
-    platformName: SharePlatform,
+    platformId: number,
     userId: string,
-  ): Promise<void> {
-    const platform = await this.prisma.platform.findUnique({
-      where: { name: platformName, user_id: userId },
+  ): Promise<Platform> {
+    const platformRecord = await this.prisma.platform.findUnique({
+      where: { id: platformId },
     });
-    if (!platform) {
-      throw new InternalServerErrorException(
-        `Configuration for platform ${platformName} not found for user ${userId}.`,
+
+    if (!platformRecord) {
+      throw new NotFoundException(
+        `Platform connection with ID ${platformId} not found.`,
       );
     }
+
+    if (platformRecord.user_id !== userId) {
+      this.logger.warn(
+        `User ${userId} attempted to use Platform ID ${platformId} which belongs to user ${platformRecord.user_id}.`,
+      );
+      throw new ForbiddenException(
+        `You do not have permission to use platform connection with ID ${platformId}.`,
+      );
+    }
+
+    return platformRecord;
   }
 
   @TryCatch()
@@ -92,7 +125,6 @@ export class AutoProjectWriteService {
   ): Promise<AutoProjectDetailsDto> {
     const { title, description } = updateDto;
 
-    // Validate if the project exists and belongs to the user
     const existingProject = await this.prisma.autoProject.findFirst({
       where: { id, user_id: userId },
     });
@@ -103,7 +135,6 @@ export class AutoProjectWriteService {
       );
     }
 
-    // Update the project
     const updatedProject = await this.prisma.autoProject.update({
       where: { id },
       data: {
@@ -118,7 +149,6 @@ export class AutoProjectWriteService {
 
   @TryCatch()
   async remove(id: number, userId: string): Promise<void> {
-    // Validate if the project exists and belongs to the user
     const existingProject = await this.prisma.autoProject.findFirst({
       where: { id, user_id: userId },
     });
@@ -129,7 +159,6 @@ export class AutoProjectWriteService {
       );
     }
 
-    // Delete the project
     await this.prisma.autoProject.delete({
       where: { id },
     });

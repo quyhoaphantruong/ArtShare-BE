@@ -97,12 +97,10 @@ export class FacebookController {
     }
 
     try {
-      const facebookPageInfo =
-        await this.facebookAuthService.handleFacebookCallback(code, stateJwt);
+      await this.facebookAuthService.handleFacebookCallback(code, stateJwt);
       this.logger.log(
         `Facebook OAuth callback processed. Attempting to redirect to success URL.`,
       );
-      console.log('🚀 ~ ', facebookPageInfo);
       res.redirect(`${this.frontendSuccessRedirectUrl}`);
     } catch (error) {
       this.logger.error(
