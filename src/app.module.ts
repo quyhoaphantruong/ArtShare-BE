@@ -27,6 +27,8 @@ import { SafeSearchModule } from './safe-search/safe-search.module';
 
 import { FirebaseModule } from './firebase/firebase.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { AutoProjectModule } from './auto-project/auto-project.module';
+import { AutoPostModule } from './auto-post/auto-post.module';
 
 @Module({
   imports: [
@@ -59,6 +61,8 @@ import { AnalyticsModule } from './analytics/analytics.module';
     SafeSearchModule,
     FirebaseModule,
     AnalyticsModule,
+    AutoProjectModule,
+    AutoPostModule,
   ],
   controllers: [AppController],
   providers: [AppService],
