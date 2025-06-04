@@ -137,7 +137,7 @@ export class BlogManagementService {
     return mappedBlog;
   }
 
-  async deleteBlog(id: number, userId: string): Promise<void> {
+  async deleteBlog(id: number, userId: string) {
     const existingBlog = await this.prisma.blog.findUnique({
       where: { id },
       select: { user_id: true },
@@ -150,7 +150,8 @@ export class BlogManagementService {
         'You do not have permission to delete this blog.',
       );
     }
-    await this.prisma.blog.delete({ where: { id } });
+    const result =await this.prisma.blog.delete({ where: { id } });
+    return result;
   }
 
   async toggleBookmark(

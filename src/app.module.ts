@@ -23,9 +23,11 @@ import { UsageModule } from './usage/usage.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { TrendingModule } from './trending/trending.module';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { SafeSearchModule } from './safe-search/safe-search.module';
 
 import { FirebaseModule } from './firebase/firebase.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { AutoProjectModule } from './auto-project/auto-project.module';
 import { AutoPostModule } from './auto-post/auto-post.module';
 
 @Module({
@@ -56,11 +58,13 @@ import { AutoPostModule } from './auto-post/auto-post.module';
     StatisticsModule,
     TrendingModule,
     SubscriptionModule,
+    SafeSearchModule,
     FirebaseModule,
     AnalyticsModule,
+    AutoProjectModule,
     AutoPostModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
