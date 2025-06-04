@@ -51,7 +51,7 @@ export class AutoPostGenerateService {
         this.artGenerationService.generateImages(
           {
             modelKey: ModelKey.GPT_IMAGE,
-            prompt: `Create visually engaging images for a social media post, each image should capture the core idea and emotion of the title and description:\nTitle: ${title}\nDescription${description}`,
+            prompt: `Create visually engaging images for a social media post, each image should capture the core idea and emotion of the title and description:\nTitle: ${title}\nDescription: ${description}`,
             n: item.images_count,
             aspectRatio: AspectRatio.SQUARE,
           },
