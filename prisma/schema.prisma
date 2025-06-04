@@ -405,7 +405,6 @@ model Platform {
 
 model AutoProject {
   id            Int               @id @default(autoincrement())
-  project_name  String
   title         String
   description   String
   status        AutoProjectStatus @default(ACTIVE)
