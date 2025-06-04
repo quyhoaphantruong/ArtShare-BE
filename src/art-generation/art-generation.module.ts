@@ -17,14 +17,13 @@ import { UsageModule } from 'src/usage/usage.module';
     GptImageStrategy,
     {
       provide: 'IMAGE_GENERATORS',
-      useFactory: (
-        gpt: GptImageStrategy,
-      ) => [gpt] as ImageGeneratorStrategy[],
+      useFactory: (gpt: GptImageStrategy) => [gpt] as ImageGeneratorStrategy[],
       inject: [GptImageStrategy],
     },
     StorageService,
     S3StorageProvider,
     PromptService,
-  ]
+  ],
+  exports: [ArtGenerationService],
 })
 export class ArtGenerationModule {}
