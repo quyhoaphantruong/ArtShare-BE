@@ -312,15 +312,14 @@ model UserAccess {
   userId               String          @id
   planId               PaidAccessLevel
   expiresAt            DateTime        @map("expires_at")
-  stripeSubscriptionId String          @unique @map("stripe_subscription_id")
-  stripePriceId        String          @map("stripe_price_id")
-  stripeCustomerId     String          @map("stripe_customer_id")
+  stripeSubscriptionId String?         @unique @map("stripe_subscription_id")
+  stripePriceId        String?         @map("stripe_price_id")
+  stripeCustomerId     String?         @map("stripe_customer_id")
   createdAt            DateTime        @default(now()) @map("created_at")
   updatedAt            DateTime        @updatedAt @map("updated_at")
   cancelAtPeriodEnd    Boolean         @default(false) @map("cancel_at_period_end")
-
-  plan Plan @relation(fields: [planId], references: [id])
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                 Plan            @relation(fields: [planId], references: [id])
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([stripeCustomerId])
   @@map("user_access")

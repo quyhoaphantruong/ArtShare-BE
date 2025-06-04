@@ -8,13 +8,23 @@ import {
 import Stripe from 'stripe';
 import { StripeCoreService } from './stripe-core.service';
 import { StripeDbService } from './stripe-db.service';
-import { Plan, User } from '@prisma/client';
+import { PaidAccessLevel, Plan, User } from '@prisma/client';
 
 export interface SubscriptionProcessingResult {
   user?: User;
   plan?: Plan;
   subscription?: Stripe.Subscription | null;
   accessRecordUpdated: boolean;
+}
+
+interface SubscriptionDetails {
+  status: Stripe.Subscription.Status;
+  priceId: string | null;
+  productId: string | null;
+  periodStartTimestamp: number | null;
+  periodEndTimestamp: number | null;
+  cancelAtPeriodEnd: boolean;
+  rawSubscription?: Stripe.Subscription;
 }
 
 @Injectable()
@@ -25,6 +35,160 @@ export class StripeWebhookProcessorService {
     private readonly stripeCoreService: StripeCoreService,
     private readonly stripeDbService: StripeDbService,
   ) {}
+
+  private async _downgradeUserToFreeTier(
+    user: User,
+    canceledStripeSubscription?:
+      | Stripe.Subscription
+      | {
+          id: string;
+          customer: string | Stripe.Customer | Stripe.DeletedCustomer | null;
+        },
+  ): Promise<SubscriptionProcessingResult> {
+    const canceledSubIdForLog = canceledStripeSubscription?.id;
+    this.logger.log(
+      `Downgrading user ${user.id} to free tier. Canceled Stripe Sub ID (if any): ${canceledSubIdForLog || 'N/A'}`,
+    );
+
+    const currentStripeCustomerId = user.stripe_customer_id || null;
+
+    await this.stripeDbService.upsertUserAccess({
+      userId: user.id,
+      planId: PaidAccessLevel.FREE,
+      expiresAt: new Date('9999-12-31T23:59:59.999Z'),
+      stripeSubscriptionId: null,
+      stripePriceId: null,
+      stripeCustomerId: currentStripeCustomerId,
+      cancelAtPeriodEnd: false,
+    });
+
+    this.logger.log(
+      `User ${user.id} successfully downgraded to free plan. User's Stripe Customer ID: ${currentStripeCustomerId || 'None'}.`,
+    );
+    return { user, accessRecordUpdated: true };
+  }
+
+  private _getPeriodTimestampsFromInvoice(
+    invoice: Stripe.Invoice | string | null | undefined,
+  ): { start: number | null; end: number | null } {
+    let periodStartTimestamp: number | null = null;
+    let periodEndTimestamp: number | null = null;
+
+    if (
+      invoice &&
+      typeof invoice === 'object' &&
+      invoice.lines?.data[0]?.period
+    ) {
+      const firstLineItemPeriod = invoice.lines.data[0].period;
+      periodStartTimestamp = firstLineItemPeriod.start;
+      periodEndTimestamp = firstLineItemPeriod.end;
+    }
+    return { start: periodStartTimestamp, end: periodEndTimestamp };
+  }
+
+  private async _getSubscriptionDetails(
+    subscriptionId: string | null | undefined,
+    isSimulated: boolean,
+    simulatedPriceId?: string | null,
+    simulatedSubscriptionStatus?: Stripe.Subscription.Status,
+  ): Promise<SubscriptionDetails | null> {
+    if (!isSimulated) {
+      if (!subscriptionId) {
+        this.logger.error(
+          'Non-simulated event requires a subscriptionId for details extraction.',
+        );
+        return null;
+      }
+      const stripeSubscription =
+        await this.stripeCoreService.retrieveSubscription(subscriptionId);
+
+      const firstItem = stripeSubscription.items?.data[0];
+      const priceObj = firstItem?.price as Stripe.Price | undefined;
+      const productObj = priceObj?.product;
+      let periodStartTimestamp = firstItem?.current_period_start;
+      let periodEndTimestamp = firstItem?.current_period_end;
+
+      if (
+        (stripeSubscription.status === 'active' ||
+          stripeSubscription.status === 'trialing') &&
+        (typeof periodStartTimestamp !== 'number' ||
+          typeof periodEndTimestamp !== 'number')
+      ) {
+        this.logger.warn(
+          `Subscription ${subscriptionId} missing direct period_start/end. Checking latest_invoice.`,
+        );
+        const invoiceTimestamps = this._getPeriodTimestampsFromInvoice(
+          stripeSubscription.latest_invoice,
+        );
+        if (
+          typeof periodStartTimestamp !== 'number' &&
+          typeof invoiceTimestamps.start === 'number'
+        ) {
+          periodStartTimestamp = invoiceTimestamps.start;
+        }
+        if (
+          typeof periodEndTimestamp !== 'number' &&
+          typeof invoiceTimestamps.end === 'number'
+        ) {
+          periodEndTimestamp = invoiceTimestamps.end;
+        }
+
+        if (
+          typeof periodStartTimestamp !== 'number' ||
+          typeof periodEndTimestamp !== 'number'
+        ) {
+          this.logger.error(
+            `Missing period start/end from subscription ${subscriptionId} or its latest invoice for an active/trialing status. Start: ${periodStartTimestamp}, End: ${periodEndTimestamp}`,
+          );
+        }
+      }
+
+      return {
+        status: stripeSubscription.status,
+        priceId: priceObj?.id || null,
+        productId: productObj
+          ? typeof productObj === 'string'
+            ? productObj
+            : productObj.id
+          : null,
+        periodStartTimestamp,
+        periodEndTimestamp,
+        cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+        rawSubscription: stripeSubscription,
+      };
+    } else {
+      if (!simulatedPriceId) {
+        this.logger.error(
+          'Simulation error: priceId is required for simulated activation.',
+        );
+        throw new BadRequestException(
+          'Simulation error: priceId is required for simulated activation.',
+        );
+      }
+
+      const price =
+        await this.stripeCoreService.retrievePrice(simulatedPriceId);
+      const productId =
+        typeof price.product === 'string' ? price.product : price.product.id;
+
+      const now = new Date();
+      const periodStartTimestamp = Math.floor(now.getTime() / 1000);
+      const endDate = new Date(now);
+      if (price.recurring?.interval === 'year')
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      else endDate.setMonth(endDate.getMonth() + 1);
+      const periodEndTimestamp = Math.floor(endDate.getTime() / 1000);
+
+      return {
+        status: simulatedSubscriptionStatus || 'active',
+        priceId: simulatedPriceId,
+        productId: productId,
+        periodStartTimestamp,
+        periodEndTimestamp,
+        cancelAtPeriodEnd: false,
+      };
+    }
+  }
 
   async processSubscriptionActivation(
     customerId: string | null | undefined,
@@ -37,34 +201,24 @@ export class StripeWebhookProcessorService {
     eventType?: string,
   ): Promise<SubscriptionProcessingResult> {
     const userIdToFind = clientReferenceId || metadataUserId;
-    const subIdLabel = subscriptionId || '(missing_or_simulated)';
+    const subIdLabel =
+      subscriptionId || (isSimulated ? '(simulated)' : '(missing_id)');
     this.logger.log(
       `Processing subscription event. Cust: ${customerId}, Sub: ${subIdLabel}, UserRef: ${userIdToFind}, Simulated: ${isSimulated}, EventType: ${eventType}`,
     );
 
     if (!customerId && !userIdToFind) {
       this.logger.error(
-        `No customerId or UserRef provided for subscription processing.`,
+        'No customerId or UserRef provided for subscription processing.',
       );
       return { accessRecordUpdated: false };
     }
     if (!subscriptionId && !isSimulated) {
-      this.logger.error(`Non-simulated event requires a subscriptionId.`);
+      this.logger.error('Non-simulated event requires a subscriptionId.');
       return { accessRecordUpdated: false };
     }
 
-    let stripeSubscription: Stripe.Subscription | null = null;
-    let determinedPriceId: string | null = simulatedPriceId || null;
-    let determinedProductId: string | null = null;
-    let periodStartTimestamp: number | null = null;
-    let periodEndTimestamp: number | null = null;
-    let determinedStatus: Stripe.Subscription.Status | null | undefined =
-      isSimulated ? simulatedSubscriptionStatus : null;
-    let cancelAtPeriodEndFlag: boolean = false;
-
     let user: User | null = null;
-    let plan: Plan | null = null;
-
     try {
       user = await this.stripeDbService.findUserByStripeData(
         customerId,
@@ -77,208 +231,110 @@ export class StripeWebhookProcessorService {
         return { accessRecordUpdated: false };
       }
 
-      if (
-        customerId &&
-        (!user.stripe_customer_id || user.stripe_customer_id !== customerId)
-      ) {
+      if (customerId && user.stripe_customer_id !== customerId) {
         await this.stripeDbService.updateUserStripeCustomerId(
           user.id,
           customerId,
         );
+        user.stripe_customer_id = customerId;
       }
 
-      if (!isSimulated && subscriptionId) {
-        stripeSubscription =
-          await this.stripeCoreService.retrieveSubscription(subscriptionId);
-        determinedStatus = stripeSubscription.status;
-        cancelAtPeriodEndFlag = stripeSubscription.cancel_at_period_end;
+      const subDetails = await this._getSubscriptionDetails(
+        subscriptionId,
+        isSimulated,
+        simulatedPriceId,
+        simulatedSubscriptionStatus,
+      );
 
-        periodStartTimestamp = (stripeSubscription as any)
-          .current_period_start as number | null;
-        periodEndTimestamp = (stripeSubscription as any).current_period_end as
-          | number
-          | null;
-
-        if (
-          (typeof periodStartTimestamp !== 'number' ||
-            typeof periodEndTimestamp !== 'number') &&
-          stripeSubscription.latest_invoice &&
-          typeof stripeSubscription.latest_invoice === 'object'
-        ) {
-          const firstLineItem = (
-            stripeSubscription.latest_invoice as Stripe.Invoice
-          ).lines?.data[0];
-          if (firstLineItem?.period) {
-            if (
-              typeof periodStartTimestamp !== 'number' &&
-              typeof firstLineItem.period.start === 'number'
-            ) {
-              periodStartTimestamp = firstLineItem.period.start;
-            }
-            if (
-              typeof periodEndTimestamp !== 'number' &&
-              typeof firstLineItem.period.end === 'number'
-            ) {
-              periodEndTimestamp = firstLineItem.period.end;
-            }
-          }
-        }
-
-        if (periodStartTimestamp === null || periodEndTimestamp === null) {
-          throw new Error(
-            'Missing period start/end from subscription or its latest invoice.',
-          );
-        }
-
-        const firstItem = stripeSubscription.items?.data[0];
-        const priceObj = firstItem?.price as Stripe.Price | undefined;
-        const productObj = priceObj?.product as
-          | Stripe.Product
-          | string
-          | undefined;
-        determinedPriceId = priceObj?.id || null;
-        determinedProductId = productObj
-          ? typeof productObj === 'string'
-            ? productObj
-            : productObj.id
-          : null;
-      } else if (isSimulated) {
-        if (!determinedPriceId)
-          throw new BadRequestException(
-            'Simulation error: priceId is required for simulated activation.',
-          );
-
-        const price =
-          await this.stripeCoreService.retrievePrice(determinedPriceId);
-        determinedProductId =
-          typeof price.product === 'string' ? price.product : price.product.id;
-
-        const now = new Date();
-        periodStartTimestamp = Math.floor(now.getTime() / 1000);
-        const endDate = new Date(now);
-        if (price.recurring?.interval === 'year')
-          endDate.setFullYear(endDate.getFullYear() + 1);
-        else endDate.setMonth(endDate.getMonth() + 1);
-        periodEndTimestamp = Math.floor(endDate.getTime() / 1000);
-
-        if (!determinedStatus) determinedStatus = 'active';
-        cancelAtPeriodEndFlag = false;
-      }
-
-      if (!determinedStatus) {
+      if (!subDetails || !subDetails.status) {
         this.logger.error(
-          `Could not determine subscription status for ${subIdLabel}.`,
+          `Could not determine subscription details or status for ${subIdLabel}.`,
         );
         return { accessRecordUpdated: false };
       }
 
-      if (determinedStatus === 'active' || determinedStatus === 'trialing') {
+      const {
+        status,
+        priceId: determinedPriceId,
+        productId: determinedProductId,
+        periodStartTimestamp,
+        periodEndTimestamp,
+        cancelAtPeriodEnd: cancelAtPeriodEndFlag,
+        rawSubscription: stripeSubscription,
+      } = subDetails;
+
+      if (status === 'active' || status === 'trialing') {
         if (
           !determinedProductId ||
           periodEndTimestamp === null ||
           !determinedPriceId ||
           periodStartTimestamp === null
         ) {
+          this.logger.error(
+            `Incomplete subscription details for activation/update of Sub ${subIdLabel}. ProductID: ${determinedProductId}, PriceID: ${determinedPriceId}, PeriodEnd: ${periodEndTimestamp}, PeriodStart: ${periodStartTimestamp}`,
+          );
           throw new InternalServerErrorException(
             'Incomplete subscription details for activation/update.',
           );
         }
 
-        plan =
+        const plan =
           await this.stripeDbService.findPlanByStripeProductId(
             determinedProductId,
           );
         if (!plan) {
+          this.logger.error(
+            `Configuration error: Plan not found in DB for Stripe Product ID ${determinedProductId}. Sub ${subIdLabel}.`,
+          );
           throw new InternalServerErrorException(
-            `Configuration error: Plan not found in DB for Stripe Product ID ${determinedProductId}.`,
+            `Configuration error: Plan not found for Stripe Product ID ${determinedProductId}.`,
           );
         }
 
         const expiresAt = new Date(periodEndTimestamp * 1000);
-        const cycleStartedAt = new Date(periodStartTimestamp * 1000);
-
-        const previousUserAccess = await this.stripeDbService.findUserAccess(
-          user.id,
-        );
+        const actualSubscriptionId = isSimulated
+          ? `sim_${Date.now()}`
+          : subscriptionId!;
+        const actualCustomerId = customerId || user.stripe_customer_id!;
 
         await this.stripeDbService.upsertUserAccess({
           userId: user.id,
           planId: plan.id,
           expiresAt,
-          stripeSubscriptionId: subscriptionId!,
+          stripeSubscriptionId: actualSubscriptionId,
           stripePriceId: determinedPriceId,
-          stripeCustomerId: customerId!,
+          stripeCustomerId: actualCustomerId,
           cancelAtPeriodEnd: cancelAtPeriodEndFlag,
         });
-
-        let shouldResetUsage = false;
-        if (isSimulated && determinedStatus === 'active') {
-          shouldResetUsage = true;
-        } else if (
-          eventType === 'checkout.session.completed' &&
-          (determinedStatus === 'active' || determinedStatus === 'trialing')
-        ) {
-          shouldResetUsage = true;
-        } else if (
-          eventType === 'invoice.paid' &&
-          (determinedStatus === 'active' || determinedStatus === 'trialing')
-        ) {
-          if (
-            !previousUserAccess ||
-            cycleStartedAt >= new Date(previousUserAccess.expiresAt)
-          ) {
-            shouldResetUsage = true;
-          } else {
-            this.logger.log(
-              `Usage Reset SKIPPED (invoice.paid): Not a new cycle. PrevExp: ${previousUserAccess.expiresAt.toISOString()}, NewCycleStart: ${cycleStartedAt.toISOString()}`,
-            );
-          }
-        } else if (
-          eventType === 'customer.subscription.updated' &&
-          (determinedStatus === 'active' || determinedStatus === 'trialing')
-        ) {
-          if (
-            !previousUserAccess ||
-            previousUserAccess.planId !== plan.id ||
-            cycleStartedAt >= new Date(previousUserAccess.expiresAt)
-          ) {
-            shouldResetUsage = true;
-          } else {
-            this.logger.log(
-              `Usage Reset SKIPPED (sub.updated): Not a new cycle or plan change.`,
-            );
-          }
-        }
-
-        if (shouldResetUsage) {
-          await this.stripeDbService.upsertUsageRecordsForCycle(
-            user.id,
-            plan,
-            cycleStartedAt,
-            expiresAt,
-          );
-        }
 
         return {
           user,
           plan,
-          subscription: stripeSubscription,
+          subscription: stripeSubscription || null,
           accessRecordUpdated: true,
         };
       } else if (
         ['canceled', 'unpaid', 'incomplete_expired', 'past_due'].includes(
-          determinedStatus,
+          status,
         )
       ) {
-        this.logger.log(
-          `Subscription ${subIdLabel} status is ${determinedStatus}. Removing user access for ${user.id}.`,
-        );
-        await this.stripeDbService.deleteUserAccessAndAllUsage(user.id);
+        const subForDowngrade = stripeSubscription || {
+          id: subscriptionId || 'simulated_ended_sub',
+          customer: customerId || user.stripe_customer_id!,
+        };
 
-        return { user, accessRecordUpdated: true };
+        const downgradeResult = await this._downgradeUserToFreeTier(
+          user,
+          subForDowngrade,
+        );
+        return {
+          user: downgradeResult.user,
+          subscription: stripeSubscription || null,
+          accessRecordUpdated: downgradeResult.accessRecordUpdated,
+        };
       } else {
         this.logger.warn(
-          `Unhandled subscription status '${determinedStatus}' for Sub ${subIdLabel}. No action taken on UserAccess.`,
+          `Unhandled subscription status '${status}' for Sub ${subIdLabel}. No action taken on UserAccess.`,
         );
       }
     } catch (error) {
@@ -301,19 +357,15 @@ export class StripeWebhookProcessorService {
   }
 
   async processSubscriptionRenewal(invoice: Stripe.Invoice): Promise<void> {
-    const inv = invoice as any; // Use inv for properties that error out
+    const subscriptionId = typeof invoice.id === 'string' ? invoice.id : null;
 
-    const subscriptionId =
-      typeof inv.subscription === 'string' ? inv.subscription : null;
-    const customerId = typeof inv.customer === 'string' ? inv.customer : null;
-    const invoiceId = inv.id;
+    const customerId =
+      typeof invoice.customer === 'string'
+        ? invoice.customer
+        : invoice.customer?.id || null;
+    const invoiceId = invoice.id;
 
-    let metadataUserId: string | undefined = undefined;
-    if (inv.subscription_details?.metadata?.userId) {
-      metadataUserId = inv.subscription_details.metadata.userId as string;
-    } else if (inv.metadata?.userId) {
-      metadataUserId = inv.metadata.userId as string;
-    }
+    const metadataUserId = invoice.metadata?.userId as string | undefined;
 
     this.logger.log(
       `Handling renewal & usage reset for invoice.paid: ${invoiceId}, Sub: ${subscriptionId}, Cust: ${customerId}, MetaUserId: ${metadataUserId}`,
@@ -338,8 +390,8 @@ export class StripeWebhookProcessorService {
         null,
         metadataUserId,
         false,
-        undefined, // Corrected from null
-        undefined, // Corrected from null
+        undefined,
+        undefined,
         'invoice.paid',
       );
 
@@ -355,7 +407,7 @@ export class StripeWebhookProcessorService {
     } catch (error) {
       this.logger.error(
         `Error handling subscription renewal for Sub ${subscriptionId} / Invoice ${invoiceId}:`,
-        error,
+        error instanceof Error ? error.stack : error,
       );
     }
   }
@@ -365,7 +417,7 @@ export class StripeWebhookProcessorService {
   ): Promise<void> {
     const subscriptionId = subscription.id;
     this.logger.log(
-      `Processing cancellation for Stripe Subscription ID: ${subscriptionId}`,
+      `Processing cancellation (e.g., customer.subscription.deleted) for Stripe Subscription ID: ${subscriptionId}, Status: ${subscription.status}`,
     );
 
     if (!subscriptionId || !subscriptionId.startsWith('sub_')) {
@@ -382,6 +434,7 @@ export class StripeWebhookProcessorService {
     const metadataUserId = subscription.metadata?.userId as string | undefined;
 
     let user: User | null = null;
+
     if (customerId || metadataUserId) {
       user = await this.stripeDbService.findUserByStripeData(
         customerId,
@@ -391,24 +444,37 @@ export class StripeWebhookProcessorService {
 
     if (user) {
       this.logger.log(
-        `User ${user.id} found for subscription ${subscriptionId}. Proceeding to remove access and usage.`,
+        `User ${user.id} found for subscription ${subscriptionId}. Proceeding to downgrade.`,
       );
-      await this.stripeDbService.deleteUserAccessAndAllUsage(user.id);
+      await this._downgradeUserToFreeTier(user, subscription);
     } else {
       this.logger.warn(
-        `User not found by customerId/metadata for subscription ${subscriptionId}. Attempting to delete UserAccess by subscriptionId directly.`,
+        `User not found by customerId ('${customerId}') or metadataUserId ('${metadataUserId}') for subscription ${subscriptionId} during cancellation. Checking for UserAccess record by subscription ID.`,
       );
-      const deletedRecord =
-        await this.stripeDbService.deleteUserAccessBySubscriptionId(
+
+      const accessRecord =
+        await this.stripeDbService.findUserAccessBySubscriptionId(
           subscriptionId,
         );
-      if (deletedRecord && deletedRecord.userId) {
-        await this.stripeDbService.deleteUserAccessAndAllUsage(
-          deletedRecord.userId,
-        );
-      } else if (!deletedRecord) {
+      if (accessRecord?.userId) {
         this.logger.warn(
-          `No UserAccess record found for subscription ${subscriptionId} to delete directly either.`,
+          `Found UserAccess for sub ${subscriptionId}, linked to user ${accessRecord.userId}. Attempting to find and downgrade this user.`,
+        );
+
+        const orphanedUser = await this.stripeDbService.findUserByStripeData(
+          null,
+          accessRecord.userId,
+        );
+        if (orphanedUser) {
+          await this._downgradeUserToFreeTier(orphanedUser, subscription);
+        } else {
+          this.logger.error(
+            `Could not find user ${accessRecord.userId} (from orphaned UserAccess) for sub ${subscriptionId}. Cannot downgrade. Potential data inconsistency.`,
+          );
+        }
+      } else {
+        this.logger.warn(
+          `No UserAccess record found for subscription ${subscriptionId}. No specific user to downgrade. The subscription might have been for a user not fully provisioned, or access already removed/downgraded.`,
         );
       }
     }
