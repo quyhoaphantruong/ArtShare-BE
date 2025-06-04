@@ -79,7 +79,7 @@ export class AutoProjectWriteService {
     });
     if (!platform) {
       throw new InternalServerErrorException(
-        `Configiration for platform ${platformName} not found for user ${userId}.`,
+        `Configuration for platform ${platformName} not found for user ${userId}.`,
       );
     }
   }
