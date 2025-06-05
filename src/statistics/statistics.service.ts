@@ -57,20 +57,46 @@ export class StatisticsService {
     return [{ key: 'posts_by_ai', count: Number(rows[0]?.count ?? 0) }];
   }
 
+  async getTotalAiImages(): Promise<StatCount[]> {
+    const rows: Array<{ count: bigint }> = await this.prisma.$queryRaw`
+    SELECT SUM(number_of_images_generated) as count
+    FROM art_generation
+    `;
+    return [{ key: 'ai_images', count: Number(rows[0]?.count ?? 0) }];
+  }
+
+  async getTop5PostsByAI(): Promise<any> {
+    const rows: Array<{ count: bigint }> = await this.prisma.$queryRaw`
+    SELECT *
+    FROM post
+    WHERE ai_created = true
+    ORDER BY like_count DESC
+    `;
+    return rows;
+  }
+
   async getAll(): Promise<{
     aspectRatios: StatCount[];
-    lightings: StatCount[];
     styles: StatCount[];
     posts_by_ai: StatCount[];
+    total_ai_images: StatCount[];
+    top_posts_by_ai: any;
   }> {
-    const [aspectRatios, lightings, styles, posts_by_ai] = await Promise.all([
-      this.getAspectRatioStats(),
-      this.getLightingStats(),
-      this.getStyles(),
-      this.getPostsByAI(),
-    ]);
-
-    return { aspectRatios, lightings, styles, posts_by_ai };
+    const [aspectRatios, styles, posts_by_ai, total_ai_images, top_posts_by_ai] =
+      await Promise.all([
+        this.getAspectRatioStats(),
+        this.getStyles(),
+        this.getPostsByAI(),
+        this.getTotalAiImages(),
+        this.getTop5PostsByAI(),
+      ]);
+    return {
+      aspectRatios,
+      styles,
+      posts_by_ai,
+      total_ai_images,
+      top_posts_by_ai,
+    };
   }
 
   async getRawTrendingPrompts(): Promise<string[]> {
