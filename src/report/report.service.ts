@@ -154,14 +154,14 @@ export class ReportService {
     if (!existingReport) {
       throw new NotFoundException(`Report ${reportId} not found.`);
     }
-    if (
-      existingReport.status === ReportStatus.RESOLVED ||
-      existingReport.status === ReportStatus.DISMISSED
-    ) {
-      throw new ConflictException(
-        `Report ${reportId} has already been ${existingReport.status.toLowerCase()}.`,
-      );
-    }
+    // if (
+    //   existingReport.status === ReportStatus.RESOLVED ||
+    //   existingReport.status === ReportStatus.DISMISSED
+    // ) {
+    //   throw new ConflictException(
+    //     `Report ${reportId} has already been ${existingReport.status.toLowerCase()}.`,
+    //   );
+    // }
 
     const updatedReport = await this.prisma.report.update({
       where: { id: reportId },
@@ -181,6 +181,7 @@ export class ReportService {
       reporterId:  updatedReport.moderator_id,
       reportId: updatedReport.id,
       reason: updatedReport.reason,
+      resolvedAt: updatedReport.resolved_at,
     });
     return updatedReport;
   }

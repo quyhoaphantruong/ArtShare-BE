@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -11,10 +11,9 @@ export class NotificationsController {
 
   @Get()
   async getNotifications(
-    @Query('unread') unread: boolean,
     @CurrentUser() user: CurrentUserType,
   ) {
-    return this.notificationsService.getUserNotifications(user.id, unread);
+    return this.notificationsService.getUserNotifications(user.id);
   }
 
   @Post('read')

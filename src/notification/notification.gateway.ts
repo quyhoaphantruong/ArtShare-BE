@@ -5,8 +5,9 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UseGuards } from '@nestjs/common';
+import { forwardRef, Inject, Logger, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { NotificationService } from './notification.service';
 
 
 @UseGuards(JwtAuthGuard)
@@ -18,10 +19,23 @@ export class NotificationsGateway
   server: Server;
 
   private connectedClients = new Map<string, Socket>();
+  private readonly logger = new Logger(NotificationsGateway.name);
 
-  handleConnection(client: Socket) {
+  constructor(
+    @Inject(forwardRef(() => NotificationService)) private readonly notificationService: NotificationService,
+  ) {}
+
+  async handleConnection(client: Socket) {
     const userId = client.handshake.query.userId as string;
+    this.logger.log(`Client connected ${userId}`);
     this.connectedClients.set(userId, client);
+
+    const undelivered = await this.notificationService.getUndeliveredNotifications(userId);
+
+    for (const notif of undelivered) {
+      client.emit('new-notification', notif);
+      await this.notificationService.markAsDelivered(notif.id);
+    }
   }
 
   handleDisconnect(client: Socket) {

@@ -1,12 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
-import { NotificationsGateway } from './notification.gateway';
 import { OnEvent } from '@nestjs/event-emitter';
+import type { NotificationsGateway } from './notification.gateway';
 
 @Injectable()
 export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      forwardRef(() => require('./notification.gateway').NotificationsGateway),
+    )
     private notificationsGateway: NotificationsGateway,
   ) {}
 
@@ -20,8 +24,6 @@ export class NotificationService {
       'new-notification',
       notification,
     );
-
-    return notification;
   }
 
   async create(userId: string, type: string, payload: object) {
@@ -34,11 +36,11 @@ export class NotificationService {
     });
   }
 
-  async getUserNotifications(userId: string, unreadOnly = true) {
+  async getUserNotifications(userId: string) {
     return this.prisma.notification.findMany({
       where: {
         userId,
-        ...(unreadOnly && { isRead: false }),
+         isRead: false,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -52,17 +54,36 @@ export class NotificationService {
   }
 
   async markAllAsRead(userId: string) {
+    this.logger.log(`markAllAsRead for user ${userId}`);
+
     await this.prisma.notification.updateMany({
       where: { userId: userId, isRead: false },
       data: { isRead: true },
     });
   }
 
+  async getUndeliveredNotifications(userId: string) {
+    this.logger.log(`getUndeliveredNotifications for user ${userId}`);
+    return this.prisma.notification.findMany({
+      where: { userId, isRead: false },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async markAsDelivered(notificationId: string) {
+    this.logger.log(`markAsDelivered for notification ${notificationId}`);
+    return this.prisma.notification.update({
+      where: { id: notificationId },
+      data: { isRead: true },
+    });
+  }
+
   @OnEvent('report.resolved')
-  handleReportResolved(payload: {
+  async handleReportResolved(payload: {
     reporterId: string;
     reportId: string;
     reason: string;
+    resolvedAt: string;
   }) {
     this.logger.log('Caught report.resolved event, creating notification...');
 
@@ -70,12 +91,23 @@ export class NotificationService {
     const notificationPayload = {
       message: `Your report regarding "${payload.reason}" has been reviewed and resolved.`,
       reportId: payload.reportId,
+      resolvedAt: payload.resolvedAt,
     };
 
-    this.createAndPush(
-      payload.reporterId,
-      notificationType,
-      notificationPayload,
-    );
+    try {
+      await this.createAndPush(
+        payload.reporterId,
+        notificationType,
+        notificationPayload,
+      );
+      this.logger.log(
+        `Notification successfully created & pushed to user ${payload.reporterId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to create/push notification for user ${payload.reporterId}:`,
+        (error as Error).stack,
+      );
+    }
   }
 }
