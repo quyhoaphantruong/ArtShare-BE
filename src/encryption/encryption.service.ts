@@ -24,7 +24,7 @@ export class EncryptionService {
     this.iv = Buffer.from(secretIv, 'hex');
 
     if (this.key.length !== 32) {
-      console.log(this.key);
+      this.logger.debug(this.key);
       throw new Error(
         'Encryption key must be 32 bytes (e.g., 64 hex characters).',
       );
