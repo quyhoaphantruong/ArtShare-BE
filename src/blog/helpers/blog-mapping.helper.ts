@@ -31,6 +31,7 @@ export const blogListItemSelect = {
       followers_count: true,
     }
   },
+  updated_at: true,
 };
 
 export type BlogForListItemPayload = Prisma.BlogGetPayload<{
@@ -111,11 +112,13 @@ export const mapBlogToListItemDto = (
     );
     return null;
   }
+
   return {
     id: blog.id,
     title: blog.title,
     content: blog.content,
     created_at: blog.created_at,
+    updated_at: blog.updated_at, 
     like_count: blog.like_count,
     comment_count: blog.comment_count,
     share_count: blog.share_count,

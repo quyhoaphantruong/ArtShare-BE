@@ -14,6 +14,9 @@ export class BlogListItemResponseDto {
   @ApiProperty({ example: '2025-05-31T10:00:00.000Z' })
   created_at: Date;
 
+  @ApiProperty({ example: '2025-05-31T10:00:00.000Z' })
+  updated_at: Date | null; 
+
   @ApiProperty({ example: 15 })
   like_count: number;
 
