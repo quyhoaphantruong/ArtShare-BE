@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { subscriptionInfoResponseMapper } from './mapper/subscription.mapper';
 import { SubscriptionInfoResponseDto } from './dto/response/subscription-info.dto';
@@ -7,8 +11,8 @@ import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 
 @Injectable()
 export class SubscriptionService {
-  constructor(private readonly prismaService: PrismaService) { }
-  
+  constructor(private readonly prismaService: PrismaService) {}
+
   private logger = new Logger(SubscriptionService.name);
 
   async getSubscriptionInfo(
@@ -35,11 +39,16 @@ export class SubscriptionService {
       },
     });
 
-    this.logger.debug('@@@@@@@ User Subscription Info:', user);
-
-    if (!user || !user.userAccess || user.UserUsage.length === 0 || !user.userAccess.plan) {
+    if (
+      !user ||
+      !user.userAccess ||
+      user.UserUsage.length === 0 ||
+      !user.userAccess.plan
+    ) {
       this.logger.warn(`User ${userId} does not have an active subscription.`);
-      throw new InternalServerErrorException('user or user access or plan or usage not found, please check the debug logs');
+      throw new InternalServerErrorException(
+        'user or user access or plan or usage not found, please check the debug logs',
+      );
     }
 
     return subscriptionInfoResponseMapper(

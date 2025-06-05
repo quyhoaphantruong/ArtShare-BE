@@ -5,7 +5,6 @@ import { ArtGenerationService } from 'src/art-generation/art-generation.service'
 import { AspectRatio } from 'src/art-generation/enum/aspect-ratio';
 import { ModelKey } from 'src/art-generation/image-generator.interface';
 import { AutoPostMeta } from 'src/auto-project/dto/request/auto-post-meta.dto';
-import { PrismaService } from 'src/prisma.service';
 import { z } from 'zod';
 
 export interface AutoPostSeedData {
@@ -28,10 +27,7 @@ export class AutoPostGenerateService {
   private readonly openai: OpenAI;
   aiCreditCost = 2;
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly artGenerationService: ArtGenerationService,
-  ) {
+  constructor(private readonly artGenerationService: ArtGenerationService) {
     this.openai = new OpenAI({
       apiKey: process.env.OPEN_AI_SECRET_KEY,
     });

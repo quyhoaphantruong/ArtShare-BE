@@ -395,6 +395,59 @@ model TrendingPrompt {
   @@map("trending_prompts")
 }
 
+model Platform {
+  id               Int           @id @default(autoincrement())
+  name             SharePlatform
+  config           Json
+  user_id          String
+  external_page_id String
+  created_at       DateTime      @default(now())
+  updated_at       DateTime?     @updatedAt
+
+  autoProjects AutoProject[]
+
+  @@unique([user_id, name, external_page_id])
+  @@map("platform")
+}
+
+model AutoProject {
+  id          Int               @id @default(autoincrement())
+  title       String
+  description String
+  status      AutoProjectStatus @default(ACTIVE)
+  created_at  DateTime          @default(now())
+  user_id     String
+  updated_at  DateTime?         @updatedAt
+  platform_id Int
+
+  user      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  autoPosts AutoPost[]
+  platform  Platform   @relation(fields: [platform_id], references: [id], onDelete: Cascade)
+
+  @@map("auto_project")
+}
+
+model AutoPost {
+  id              Int            @id @default(autoincrement())
+  auto_project_id Int
+  content         String
+  image_urls      String[]       @default([])
+  scheduled_at    DateTime
+  status          AutoPostStatus @default(PENDING)
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+
+  posted_at        DateTime?
+  error_message    String?
+  n8n_triggered_at DateTime?
+  n8n_execution_id String?
+  platform_post_id String?
+
+  autoProject AutoProject @relation(fields: [auto_project_id], references: [id], onDelete: Cascade)
+
+  @@map("auto_post")
+}
+
 enum PaidAccessLevel {
   FREE       @map("free")
   ARTIST_PRO @map("artist_pro")
@@ -460,52 +513,6 @@ enum AspectRatio {
   PORTRAIT
 }
 
-model Platform {
-  id     Int           @id @default(autoincrement())
-  name   SharePlatform @unique
-  config Json
-
-  user_id    String
-  created_at DateTime  @default(now())
-  updated_at DateTime? @updatedAt
-
-  autoProjects AutoProject[]
-
-  @@map("platform")
-}
-
-model AutoProject {
-  id            Int               @id @default(autoincrement())
-  title         String
-  description   String
-  status        AutoProjectStatus @default(ACTIVE)
-  platform_name SharePlatform
-  created_at    DateTime          @default(now())
-  user_id       String
-  updated_at    DateTime?         @updatedAt
-
-  user      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  autoPosts AutoPost[]
-  platform  Platform   @relation(fields: [platform_name], references: [name], onDelete: Cascade)
-
-  @@map("auto_project")
-}
-
-model AutoPost {
-  id              Int            @id @default(autoincrement())
-  auto_project_id Int
-  content         String
-  image_urls      String[]
-  scheduled_at    DateTime
-  status          AutoPostStatus @default(PENDING)
-  created_at      DateTime       @default(now())
-  updated_at      DateTime?      @updatedAt
-
-  autoProject AutoProject @relation(fields: [auto_project_id], references: [id], onDelete: Cascade)
-
-  @@map("auto_post")
-}
-
 enum AutoProjectStatus {
   ACTIVE
   COMPLETED
@@ -518,4 +525,5 @@ enum AutoPostStatus {
   POSTED
   FAILED
   CANCELLED
+  PROCESSING
 }
