@@ -25,7 +25,7 @@ import {
   UpdateAutoPostDto,
   UpdateAutoPostStatusDto,
 } from './dto/auto-post.dto.ts';
-import { PlatformPageConfig } from 'src/auth/facebook/facebook.type.js';
+import { PlatformPageConfig } from 'src/platform/dtos/platform-config.interface.js';
 
 export interface PlatformConfig {
   encryptedFacebookAccessToken?: string;

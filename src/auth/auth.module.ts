@@ -11,6 +11,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { FacebookAuthService } from './facebook/facebook.service';
 import { HttpModule } from '@nestjs/axios';
 import { EncryptionService } from 'src/encryption/encryption.service';
+import { PlatformModule } from 'src/platform/platform.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { EncryptionService } from 'src/encryption/encryption.service';
       isGlobal: true,
     }),
     HttpModule,
+    PlatformModule,
   ],
   providers: [
     AuthService,
