@@ -12,7 +12,9 @@ export interface StatCount {
 export class StatisticsService {
   private readonly logger = new Logger(StatisticsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
   private async rawStats(
     column: string,
@@ -81,21 +83,33 @@ export class StatisticsService {
     posts_by_ai: StatCount[];
     total_ai_images: StatCount[];
     top_posts_by_ai: any;
+    trending_prompts: any[];
   }> {
-    const [aspectRatios, styles, posts_by_ai, total_ai_images, top_posts_by_ai] =
-      await Promise.all([
-        this.getAspectRatioStats(),
-        this.getStyles(),
-        this.getPostsByAI(),
-        this.getTotalAiImages(),
-        this.getTop5PostsByAI(),
-      ]);
+    const [
+      aspectRatios,
+      styles,
+      posts_by_ai,
+      total_ai_images,
+      top_posts_by_ai,
+    ] = await Promise.all([
+      this.getAspectRatioStats(),
+      this.getStyles(),
+      this.getPostsByAI(),
+      this.getTotalAiImages(),
+      this.getTop5PostsByAI(),
+    ]);
+
+    const storedPrompts = await this.getStoredTrendingPrompts(
+      'trending_prompts_v1',
+    );
+
     return {
       aspectRatios,
       styles,
       posts_by_ai,
       total_ai_images,
       top_posts_by_ai,
+      trending_prompts: storedPrompts ?? [],
     };
   }
 
