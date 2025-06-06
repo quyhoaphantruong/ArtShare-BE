@@ -6,7 +6,7 @@ import { CreatePostRequestDto } from "../dto/request/create-post.dto";
 export class PostsManagementValidator {
   constructor(
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   async validateCreateRequest(
     request: CreatePostRequestDto,

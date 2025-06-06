@@ -26,7 +26,7 @@ export class AuthGuard implements CanActivate {
     } catch (error) {
       console.error(error);
       throw new UnauthorizedException(
-        `'You are not authroized to access this resource`,
+        `You are not authroized to access this resource`,
       );
     }
   }

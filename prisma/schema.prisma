@@ -45,52 +45,56 @@ model User {
   stripe_customer_id  String?   @unique
   is_onboard          Boolean   @default(false)
 
-  collections      Collection[]
-  blogs            Blog[]
-  bookmarks        Bookmark[]
-  comments         Comment[]
-  followers        Follow[]      @relation("followers_of_user")
-  followings       Follow[]      @relation("users_following")
-  likes            Like[]
-  posts            Post[]
-  ratings          Rating[]
-  Report           Report[]      @relation("UserReports")
-  shares           Share[]
-  userAccess       UserAccess?
-  roles            UserRole[]
-  UserUsage        UserUsage[]
-  CommentLike      CommentLike[]
-  reportsResolved  Report[] @relation("ModeratorReports") 
+  collections     Collection[]
+  blogs           Blog[]
+  bookmarks       Bookmark[]
+  comments        Comment[]
+  followers       Follow[]      @relation("followers_of_user")
+  followings      Follow[]      @relation("users_following")
+  likes           Like[]
+  posts           Post[]
+  ratings         Rating[]
+  Report          Report[]      @relation("UserReports")
+  shares          Share[]
+  userAccess      UserAccess?
+  roles           UserRole[]
+  UserUsage       UserUsage[]
+  CommentLike     CommentLike[]
+  reportsResolved Report[]      @relation("ModeratorReports")
+  AutoProject     AutoProject[]
+
   notifications    Notification[]
   @@map("user")
 }
 
 model Post {
-  id            Int       @id @default(autoincrement())
-  user_id       String
-  title         String
-  description   String?
-  created_at    DateTime  @default(now())
-  is_published  Boolean   @default(false)
-  is_private    Boolean   @default(false)
-  group_id      Int?
-  share_count   Int       @default(0)
-  comment_count Int       @default(0)
-  view_count    Int       @default(0)
-  like_count    Int       @default(0)
-  thumbnail_url String
-  updated_at    DateTime? @updatedAt
-  is_mature     Boolean   @default(false)
-  ai_created    Boolean   @default(false)
+  id                Int       @id @default(autoincrement())
+  user_id           String
+  title             String
+  description       String?
+  created_at        DateTime  @default(now())
+  is_published      Boolean   @default(false)
+  is_private        Boolean   @default(false)
+  group_id          Int?
+  share_count       Int       @default(0)
+  comment_count     Int       @default(0)
+  view_count        Int       @default(0)
+  like_count        Int       @default(0)
+  thumbnail_url     String
+  updated_at        DateTime? @updatedAt
+  is_mature         Boolean   @default(false)
+  ai_created        Boolean   @default(false)
+  art_generation_id Int?
 
   likes               Like[]
   medias              Media[]
-  user                User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user                User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
   shares              Share[]
-  categories          Category[]  @relation("CategoryToPost")
+  categories          Category[]     @relation("CategoryToPost")
   thumbnail_crop_meta Json?
-  Collection          Collection? @relation(fields: [collectionId], references: [id])
+  Collection          Collection?    @relation(fields: [collectionId], references: [id])
   collectionId        Int?
+  art_generation      ArtGeneration? @relation(fields: [art_generation_id], references: [id])
 
   @@index([user_id])
   @@map("post")
@@ -309,15 +313,14 @@ model UserAccess {
   userId               String          @id
   planId               PaidAccessLevel
   expiresAt            DateTime        @map("expires_at")
-  stripeSubscriptionId String          @unique @map("stripe_subscription_id")
-  stripePriceId        String          @map("stripe_price_id")
-  stripeCustomerId     String          @map("stripe_customer_id")
+  stripeSubscriptionId String?         @unique @map("stripe_subscription_id")
+  stripePriceId        String?         @map("stripe_price_id")
+  stripeCustomerId     String?         @map("stripe_customer_id")
   createdAt            DateTime        @default(now()) @map("created_at")
   updatedAt            DateTime        @updatedAt @map("updated_at")
   cancelAtPeriodEnd    Boolean         @default(false) @map("cancel_at_period_end")
-
-  plan Plan @relation(fields: [planId], references: [id])
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                 Plan            @relation(fields: [planId], references: [id])
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([stripeCustomerId])
   @@map("user_access")
@@ -378,6 +381,8 @@ model ArtGeneration {
   created_at                 DateTime    @default(now())
   updated_at                 DateTime?   @updatedAt
 
+  Post Post[]
+
   @@map("art_generation")
 }
 
@@ -389,6 +394,59 @@ model TrendingPrompt {
   updated_at DateTime @updatedAt
 
   @@map("trending_prompts")
+}
+
+model Platform {
+  id               Int           @id @default(autoincrement())
+  name             SharePlatform
+  config           Json
+  user_id          String
+  external_page_id String
+  created_at       DateTime      @default(now())
+  updated_at       DateTime?     @updatedAt
+
+  autoProjects AutoProject[]
+
+  @@unique([user_id, name, external_page_id])
+  @@map("platform")
+}
+
+model AutoProject {
+  id          Int               @id @default(autoincrement())
+  title       String
+  description String
+  status      AutoProjectStatus @default(ACTIVE)
+  created_at  DateTime          @default(now())
+  user_id     String
+  updated_at  DateTime?         @updatedAt
+  platform_id Int
+
+  user      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  autoPosts AutoPost[]
+  platform  Platform   @relation(fields: [platform_id], references: [id], onDelete: Cascade)
+
+  @@map("auto_project")
+}
+
+model AutoPost {
+  id              Int            @id @default(autoincrement())
+  auto_project_id Int
+  content         String
+  image_urls      String[]       @default([])
+  scheduled_at    DateTime
+  status          AutoPostStatus @default(PENDING)
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+
+  posted_at        DateTime?
+  error_message    String?
+  n8n_triggered_at DateTime?
+  n8n_execution_id String?
+  platform_post_id String?
+
+  autoProject AutoProject @relation(fields: [auto_project_id], references: [id], onDelete: Cascade)
+
+  @@map("auto_post")
 }
 
 model Notification {
@@ -467,4 +525,19 @@ enum AspectRatio {
   SQUARE
   LANDSCAPE
   PORTRAIT
+}
+
+enum AutoProjectStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum AutoPostStatus {
+  PENDING
+  POSTED
+  FAILED
+  CANCELLED
+  PROCESSING
 }

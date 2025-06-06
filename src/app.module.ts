@@ -30,6 +30,8 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationModule } from './notification/notification.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
+import { AutoProjectModule } from './auto-project/auto-project.module';
+import { AutoPostModule } from './auto-post/auto-post.module';
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     FirebaseModule,
     AnalyticsModule,
     NotificationModule,
+    AutoProjectModule,
+    AutoPostModule,
   ],
   controllers: [AppController],
   providers: [AppService],

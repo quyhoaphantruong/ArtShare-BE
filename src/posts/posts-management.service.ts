@@ -1,11 +1,12 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
-import { StorageService } from 'src/storage/storage.service';import { MediaType, Post } from '@prisma/client';
+import { StorageService } from 'src/storage/storage.service'; import { MediaType, Post } from '@prisma/client';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
@@ -26,7 +27,7 @@ export class PostsManagementService {
     private readonly qdrantService: QdrantService,
     private readonly postEmbeddingService: PostsEmbeddingService,
     private readonly postsManagementValidator: PostsManagementValidator,
-  ) {}
+  ) { }
 
   @TryCatch()
   async createPost(
@@ -34,12 +35,16 @@ export class PostsManagementService {
     images: Express.Multer.File[],
     userId: string,
   ): Promise<PostDetailsResponseDto> {
-    const { cate_ids = [], video_url, ...rest } = request;
+    const { cate_ids = [], video_url, prompt_id, ...rest } = request;
 
     const { parsedCropMeta } = await this.postsManagementValidator.validateCreateRequest(
       request,
       images,
     );
+
+    if (prompt_id) {
+      await this.validateAiArtExistence(prompt_id);
+    }
 
     const mediasToCreate = await this.buildMediasToCreate(
       images,
@@ -50,6 +55,7 @@ export class PostsManagementService {
     const createdPost = await this.prisma.post.create({
       data: {
         user_id: userId,
+        art_generation_id: prompt_id,
         ...rest,
         medias: { create: mediasToCreate },
         categories: { connect: cate_ids.map((id) => ({ id })) },
@@ -67,8 +73,6 @@ export class PostsManagementService {
 
     return plainToInstance(PostDetailsResponseDto, createdPost);
   }
-
-  
 
   private async buildMediasToCreate(
     images: Express.Multer.File[],
@@ -100,6 +104,15 @@ export class PostsManagementService {
     }
 
     return mediasToCreate;
+  }
+
+  private async validateAiArtExistence(prompt_id: number): Promise<void> {
+    const artGeneration = await this.prisma.artGeneration.findUnique({
+      where: { id: prompt_id },
+    });
+    if (!artGeneration) {
+      throw new BadRequestException('AI art generation not found');
+    }
   }
 
   @TryCatch()
