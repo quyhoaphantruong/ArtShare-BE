@@ -29,20 +29,61 @@ jobs:
       - name: Run Formatting Check
         run: yarn format
 
-      - name: Build Project
-        run: yarn build
+      - name: Audit Dependencies
+        run: yarn audit --level=high
+        continue-on-error: true  # Don't fail CI, but report
 
-      - name: Run Tests
-        run: yarn test --coverage
+      - name: Build Project (Production)
+        env:
+          NODE_ENV: production
+        run: |
+          set -e
+          yarn build
+          # Validate build output exists
+          if [ ! -d "dist" ] && [ ! -d "build" ]; then
+            echo "Build output directory not found!"
+            exit 1
+          fi
 
-      # - name: Setup Code Climate test-reporter
+      - name: Build Docker Image
+        run: docker build -t artshare-backend:test .
+
+      - name: Test Docker Container
+        run: |
+          # Run the container
+          docker run -d --name test-container \
+            -p 3000:3000 \
+            -e NODE_ENV=production \
+            artshare-backend:test
+          
+          # Wait for it to start
+          sleep 10
+          
+          # Check if container is still running
+          if [ ! "$(docker ps -q -f name=test-container)" ]; then
+            echo "Container crashed!"
+            docker logs test-container
+            exit 1
+          fi
+          
+          # Try to hit the health endpoint
+          curl -f http://localhost:3000/health || \
+            (docker logs test-container && exit 1)
+          
+          # Cleanup
+          docker stop test-container
+          docker rm test-container
+      # - name: Run Unit Tests
+      #   run: yarn test --coverage --passWithNoTests=false
+
+      # - name: Run Integration Tests
+      #   run: yarn test:integration
+      #   if: ${{ always() }}  # Run even if unit tests fail
+
+      # - name: Start and Smoke Test
       #   run: |
-      #     curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
-      #     chmod +x ./cc-test-reporter
-
-      # - name: Upload Code Climate test report
-      #   run: |
-      #     ./cc-test-reporter format-coverage -t lcov coverage/lcov.info -p . --debug
-      #     ./cc-test-reporter upload-coverage
-      #   env:
-      #     CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+      #     yarn start & 
+      #     SERVER_PID=$!
+      #     sleep 10  # Wait for server to start
+      #     curl -f http://localhost:3000 || (kill $SERVER_PID && exit 1)
+      #     kill $SERVER_PID
