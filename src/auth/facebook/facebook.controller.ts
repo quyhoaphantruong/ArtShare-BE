@@ -18,17 +18,17 @@ import { JwtAuthGuard } from '../jwt-auth.guard';
 @Controller('facebook-integration')
 export class FacebookController {
   private readonly logger = new Logger(FacebookController.name);
-  private readonly frontendSuccessRedirectUrl: string;
-  private readonly frontendErrorRedirectUrl: string;
+  private readonly defaultFrontendSuccessRedirectUrl: string;
+  private readonly defaultFrontendErrorRedirectUrl: string;
 
   constructor(
     private readonly facebookAuthService: FacebookAuthService,
     private readonly configService: ConfigService,
   ) {
-    this.frontendSuccessRedirectUrl =
+    this.defaultFrontendSuccessRedirectUrl =
       this.configService.get<string>('FRONTEND_URL_FB_SETUP_SUCCESS') ||
       'http://localhost:5173';
-    this.frontendErrorRedirectUrl =
+    this.defaultFrontendErrorRedirectUrl =
       this.configService.get<string>('FRONTEND_URL_FB_SETUP_ERROR') ||
       'http://localhost:5173';
   }
@@ -39,7 +39,10 @@ export class FacebookController {
    */
   @UseGuards(JwtAuthGuard)
   @Get('initiate-connection-url')
-  async getFacebookInitiationUrl(@CurrentUser() user: CurrentUserType) {
+  async getFacebookInitiationUrl(
+    @CurrentUser() user: CurrentUserType,
+    @Query('redirectUrl') redirectUrl?: string,
+  ) {
     const userId = user?.id;
     if (!userId) {
       this.logger.warn(
@@ -51,8 +54,19 @@ export class FacebookController {
     }
 
     try {
-      const { loginUrl } =
-        await this.facebookAuthService.getFacebookLoginUrl(userId);
+      // -> 3. Use the provided URL, or fall back to the default from your .env file.
+      // This also protects against empty strings being passed.
+      const successRedirectUrl =
+        redirectUrl || this.defaultFrontendSuccessRedirectUrl;
+
+      this.logger.log(`Using success redirect URL: ${successRedirectUrl}`);
+
+      // -> 4. Pass the dynamic URL to your service layer.
+      const { loginUrl } = await this.facebookAuthService.getFacebookLoginUrl(
+        userId,
+        successRedirectUrl,
+      );
+
       return { facebookLoginUrl: loginUrl };
     } catch (error) {
       this.logger.error(
@@ -85,23 +99,26 @@ export class FacebookController {
         `Facebook callback error: ${fbError} - ${errorDescription}`,
       );
       return res.redirect(
-        `${this.frontendErrorRedirectUrl}&message=${encodeURIComponent(errorDescription || 'Facebook login failed.')}`,
+        `${this.defaultFrontendErrorRedirectUrl}&message=${encodeURIComponent(errorDescription || 'Facebook login failed.')}`,
       );
     }
 
     if (!code || !stateJwt) {
       this.logger.warn(`Facebook callback missing code or state JWT.`);
       return res.redirect(
-        `${this.frontendErrorRedirectUrl}&message=${encodeURIComponent('Invalid callback from Facebook.')}`,
+        `${this.defaultFrontendErrorRedirectUrl}&message=${encodeURIComponent('Invalid callback from Facebook.')}`,
       );
     }
 
     try {
-      await this.facebookAuthService.handleFacebookCallback(code, stateJwt);
+      const successRedirectUrl =
+        await this.facebookAuthService.handleFacebookCallback(code, stateJwt);
       this.logger.log(
         `Facebook OAuth callback processed. Attempting to redirect to success URL.`,
       );
-      res.redirect(`${this.frontendSuccessRedirectUrl}`);
+      res.redirect(
+        `${successRedirectUrl || this.defaultFrontendSuccessRedirectUrl}`,
+      );
     } catch (error) {
       this.logger.error(
         `Error processing Facebook callback:`,
@@ -112,7 +129,7 @@ export class FacebookController {
           ? 'OAuth state validation failed.'
           : (error as any).message || 'Failed to process Facebook login.';
       res.redirect(
-        `${this.frontendErrorRedirectUrl}&message=${encodeURIComponent(errorMessage)}`,
+        `${this.defaultFrontendErrorRedirectUrl}&message=${encodeURIComponent(errorMessage)}`,
       );
     }
   }

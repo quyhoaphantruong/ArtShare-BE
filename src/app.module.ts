@@ -32,6 +32,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 
 import { AutoProjectModule } from './auto-project/auto-project.module';
 import { AutoPostModule } from './auto-post/auto-post.module';
+import { PlatformModule } from './platform/platform.module';
 
 @Module({
   imports: [
@@ -68,8 +69,9 @@ import { AutoPostModule } from './auto-post/auto-post.module';
     NotificationModule,
     AutoProjectModule,
     AutoPostModule,
+    PlatformModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

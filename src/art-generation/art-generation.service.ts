@@ -1,5 +1,9 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { ImageGenerationResult, ImageGeneratorStrategy, ModelKey } from './image-generator.interface';
+import {
+  ImageGenerationResult,
+  ImageGeneratorStrategy,
+  ModelKey,
+} from './image-generator.interface';
 import { nanoid } from 'nanoid';
 import { StorageService } from 'src/storage/storage.service';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
@@ -24,7 +28,9 @@ export class ArtGenerationService {
     private readonly usageService: UsageService,
   ) {
     this.strategies = Object.fromEntries(
-      this.generators.map(g => [g.modelKey, g] as [ModelKey, ImageGeneratorStrategy])
+      this.generators.map(
+        (g) => [g.modelKey, g] as [ModelKey, ImageGeneratorStrategy],
+      ),
     ) as Record<ModelKey, ImageGeneratorStrategy>;
   }
 
@@ -34,10 +40,35 @@ export class ArtGenerationService {
   ): Promise<ImageGenerationResponseDto> {
     const { modelKey, prompt, n, aspectRatio } = dto;
 
+    if (n <= 0) {
+      // return empty response
+      return plainToInstance(ImageGenerationResponseDto, {
+        user_id: userId,
+        user_prompt: prompt,
+        final_prompt: this.getFinalPrompt(
+          prompt,
+          dto.style,
+          dto.lighting,
+          dto.camera,
+        ),
+        model_key: modelKey,
+        number_of_images_generated: 0,
+        image_urls: [],
+        aspect_ratio: aspectRatio,
+        style: dto.style,
+        lighting: dto.lighting,
+        camera: dto.camera,
+      });
+    }
+
     await this.usageService.handleCreditUsage(
       userId,
       FeatureKey.AI_CREDITS,
-      this.creditCostPerImage * n + (aspectRatio === AspectRatio.LANDSCAPE || aspectRatio === AspectRatio.PORTRAIT ? 1 : 0), // extra cost for landscape/portrait
+      this.creditCostPerImage * n +
+        (aspectRatio === AspectRatio.LANDSCAPE ||
+        aspectRatio === AspectRatio.PORTRAIT
+          ? 1
+          : 0), // extra cost for landscape/portrait
     );
 
     // get the model based on the modelKey
@@ -48,8 +79,17 @@ export class ArtGenerationService {
       );
     }
     // generate the image
-    const finalPrompt: string = this.getFinalPrompt(prompt, dto.style, dto.lighting, dto.camera);
-    const imageGenerationResult: ImageGenerationResult = await strat.generate({ prompt: finalPrompt, n, aspectRatio });
+    const finalPrompt: string = this.getFinalPrompt(
+      prompt,
+      dto.style,
+      dto.lighting,
+      dto.camera,
+    );
+    const imageGenerationResult: ImageGenerationResult = await strat.generate({
+      prompt: finalPrompt,
+      n,
+      aspectRatio,
+    });
 
     if (!imageGenerationResult || !imageGenerationResult.b64EncodedImages) {
       throw new BadRequestException('Image generation failed');
@@ -57,7 +97,7 @@ export class ArtGenerationService {
     const { b64EncodedImages } = imageGenerationResult;
 
     // save the images to storage
-    const files: Express.Multer.File[] = b64EncodedImages.map(b64 => {
+    const files: Express.Multer.File[] = b64EncodedImages.map((b64) => {
       const buffer = Buffer.from(b64, 'base64');
       return {
         fieldname: 'file',
@@ -68,9 +108,12 @@ export class ArtGenerationService {
         size: buffer.length,
       } as Express.Multer.File;
     });
-    const uploads: FileUploadResponse[] = await this.storageService.uploadFiles(files, 'generated-images');
+    const uploads: FileUploadResponse[] = await this.storageService.uploadFiles(
+      files,
+      'generated-images',
+    );
 
-    const urls = uploads.map(upload => upload.url);
+    const urls = uploads.map((upload) => upload.url);
 
     // save info to the database
     const generatedArt = await this.prismaService.artGeneration.create({
@@ -88,10 +131,15 @@ export class ArtGenerationService {
       },
     });
 
-    return plainToInstance(ImageGenerationResponseDto, generatedArt);;
+    return plainToInstance(ImageGenerationResponseDto, generatedArt);
   }
 
-  private getFinalPrompt(prompt: string, style?: string, lighting?: string, camera?: string): string {
+  private getFinalPrompt(
+    prompt: string,
+    style?: string,
+    lighting?: string,
+    camera?: string,
+  ): string {
     const parts: string[] = [prompt];
     if (style) {
       parts.push(`in the style of ${style}`);

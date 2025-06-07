@@ -13,6 +13,7 @@ import {
   HttpCode,
   HttpStatus,
   DefaultValuePipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { CreateBlogDto } from './dto/request/create-blog.dto';
 import { UpdateBlogDto } from './dto/request/update-blog.dto';
@@ -125,23 +126,37 @@ export class BlogController {
   }
 
   /**
-   * GET /blogs/{id} - Get blog details by ID
-   */
-  @Public()
-  @Get(':id')
-  @Public()
-  async findBlogById(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user?: CurrentUserType,
-  ): Promise<BlogDetailsResponseDto> {
-    const blog = await this.blogExploreService.findBlogById(id, user?.id);
-    if (!blog) {
-      throw new NotFoundException(
-        `Blog with ID ${id} not found or access denied.`,
-      );
+ * GET /blogs/{id} - Get blog details by ID
+ */
+@Public()
+@Get(':id')
+async findBlogById(
+  @Param('id', ParseIntPipe) id: number,
+  @CurrentUser() user?: CurrentUserType,
+): Promise<BlogDetailsResponseDto> {
+  const blog = await this.blogExploreService.findBlogById(id, user?.id);
+  
+  if (!blog) {
+    // Get more specific error information
+    const accessInfo = await this.blogExploreService.checkBlogAccess(id, user?.id);
+    
+    if (!accessInfo.exists) {
+      throw new NotFoundException(`Blog with ID ${id} not found.`);
     }
-    return blog;
+    
+    // Provide specific error messages based on access reason
+    switch (accessInfo.reason) {
+      case 'not_published':
+        throw new ForbiddenException('This blog is not published yet.');
+      case 'protected':
+        throw new ForbiddenException('This blog is protected and you do not have access to view it.');
+      default:
+        throw new NotFoundException(`Blog with ID ${id} not found or access denied.`);
+    }
   }
+  
+  return blog;
+}
 
   /**
    * POST /blogs - Create a new blog post (Standard REST, replaces /blogs/create)

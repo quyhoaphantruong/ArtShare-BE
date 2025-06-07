@@ -8,17 +8,17 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { firstValueFrom } from 'rxjs';
-import { EncryptionService } from 'src/encryption/encryption.service';
 import { v4 as uuidv4 } from 'uuid';
 import {
   FacebookPageApiResponseData,
   FacebookPagesApiResponse,
   FacebookUserTokenResponse,
-  PlatformPageConfig,
   PublicFacebookPageData,
 } from './facebook.type';
-import { Prisma, SharePlatform } from '@prisma/client';
-import { PrismaService } from 'src/prisma.service';
+import { SharePlatform } from '@prisma/client';
+import { PublicPlatformOutputDto } from 'src/platform/dtos/public-platform-output.dto';
+import { ApiPageData } from 'src/platform/dtos/sync-platform-input.dto';
+import { PlatformService } from 'src/platform/platform.service';
 
 @Injectable()
 export class FacebookAuthService {
@@ -33,9 +33,8 @@ export class FacebookAuthService {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-    private readonly encryptionService: EncryptionService,
     private readonly jwtService: JwtService,
-    private readonly prisma: PrismaService,
+    private readonly platformService: PlatformService,
   ) {
     this.FB_APP_ID = this.configService.get<string>('FACEBOOK_APP_ID');
     this.FB_APP_SECRET = this.configService.get<string>('FACEBOOK_APP_SECRET');
@@ -55,11 +54,15 @@ export class FacebookAuthService {
     }
   }
 
-  async getFacebookLoginUrl(userId: string): Promise<{ loginUrl: string }> {
+  async getFacebookLoginUrl(
+    userId: string,
+    successRedirectUrl: string,
+  ): Promise<{ loginUrl: string }> {
     const payload = {
       sub: userId,
       nonce: uuidv4(),
       purpose: 'facebook_page_connection_state',
+      successRedirectUrl,
     };
     const stateJwt = await this.jwtService.signAsync(payload, {
       secret: this.OAUTH_STATE_JWT_SECRET,
@@ -76,8 +79,12 @@ export class FacebookAuthService {
   async handleFacebookCallback(
     code: string,
     receivedStateJwt: string,
-  ): Promise<PublicFacebookPageData[]> {
-    let statePayload: { sub: string; purpose: string };
+  ): Promise<string | null> {
+    let statePayload: {
+      sub: string;
+      purpose: string;
+      successRedirectUrl?: string;
+    };
     try {
       statePayload = await this.jwtService.verifyAsync(receivedStateJwt, {
         secret: this.OAUTH_STATE_JWT_SECRET,
@@ -132,19 +139,33 @@ export class FacebookAuthService {
       client_secret: this.FB_APP_SECRET,
       fb_exchange_token: userTokenResponse.access_token,
     };
+
     let longLivedUserToken: string;
+    let tokenExpiresAt: Date | null = null;
+
     try {
       const response = await firstValueFrom(
         this.httpService.get<FacebookUserTokenResponse>(longLivedTokenUrl, {
           params: longLivedParams,
         }),
       );
-      longLivedUserToken = response.data.access_token;
+      const { access_token, expires_in } = response.data;
+      longLivedUserToken = access_token;
+
+      if (expires_in) {
+        const expirationDate = new Date();
+        expirationDate.setSeconds(expirationDate.getSeconds() + expires_in);
+        tokenExpiresAt = expirationDate;
+        this.logger.log(
+          `Token for user ${internalUserId} will expire at ${tokenExpiresAt.toISOString()}`,
+        );
+      }
     } catch (error) {
       this.logger.error(
         'Error exchanging for long-lived user token:',
         (error as any).response?.data || (error as any).message,
       );
+
       longLivedUserToken = userTokenResponse.access_token;
     }
 
@@ -176,87 +197,36 @@ export class FacebookAuthService {
       `User ${internalUserId} authorized ${authorizedPagesFromApi.length} page(s) via Facebook UI.`,
     );
 
-    const processedPublicPageData: PublicFacebookPageData[] = [];
+    const pagesToSync: ApiPageData[] = authorizedPagesFromApi.map(
+      (apiPage) => ({
+        id: apiPage.id,
+        name: apiPage.name,
+        access_token: apiPage.access_token,
+        category: apiPage.category,
+        token_expires_at: tokenExpiresAt,
+      }),
+    );
 
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        const authorizedApiPageIds = new Set(
-          authorizedPagesFromApi.map((p) => p.id),
-        );
-
-        const existingUserFacebookPlatforms = await tx.platform.findMany({
-          where: {
-            user_id: internalUserId,
-            name: SharePlatform.FACEBOOK,
-          },
-        });
-
-        for (const pageFromApi of authorizedPagesFromApi) {
-          const pageConfig: PlatformPageConfig = {
-            page_name: pageFromApi.name,
-            encrypted_access_token: this.encryptionService.encrypt(
-              pageFromApi.access_token,
-            ),
-            category: pageFromApi.category,
-          };
-
-          const upsertedPlatform = await tx.platform.upsert({
-            where: {
-              user_id_name_external_page_id: {
-                user_id: internalUserId,
-                name: SharePlatform.FACEBOOK,
-                external_page_id: pageFromApi.id,
-              },
-            },
-            create: {
-              user_id: internalUserId,
-              name: SharePlatform.FACEBOOK,
-              external_page_id: pageFromApi.id,
-              config: pageConfig as unknown as Prisma.InputJsonValue,
-            },
-            update: {
-              config: pageConfig as unknown as Prisma.InputJsonValue,
-            },
-          });
-          processedPublicPageData.push({
-            id: upsertedPlatform.external_page_id,
-            name: pageFromApi.name,
-            category: pageFromApi.category,
-            platform_db_id: upsertedPlatform.id,
-          });
-        }
-
-        const platformsToDelete = existingUserFacebookPlatforms.filter(
-          (dbPlatform) =>
-            !authorizedApiPageIds.has(dbPlatform.external_page_id),
-        );
-
-        if (platformsToDelete.length > 0) {
-          this.logger.log(
-            `Removing ${platformsToDelete.length} de-authorized Facebook page connections for user_id ${internalUserId}.`,
-          );
-          await tx.platform.deleteMany({
-            where: {
-              id: {
-                in: platformsToDelete.map((p) => p.id),
-              },
-            },
-          });
-        }
+    const synchronizedPlatforms: PublicPlatformOutputDto[] =
+      await this.platformService.synchronizePlatforms({
+        userId: internalUserId,
+        platformName: SharePlatform.FACEBOOK,
+        pagesFromApi: pagesToSync,
       });
 
-      this.logger.log(
-        `Successfully synchronized ${processedPublicPageData.length} Facebook page(s) for user_id ${internalUserId}.`,
-      );
-      return processedPublicPageData;
-    } catch (dbError) {
-      this.logger.error(
-        `Database error during Facebook page synchronization for user_id ${internalUserId}:`,
-        dbError,
-      );
-      throw new InternalServerErrorException(
-        'Failed to save/update Facebook page connections.',
-      );
-    }
+    const publicFacebookPages: PublicFacebookPageData[] =
+      synchronizedPlatforms.map((p) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        platform_db_id: p.platform_db_id,
+        status: p.status,
+      }));
+
+    this.logger.log(
+      `Successfully synchronized ${publicFacebookPages.length} Facebook page(s) for user_id ${internalUserId}.`,
+    );
+
+    return statePayload.successRedirectUrl || null;
   }
 }

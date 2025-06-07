@@ -397,13 +397,15 @@ model TrendingPrompt {
 }
 
 model Platform {
-  id               Int           @id @default(autoincrement())
+  id               Int            @id @default(autoincrement())
   name             SharePlatform
   config           Json
   user_id          String
   external_page_id String
-  created_at       DateTime      @default(now())
-  updated_at       DateTime?     @updatedAt
+  created_at       DateTime       @default(now())
+  updated_at       DateTime?      @updatedAt
+  status           PlatformStatus @default(ACTIVE) // Default new connections to ACTIVE
+  token_expires_at DateTime?
 
   autoProjects AutoProject[]
 
@@ -540,4 +542,9 @@ enum AutoPostStatus {
   FAILED
   CANCELLED
   PROCESSING
+}
+
+enum PlatformStatus {
+  ACTIVE
+  INACTIVE
 }
