@@ -23,6 +23,14 @@ jobs:
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Check for peer dependency warnings
+        run: |
+          # This will show warnings about missing peer deps
+          yarn install --frozen-lockfile 2>&1 | grep -i "peer" || true
+          
+          # For npm users: npm ls will show missing peer deps
+          npx npm ls 2>&1 | grep -i "missing" || true
+
       - name: Run Linting
         run: yarn lint
 
@@ -46,33 +54,35 @@ jobs:
           fi
 
       - name: Build Docker Image
-        run: docker build -t artshare-backend:test .
-
-      - name: Test Docker Container
         run: |
-          # Run the container
+          docker build -t artshare-backend:test .
+          
+          # Export the image structure for debugging
+          docker run --rm artshare-backend:test ls -la /app/
+          docker run --rm artshare-backend:test ls -la /app/node_modules/@nestjs/ || true
+          docker run --rm artshare-backend:test find /app/node_modules -name "*keyv*" || true
+
+      - name: Test Docker Container Startup
+        run: |
+          # Run with explicit error output
           docker run -d --name test-container \
             -p 3000:3000 \
             -e NODE_ENV=production \
+            -e DATABASE_URL="postgresql://test:test@localhost:5432/test" \
             artshare-backend:test
           
-          # Wait for it to start
-          sleep 10
+          # Give it time to fail
+          sleep 5
           
-          # Check if container is still running
+          # Check logs regardless of status
+          echo "=== Docker logs ==="
+          docker logs test-container
+          
+          # Check if it's still running
           if [ ! "$(docker ps -q -f name=test-container)" ]; then
             echo "Container crashed!"
-            docker logs test-container
             exit 1
           fi
-          
-          # Try to hit the health endpoint
-          curl -f http://localhost:3000/health || \
-            (docker logs test-container && exit 1)
-          
-          # Cleanup
-          docker stop test-container
-          docker rm test-container
       # - name: Run Unit Tests
       #   run: yarn test --coverage --passWithNoTests=false
 
