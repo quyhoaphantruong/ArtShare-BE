@@ -11,6 +11,7 @@ import { User } from '@prisma/client';
 import { StripeCoreService } from './stripe-core.service';
 import { StripeDbService } from './stripe-db.service';
 import { StripeWebhookProcessorService } from './stripe-webhook-processor.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class StripeService {
@@ -21,12 +22,25 @@ export class StripeService {
     private readonly stripeCoreService: StripeCoreService,
     private readonly stripeDbService: StripeDbService,
     private readonly stripeWebhookProcessorService: StripeWebhookProcessorService,
+    private readonly configService: ConfigService,
   ) {
     this.planToPriceIdMap = {
-      artist_monthly: process.env.STRIPE_ARTIST_MONTHLY_PRICE_ID || '',
-      artist_yearly: process.env.STRIPE_ARTIST_YEARLY_PRICE_ID || '',
-      studio_monthly: process.env.STRIPE_STUDIO_MONTHLY_PRICE_ID || '',
-      studio_yearly: process.env.STRIPE_STUDIO_YEARLY_PRICE_ID || '',
+      artist_monthly: this.configService.get<string>(
+        'STRIPE_ARTIST_MONTHLY_PRICE_ID',
+        '',
+      ),
+      artist_yearly: this.configService.get<string>(
+        'STRIPE_ARTIST_YEARLY_PRICE_ID',
+        '',
+      ),
+      studio_monthly: this.configService.get<string>(
+        'STRIPE_STUDIO_MONTHLY_PRICE_ID',
+        '',
+      ),
+      studio_yearly: this.configService.get<string>(
+        'STRIPE_STUDIO_YEARLY_PRICE_ID',
+        '',
+      ),
     };
   }
 
@@ -151,7 +165,7 @@ export class StripeService {
       }
 
       const devSuffix = '+location_VN';
-      const isDevelopment = process.env.NODE_ENV === 'development';
+      const isDevelopment = this.configService.get<string>('NODE_ENV') === 'development';
       let customerEmailForStripe: string | undefined = email;
       if (isDevelopment && customerEmailForStripe) {
         const emailParts = customerEmailForStripe.split('@');

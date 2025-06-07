@@ -34,7 +34,7 @@ import { PlatformModule } from './platform/platform.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // <-- Makes ConfigService available globally
+      isGlobal: true, // Makes ConfigService available globally
     }),
     UserModule,
     AuthModule,
@@ -52,9 +52,6 @@ import { PlatformModule } from './platform/platform.module';
     StripeModule,
     UsageModule,
     ScheduleModule.forRoot(),
-    ConfigModule.forRoot({
-      isGlobal: true, // ✅ optional but useful
-    }),
     ArtGenerationModule,
     StatisticsModule,
     TrendingModule,

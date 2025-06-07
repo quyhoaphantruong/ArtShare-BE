@@ -13,6 +13,8 @@ const prisma = new PrismaClient();
 const userIdToDelete = process.argv[2];
 console.log(`Target user ID: ${userIdToDelete}`);
 
+// Since this is a standalone script, we need to access process.env directly
+// In a NestJS application context, these would use ConfigService instead
 const serviceAccount = {
   type: process.env.FIREBASE_TYPE,
   project_id: process.env.FIREBASE_PROJECT_ID,

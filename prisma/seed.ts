@@ -26,7 +26,7 @@ const planData: Prisma.PlanCreateInput[] = [
   {
     id: PaidAccessLevel.ARTIST_PRO,
     name: 'Pro Artists',
-    stripeProductId: process.env.STRIPE_ARTIST_PRODUCT_ID,
+    stripeProductId: process.env.STRIPE_ARTIST_PRODUCT_ID, // Script context: using process.env is acceptable here
     description: 'Great for small businesses',
     imageQualityAllowed: ImageQuality.HIGH,
     dailyQuotaCredits: 50,
@@ -42,7 +42,7 @@ const planData: Prisma.PlanCreateInput[] = [
   {
     id: PaidAccessLevel.STUDIO,
     name: 'Studios',
-    stripeProductId: process.env.STRIPE_STUDIO_PRODUCT_ID,
+    stripeProductId: process.env.STRIPE_STUDIO_PRODUCT_ID, // Script context: using process.env is acceptable here
     description: 'Great for large businesses',
     imageQualityAllowed: ImageQuality.HIGH,
     dailyQuotaCredits: 5000,

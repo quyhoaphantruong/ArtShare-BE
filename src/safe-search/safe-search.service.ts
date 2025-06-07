@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ImageAnnotatorClient, protos } from '@google-cloud/vision';
 import { ISafeSearchAnnotation, Likelihood } from './types/safe-search-annotation.type';
 import { plainToInstance } from 'class-transformer';
@@ -10,9 +11,9 @@ import { AdultDetectionResponseDto } from './dto/response/adult-detection.dto';
 export class SafeSearchService {
   private client: ImageAnnotatorClient;
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     this.client = new ImageAnnotatorClient({
-      apiKey: process.env.GOOGLE_VISION_API_KEY,
+      apiKey: this.configService.get<string>('GOOGLE_VISION_API_KEY'),
     });
   }
 

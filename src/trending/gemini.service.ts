@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class GeminiService {
   private genAI: GoogleGenerativeAI;
 
-  constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
+  constructor(private readonly configService: ConfigService) {
+    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY environment variable not set.');
     }
