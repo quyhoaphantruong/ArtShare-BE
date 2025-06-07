@@ -1,9 +1,3 @@
-export interface PlatformPageConfig {
-  page_name: string;
-  encrypted_access_token: string;
-  category: string;
-}
-
 export interface PublicFacebookPageData {
   id: string;
   name: string;

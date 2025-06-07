@@ -29,6 +29,7 @@ import { FirebaseModule } from './firebase/firebase.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AutoProjectModule } from './auto-project/auto-project.module';
 import { AutoPostModule } from './auto-post/auto-post.module';
+import { PlatformModule } from './platform/platform.module';
 
 @Module({
   imports: [
@@ -63,8 +64,9 @@ import { AutoPostModule } from './auto-post/auto-post.module';
     AnalyticsModule,
     AutoProjectModule,
     AutoPostModule,
+    PlatformModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
