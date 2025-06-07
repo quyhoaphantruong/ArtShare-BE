@@ -1,21 +1,24 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EmbeddingService } from './embedding.service';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { QdrantService } from './qdrant.service';
 
 @Module({
+  imports: [ConfigModule],
   providers: [
     EmbeddingService,
     QdrantService,
     {
       provide: QdrantClient,
-      useFactory: () => {
+      useFactory: (configService: ConfigService) => {
         return new QdrantClient({
-          url: process.env.QDRANT_URL,
+          url: configService.get('QDRANT_URL'),
           port: 6333,
-          apiKey: process.env.QDRANT_API_KEY,
+          apiKey: configService.get('QDRANT_API_KEY'),
         });
       },
+      inject: [ConfigService],
     },
   ],
   exports: [EmbeddingService, QdrantClient, QdrantService],

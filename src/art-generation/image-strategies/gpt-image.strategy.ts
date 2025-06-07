@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import OpenAI from 'openai';
 import { ImageGenerationOptions, ImageGenerationResult, ImageGeneratorStrategy, ModelKey } from '../image-generator.interface';
@@ -8,9 +9,9 @@ import { AspectRatio } from '../enum/aspect-ratio';
 export class GptImageStrategy implements ImageGeneratorStrategy {
   private readonly openai: OpenAI;
   
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     this.openai = new OpenAI({
-      apiKey: process.env.OPEN_AI_SECRET_KEY,
+      apiKey: this.configService.get<string>('OPEN_AI_SECRET_KEY'),
     });
   }
 

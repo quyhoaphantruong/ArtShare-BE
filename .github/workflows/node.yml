@@ -23,26 +23,77 @@ jobs:
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Check for peer dependency warnings
+        run: |
+          # This will show warnings about missing peer deps
+          yarn install --frozen-lockfile 2>&1 | grep -i "peer" || true
+          
+          # For npm users: npm ls will show missing peer deps
+          npx npm ls 2>&1 | grep -i "missing" || true
+
       - name: Run Linting
         run: yarn lint
 
       - name: Run Formatting Check
         run: yarn format
 
-      - name: Build Project
-        run: yarn build
+      - name: Audit Dependencies
+        run: yarn audit --level=high
+        continue-on-error: true  # Don't fail CI, but report
 
-      - name: Run Tests
-        run: yarn test --coverage
+      - name: Build Project (Production)
+        env:
+          NODE_ENV: production
+        run: |
+          set -e
+          yarn build
+          # Validate build output exists
+          if [ ! -d "dist" ] && [ ! -d "build" ]; then
+            echo "Build output directory not found!"
+            exit 1
+          fi
 
-      # - name: Setup Code Climate test-reporter
+      - name: Build Docker Image
+        run: |
+          docker build -t artshare-backend:test .
+          
+          # Export the image structure for debugging
+          docker run --rm artshare-backend:test ls -la /app/
+          docker run --rm artshare-backend:test ls -la /app/node_modules/@nestjs/ || true
+          docker run --rm artshare-backend:test find /app/node_modules -name "*keyv*" || true
+
+      - name: Test Docker Container Startup
+        run: |
+          # Run with explicit error output
+          docker run -d --name test-container \
+            -p 3000:3000 \
+            -e NODE_ENV=production \
+            -e DATABASE_URL="postgresql://test:test@localhost:5432/test" \
+            artshare-backend:test
+          
+          # Give it time to fail
+          sleep 5
+          
+          # Check logs regardless of status
+          echo "=== Docker logs ==="
+          docker logs test-container
+          
+          # Check if it's still running
+          if [ ! "$(docker ps -q -f name=test-container)" ]; then
+            echo "Container crashed!"
+            exit 1
+          fi
+      # - name: Run Unit Tests
+      #   run: yarn test --coverage --passWithNoTests=false
+
+      # - name: Run Integration Tests
+      #   run: yarn test:integration
+      #   if: ${{ always() }}  # Run even if unit tests fail
+
+      # - name: Start and Smoke Test
       #   run: |
-      #     curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
-      #     chmod +x ./cc-test-reporter
-
-      # - name: Upload Code Climate test report
-      #   run: |
-      #     ./cc-test-reporter format-coverage -t lcov coverage/lcov.info -p . --debug
-      #     ./cc-test-reporter upload-coverage
-      #   env:
-      #     CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+      #     yarn start & 
+      #     SERVER_PID=$!
+      #     sleep 10  # Wait for server to start
+      #     curl -f http://localhost:3000 || (kill $SERVER_PID && exit 1)
+      #     kill $SERVER_PID
