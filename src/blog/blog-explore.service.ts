@@ -92,6 +92,7 @@ export class BlogExploreService {
     id: number,
     requestingUserId?: string | null,
   ): Promise<BlogDetailsResponseDto | null> {
+    // Single query that gets all needed data for both existence and access checks
     const blog = await this.prisma.blog.findUnique({
       where: { id },
       include: {
@@ -102,7 +103,6 @@ export class BlogExploreService {
             profile_picture_url: true,
             full_name: true,
             followers_count: true,
-            followers: true
           },
         },
         likes: {
@@ -113,22 +113,74 @@ export class BlogExploreService {
       },
     });
 
-    console.log("@@ blog user", blog?.user)
-    console.log("@@ blog", blog?.user.followers)
-    if (!blog) return null;
+    if (!blog) {
+      return null; // Blog doesn't exist
+    }
 
-    if (blog.is_protected && blog.user_id !== requestingUserId) {
-      return null;
+    const isOwner = blog.user_id === requestingUserId;
+
+    // Apply access control rules using the same blog object
+    if (!blog.is_published && !isOwner) {
+      return null; // Unpublished blog, not accessible to non-owners
     }
-    if (!blog.is_published && blog.user_id !== requestingUserId) {
-      return null;
+
+    if (blog.is_protected && !isOwner) {
+      return null; // Protected blog, not accessible to non-owners
     }
-    // update view count
+
+    // Increment view count for accessible blogs
     await this.prisma.blog.update({
       where: { id },
       data: { view_count: { increment: 1 } },
     });
+
     return mapBlogToDetailsDto(blog);
+  }
+  async checkBlogAccess(
+    id: number,
+    requestingUserId?: string | null,
+  ): Promise<{
+    exists: boolean;
+    accessible: boolean;
+    reason?: 'not_found' | 'not_published' | 'protected';
+    isOwner?: boolean;
+  }> {
+    // Use select instead of include for minimal data fetch
+    const blog = await this.prisma.blog.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        is_published: true,
+        is_protected: true,
+        user_id: true,
+      },
+    });
+
+    if (!blog) {
+      return { exists: false, accessible: false, reason: 'not_found' };
+    }
+
+    const isOwner = blog.user_id === requestingUserId;
+
+    if (!blog.is_published && !isOwner) {
+      return {
+        exists: true,
+        accessible: false,
+        reason: 'not_published',
+        isOwner,
+      };
+    }
+
+    if (blog.is_protected && !isOwner) {
+      return {
+        exists: true,
+        accessible: false,
+        reason: 'protected',
+        isOwner,
+      };
+    }
+
+    return { exists: true, accessible: true, isOwner };
   }
 
   async getTrendingBlogs(
@@ -218,7 +270,7 @@ export class BlogExploreService {
     const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
       where: { user_id: user.id },
       select: blogListItemSelect,
-      orderBy: { updated_at: 'desc' }, 
+      orderBy: { updated_at: 'desc' },
       take: take,
       skip: skip,
     });
