@@ -54,11 +54,15 @@ export class FacebookAuthService {
     }
   }
 
-  async getFacebookLoginUrl(userId: string): Promise<{ loginUrl: string }> {
+  async getFacebookLoginUrl(
+    userId: string,
+    successRedirectUrl: string,
+  ): Promise<{ loginUrl: string }> {
     const payload = {
       sub: userId,
       nonce: uuidv4(),
       purpose: 'facebook_page_connection_state',
+      successRedirectUrl,
     };
     const stateJwt = await this.jwtService.signAsync(payload, {
       secret: this.OAUTH_STATE_JWT_SECRET,
@@ -75,8 +79,12 @@ export class FacebookAuthService {
   async handleFacebookCallback(
     code: string,
     receivedStateJwt: string,
-  ): Promise<PublicFacebookPageData[]> {
-    let statePayload: { sub: string; purpose: string };
+  ): Promise<string | null> {
+    let statePayload: {
+      sub: string;
+      purpose: string;
+      successRedirectUrl?: string;
+    };
     try {
       statePayload = await this.jwtService.verifyAsync(receivedStateJwt, {
         secret: this.OAUTH_STATE_JWT_SECRET,
@@ -131,19 +139,35 @@ export class FacebookAuthService {
       client_secret: this.FB_APP_SECRET,
       fb_exchange_token: userTokenResponse.access_token,
     };
+
     let longLivedUserToken: string;
+    let tokenExpiresAt: Date | null = null;
+
     try {
       const response = await firstValueFrom(
+        // Use the updated interface here
         this.httpService.get<FacebookUserTokenResponse>(longLivedTokenUrl, {
           params: longLivedParams,
         }),
       );
-      longLivedUserToken = response.data.access_token;
+      const { access_token, expires_in } = response.data;
+      longLivedUserToken = access_token;
+
+      if (expires_in) {
+        // Calculate the absolute expiration timestamp
+        const expirationDate = new Date();
+        expirationDate.setSeconds(expirationDate.getSeconds() + expires_in);
+        tokenExpiresAt = expirationDate;
+        this.logger.log(
+          `Token for user ${internalUserId} will expire at ${tokenExpiresAt.toISOString()}`,
+        );
+      }
     } catch (error) {
       this.logger.error(
         'Error exchanging for long-lived user token:',
         (error as any).response?.data || (error as any).message,
       );
+      // Fallback to the short-lived token, no expiration date available
       longLivedUserToken = userTokenResponse.access_token;
     }
 
@@ -179,8 +203,9 @@ export class FacebookAuthService {
       (apiPage) => ({
         id: apiPage.id,
         name: apiPage.name,
-        access_token: apiPage.access_token,
+        access_token: apiPage.access_token, // This is the long-lived page token
         category: apiPage.category,
+        token_expires_at: tokenExpiresAt, // Pass the expiration date for each page
       }),
     );
 
@@ -188,7 +213,7 @@ export class FacebookAuthService {
       await this.platformService.synchronizePlatforms({
         userId: internalUserId,
         platformName: SharePlatform.FACEBOOK,
-        pagesFromApi: pagesToSync,
+        pagesFromApi: pagesToSync, // Pass the enriched data
       });
 
     const publicFacebookPages: PublicFacebookPageData[] =
@@ -197,11 +222,13 @@ export class FacebookAuthService {
         name: p.name,
         category: p.category,
         platform_db_id: p.platform_db_id,
+        status: p.status,
       }));
 
     this.logger.log(
       `Successfully synchronized ${publicFacebookPages.length} Facebook page(s) for user_id ${internalUserId}.`,
     );
-    return publicFacebookPages;
+
+    return statePayload.successRedirectUrl || null;
   }
 }
