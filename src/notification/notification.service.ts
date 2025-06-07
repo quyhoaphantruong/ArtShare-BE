@@ -37,13 +37,14 @@ export class NotificationService {
   }
 
   async getUserNotifications(userId: string) {
-    return this.prisma.notification.findMany({
+    const notifications = await this.prisma.notification.findMany({
       where: {
         userId,
          isRead: false,
       },
       orderBy: { createdAt: 'desc' },
     });
+    return notifications;
   }
 
   async markAsRead(notificationId: string) {

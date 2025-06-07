@@ -34,7 +34,6 @@ export class NotificationsGateway
 
     for (const notif of undelivered) {
       client.emit('new-notification', notif);
-      await this.notificationService.markAsDelivered(notif.id);
     }
   }
 
