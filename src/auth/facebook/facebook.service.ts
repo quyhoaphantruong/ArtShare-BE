@@ -145,7 +145,6 @@ export class FacebookAuthService {
 
     try {
       const response = await firstValueFrom(
-        // Use the updated interface here
         this.httpService.get<FacebookUserTokenResponse>(longLivedTokenUrl, {
           params: longLivedParams,
         }),
@@ -154,7 +153,6 @@ export class FacebookAuthService {
       longLivedUserToken = access_token;
 
       if (expires_in) {
-        // Calculate the absolute expiration timestamp
         const expirationDate = new Date();
         expirationDate.setSeconds(expirationDate.getSeconds() + expires_in);
         tokenExpiresAt = expirationDate;
@@ -167,7 +165,7 @@ export class FacebookAuthService {
         'Error exchanging for long-lived user token:',
         (error as any).response?.data || (error as any).message,
       );
-      // Fallback to the short-lived token, no expiration date available
+
       longLivedUserToken = userTokenResponse.access_token;
     }
 
@@ -203,9 +201,9 @@ export class FacebookAuthService {
       (apiPage) => ({
         id: apiPage.id,
         name: apiPage.name,
-        access_token: apiPage.access_token, // This is the long-lived page token
+        access_token: apiPage.access_token,
         category: apiPage.category,
-        token_expires_at: tokenExpiresAt, // Pass the expiration date for each page
+        token_expires_at: tokenExpiresAt,
       }),
     );
 
@@ -213,7 +211,7 @@ export class FacebookAuthService {
       await this.platformService.synchronizePlatforms({
         userId: internalUserId,
         platformName: SharePlatform.FACEBOOK,
-        pagesFromApi: pagesToSync, // Pass the enriched data
+        pagesFromApi: pagesToSync,
       });
 
     const publicFacebookPages: PublicFacebookPageData[] =

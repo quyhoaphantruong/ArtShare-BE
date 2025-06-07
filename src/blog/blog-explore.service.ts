@@ -218,7 +218,7 @@ export class BlogExploreService {
     const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
       where: { user_id: user.id },
       select: blogListItemSelect,
-      orderBy: { created_at: 'desc' },
+      orderBy: { updated_at: 'desc' }, 
       take: take,
       skip: skip,
     });
