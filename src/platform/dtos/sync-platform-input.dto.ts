@@ -5,6 +5,7 @@ export interface ApiPageData {
   name: string;
   access_token: string;
   category: string;
+  token_expires_at: Date | null;
   [key: string]: any;
 }
 

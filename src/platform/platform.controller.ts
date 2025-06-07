@@ -22,6 +22,8 @@ import { Platform, SharePlatform } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles } from 'src/auth/decorators/roles.decorators';
 import { Role } from 'src/auth/enums/role.enum';
+import { CurrentUserType } from 'src/auth/types/current-user.type';
+import { CurrentUser } from 'src/auth/decorators/users.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('platforms')
@@ -46,18 +48,16 @@ export class PlatformController {
 
   @Get()
   async findAllForUser(
-    @Query('userId') userId: string,
+    @CurrentUser() user: CurrentUserType,
     @Query('platformName') platformName?: SharePlatform,
   ): Promise<Platform[]> {
-    if (!userId) {
-    }
     if (platformName) {
       return this.platformService.findPlatformsByUserIdAndName(
-        userId,
+        user.id,
         platformName,
       );
     }
-    return this.platformService.findPlatformsByUserId(userId);
+    return this.platformService.findPlatformsByUserId(user.id);
   }
 
   @Get(':id')

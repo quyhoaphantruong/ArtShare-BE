@@ -4,7 +4,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Platform, Prisma, SharePlatform } from '@prisma/client';
+import {
+  Platform,
+  PlatformStatus,
+  Prisma,
+  SharePlatform,
+} from '@prisma/client';
 import { PlatformPageConfig } from './dtos/platform-config.interface';
 import { CreatePlatformDto } from './dtos/create-platform.dto';
 import { SyncPlatformInputDto } from './dtos/sync-platform-input.dto';
@@ -260,6 +265,7 @@ export class PlatformService {
             name: apiPageName,
             access_token: apiAccessToken,
             category: apiCategory,
+            token_expires_at,
             ...remainingApiFields
           } = pageFromApi;
 
@@ -284,10 +290,14 @@ export class PlatformService {
               name: platformName,
               external_page_id: apiExternalId,
               config: pageConfigForDb as unknown as Prisma.InputJsonValue,
+              status: PlatformStatus.ACTIVE,
+              token_expires_at: token_expires_at,
             },
             update: {
               config: pageConfigForDb as unknown as Prisma.InputJsonValue,
               updated_at: new Date(),
+              status: PlatformStatus.ACTIVE,
+              token_expires_at: token_expires_at,
             },
           });
 
@@ -296,6 +306,7 @@ export class PlatformService {
             name: apiPageName,
             category: apiCategory || '',
             platform_db_id: upsertedPlatform.id,
+            status: upsertedPlatform.status,
           });
         }
 
