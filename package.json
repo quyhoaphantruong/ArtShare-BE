@@ -57,6 +57,7 @@
     "express-session": "^1.18.1",
     "firebase": "^11.4.0",
     "firebase-admin": "^13.2.0",
+    "keyv": "^5.3.3",
     "nanoid": "^3.0.0",
     "openai": "^4.97.0",
     "passport": "^0.7.0",

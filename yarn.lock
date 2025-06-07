@@ -5873,7 +5873,7 @@ keyv@^4.5.3:
 
 keyv@^5.3.3:
   version "5.3.3"
-  resolved "https://registry.npmjs.org/keyv/-/keyv-5.3.3.tgz"
+  resolved "https://registry.yarnpkg.com/keyv/-/keyv-5.3.3.tgz#ec2d723fbd7b908de5ee7f56b769d46dbbeaf8ba"
   integrity sha512-Rwu4+nXI9fqcxiEHtbkvoes2X+QfkTRo1TMkPfwzipGsJlJO/z69vqB4FNl9xJ3xCpAcbkvmEabZfPzrwN3+gQ==
   dependencies:
     "@keyv/serialize" "^1.0.3"
