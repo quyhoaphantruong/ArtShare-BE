@@ -294,54 +294,69 @@ export class BlogExploreService {
     }
 
     const relevantQueryText = blog.title + ' ' + blog.content;
-    return await this.getBlogsByQueryEmbedding(relevantQueryText, take, skip);
+    
+    // MODIFICATION 1: Pass the blogId to be excluded down to the next function.
+    return await this.getBlogsByQueryEmbedding(relevantQueryText, take, skip, blogId);
   }
 
   private async getBlogsByQueryEmbedding(
-    searchQuery: string,
-    take: number,
-    skip: number,
-  ): Promise<BlogListItemResponseDto[]> {
-    const queryEmbedding =
-      await this.embeddingService.generateEmbeddingFromText(searchQuery);
-    const searchResponse = await this.qdrantClient.query(
-      this.qdrantCollectionName,
-      {
-        prefetch: [
-          {
-            query: queryEmbedding,
-            using: 'title',
-          },
-          {
-            query: queryEmbedding,
-            using: 'content',
-          },
-        ],
-        query: {
-          fusion: 'dbsf',
+  searchQuery: string,
+  take: number,
+  skip: number,
+  excludeId?: number, 
+): Promise<BlogListItemResponseDto[]> {
+  const queryEmbedding =
+    await this.embeddingService.generateEmbeddingFromText(searchQuery);
+    
+  const searchResponse = await this.qdrantClient.query(
+    this.qdrantCollectionName,
+    {
+      prefetch: [
+        {
+          query: queryEmbedding,
+          using: 'title',
         },
-        offset: skip,
-        limit: take,
-        // with_payload: true,
+        {
+          query: queryEmbedding,
+          using: 'content',
+        },
+      ],
+      query: {
+        fusion: 'dbsf',
       },
-    );
+      
+      // Only add filter if excludeId is provided
+      ...(excludeId && {
+        filter: {
+          must_not: [
+            {
+              has_id: [excludeId], 
+            },
+          ],
+        },
+      }),
+      
+      offset: skip,
+      limit: take,
+    },
+  );
 
-    const pointIds: number[] = searchResponse.points.map((point) =>
-      Number(point.id),
-    );
+  const pointIds: number[] = searchResponse.points.map((point) =>
+    Number(point.id),
+  );
 
-    const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
-      where: { id: { in: pointIds } },
-      select: blogListItemSelect,
-    });
+  const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
+    where: { id: { in: pointIds } },
+    select: blogListItemSelect,
+  });
 
-    // Sort posts in the same order as returned by Qdrant
-    const sortedBlogs: BlogForListItemPayload[] = pointIds
-      .map((id) => blogs.find((blog) => blog.id === id))
-      .filter((blog) => blog !== undefined);
+  const sortedBlogs: BlogForListItemPayload[] = pointIds
+    .map((id) => blogs.find((blog) => blog.id === id))
+    .filter((blog) => blog !== undefined);
 
-    return sortedBlogs
-      .map(mapBlogToListItemDto)
-      .filter((b): b is BlogListItemResponseDto => b !== null);
-  }
+  return sortedBlogs
+    .map(mapBlogToListItemDto)
+    .filter((b): b is BlogListItemResponseDto => b !== null);
+}
+
 }
