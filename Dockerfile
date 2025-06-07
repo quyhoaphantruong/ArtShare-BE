@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:20 AS builder
 WORKDIR /app
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
@@ -17,7 +17,7 @@ COPY . .
 RUN yarn build
 
 # Stage 2: Production dependencies only
-FROM node:20-alpine AS deps
+FROM node:20 AS deps
 WORKDIR /app
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile --production
@@ -25,7 +25,7 @@ COPY prisma ./prisma
 RUN yarn prisma generate
 
 # Stage 3: Runtime
-FROM node:20-alpine
+FROM node:20
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=deps /app/node_modules ./node_modules
