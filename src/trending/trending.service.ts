@@ -19,9 +19,8 @@ export class TrendingService {
 
     const rawPrompts = await this.statisticsService.getRawTrendingPrompts();
 
-    const thematicPrompts = await this.geminiService.generateCanonicalPrompts(
-      rawPrompts
-    );
+    const thematicPrompts =
+      await this.geminiService.generateCanonicalPrompts(rawPrompts);
 
     if (thematicPrompts.length === 0) {
       this.logger.warn(
@@ -53,8 +52,8 @@ export class TrendingService {
     const storedPrompts = await this.statisticsService.getStoredTrendingPrompts(
       TrendingService.TRENDING_PROMPTS_DB_KEY,
     );
-    const prompts = await this.statisticsService.getRawTrendingPrompts();
-    this.logger.log(`raw prompts: ${prompts}`);
+    // const prompts = await this.statisticsService.getRawTrendingPrompts();
+    // this.logger.log(`raw prompts: ${prompts}`);
 
     return storedPrompts || [];
   }

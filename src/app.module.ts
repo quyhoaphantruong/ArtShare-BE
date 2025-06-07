@@ -27,6 +27,9 @@ import { SafeSearchModule } from './safe-search/safe-search.module';
 
 import { FirebaseModule } from './firebase/firebase.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { NotificationModule } from './notification/notification.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+
 import { AutoProjectModule } from './auto-project/auto-project.module';
 import { AutoPostModule } from './auto-post/auto-post.module';
 import { PlatformModule } from './platform/platform.module';
@@ -36,6 +39,7 @@ import { PlatformModule } from './platform/platform.module';
     ConfigModule.forRoot({
       isGlobal: true, // <-- Makes ConfigService available globally
     }),
+    EventEmitterModule.forRoot(),
     UserModule,
     AuthModule,
     PostsModule,
@@ -62,6 +66,7 @@ import { PlatformModule } from './platform/platform.module';
     SafeSearchModule,
     FirebaseModule,
     AnalyticsModule,
+    NotificationModule,
     AutoProjectModule,
     AutoPostModule,
     PlatformModule,
