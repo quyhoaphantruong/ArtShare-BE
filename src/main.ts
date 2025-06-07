@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import metadata from './metadata';
 import express from 'express';
 
@@ -9,14 +10,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'fatal', 'error', 'warn', 'debug', 'verbose'],
   });
-  const port = process.env.PORT ?? 3000;
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('PORT') ?? 3000;
   const logger = new Logger('Bootstrap');
 
   // Enable CORS
   app.enableCors({
     origin: [
-      process.env.FRONTEND_URL || 'http://localhost:5173',
-      process.env.ADMIN_FRONTEND_URL || 'http://localhost:1574',
+      configService.get<string>('FRONTEND_URL') || 'http://localhost:5173',
+      configService.get<string>('ADMIN_FRONTEND_URL') || 'http://localhost:1574',
     ], // List allowed origins
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // List allowed HTTP methods
     allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers

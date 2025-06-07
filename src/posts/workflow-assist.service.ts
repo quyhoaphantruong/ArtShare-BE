@@ -11,6 +11,7 @@ import { PostCategoryResponseDto } from './dto/response/category.dto';
 import { UsageService } from 'src/usage/usage.service';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 import { TryCatch } from 'src/common/try-catch.decorator';
+import { ConfigService } from '@nestjs/config';
 
 const PostMetadata = z.object({
   title: z.string(),
@@ -27,9 +28,10 @@ export class WorkflowAssistService {
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
     private readonly usageService: UsageService,
+    private readonly configService: ConfigService,
   ) {
     this.openai = new OpenAI({
-      apiKey: process.env.OPEN_AI_SECRET_KEY,
+      apiKey: this.configService.get<string>('OPEN_AI_SECRET_KEY'),
     });
   }
 

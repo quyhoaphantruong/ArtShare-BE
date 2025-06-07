@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { ArtGenerationService } from 'src/art-generation/art-generation.service';
@@ -27,9 +28,12 @@ export class AutoPostGenerateService {
   private readonly openai: OpenAI;
   aiCreditCost = 2;
 
-  constructor(private readonly artGenerationService: ArtGenerationService) {
+  constructor(
+    private readonly artGenerationService: ArtGenerationService,
+    private readonly configService: ConfigService,
+  ) {
     this.openai = new OpenAI({
-      apiKey: process.env.OPEN_AI_SECRET_KEY,
+      apiKey: this.configService.get<string>('OPEN_AI_SECRET_KEY'),
     });
   }
 
