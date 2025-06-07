@@ -6,7 +6,8 @@ import { ConfigService } from '@nestjs/config';
 import metadata from './metadata';
 import * as express from 'express';
 import helmet from 'helmet';
-import compression from 'compression';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const compression = require('compression');
 import rateLimit from 'express-rate-limit';
 
 async function bootstrap() {
@@ -72,7 +73,7 @@ async function bootstrap() {
       error: 'Too many API requests from this IP, please try again later.',
       retryAfter: '15 minutes'
     },
-    skip: (req) => req.path.startsWith('/api/stripe/webhook'), // Skip webhook endpoints
+    skip: (req: express.Request) => req.path.startsWith('/api/stripe/webhook'), // Skip webhook endpoints
   });
   app.use('/api', apiLimiter);
 
