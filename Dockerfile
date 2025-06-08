@@ -1,5 +1,5 @@
 # Use slim variant for smaller attack surface
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 # Install security updates and required packages
 RUN apt-get update && \
@@ -30,7 +30,7 @@ COPY . .
 RUN yarn build
 
 # Stage 2: Production dependencies
-FROM node:20-slim AS deps
+FROM node:22-slim AS deps
 
 # Install security updates
 RUN apt-get update && \
@@ -46,11 +46,11 @@ COPY prisma ./prisma
 RUN yarn prisma generate
 
 # Stage 3: Production runtime
-FROM node:20-slim
+FROM node:22-slim
 
-# Install security updates and dumb-init
+# Install security updates, dumb-init, and curl for health checks
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends dumb-init && \
+    apt-get install -y --no-install-recommends dumb-init curl && \
     apt-get upgrade -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
