@@ -464,19 +464,6 @@ model AutoPost {
   @@map("auto_post")
 }
 
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String   
-  type      String
-  payload   Json
-  isRead    Boolean  @default(false) @map("is_read")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("notifications")
-}
-
 enum PaidAccessLevel {
   FREE       @map("free")
   ARTIST_PRO @map("artist_pro")
