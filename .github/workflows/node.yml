@@ -103,7 +103,7 @@ jobs:
         with:
           host: ${{ secrets.DO_HOST }}
           username: root
-          password: ${{ secrets.DO_PASSWORD }}
+          key: ${{ secrets.DO_SSH_KEY }}
           envs: GITHUB_SHA,DOCKER_IMAGE,CONTAINER_NAME
           script: |
             set -e
@@ -263,7 +263,7 @@ jobs:
         with:
           host: ${{ secrets.DO_HOST }}
           username: root
-          password: ${{ secrets.DO_PASSWORD }}
+          key: ${{ secrets.DO_SSH_KEY }}
           envs: CONTAINER_NAME
           script: |
             # Final verification
@@ -296,7 +296,7 @@ jobs:
         with:
           host: ${{ secrets.DO_HOST }}
           username: root
-          password: ${{ secrets.DO_PASSWORD }}
+          key: ${{ secrets.DO_SSH_KEY }}
           envs: CONTAINER_NAME
           script: |
             echo "🎉 Deployment of commit ${{ github.sha }} completed successfully!"
@@ -312,7 +312,7 @@ jobs:
         with:
           host: ${{ secrets.DO_HOST }}
           username: root
-          password: ${{ secrets.DO_PASSWORD }}
+          key: ${{ secrets.DO_SSH_KEY }}
           envs: CONTAINER_NAME
           script: |
             echo "❌ Deployment failed for commit ${{ github.sha }}"
