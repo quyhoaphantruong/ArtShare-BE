@@ -49,9 +49,28 @@ jobs:
             exit 1
           fi
 
-      - name: Build Docker Image
+      - name: Build Docker Image with Cache
         run: |
-          docker build -t ${{ env.DOCKER_IMAGE }}:test .
+          # Build with layer caching for faster builds
+          docker build \
+            --cache-from ${{ env.DOCKER_IMAGE }}:latest \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -t ${{ env.DOCKER_IMAGE }}:${{ github.sha }} \
+            -t ${{ env.DOCKER_IMAGE }}:test .
+
+      - name: Debug Branch Info
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Is main branch: ${{ github.ref == 'refs/heads/main' }}"
+
+      - name: Upload Docker Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ github.sha }}
+          path: docker-image.tar.gz
+          retention-days: 7
 
       - name: Test Docker Container
         run: |
@@ -75,18 +94,17 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
       - name: Deploy to Digital Ocean
         uses: appleboy/ssh-action@v1.0.3
         env:
           GITHUB_SHA: ${{ github.sha }}
+          DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         with:
-          host: ${{ secrets.DO_HOST }}  # 68.183.187.0
+          host: ${{ secrets.DO_HOST }}
           username: root
-          password: ${{ secrets.DO_PASSWORD }}  # Your secret
-          envs: GITHUB_SHA
+          password: ${{ secrets.DO_PASSWORD }}
+          envs: GITHUB_SHA,DOCKER_IMAGE,CONTAINER_NAME
           script: |
             set -e
             
@@ -98,8 +116,8 @@ jobs:
             # Backup current state for rollback
             echo "📦 Creating backup of current deployment..."
             BACKUP_IMAGE="${DOCKER_IMAGE}:backup-$(date +%s)"
-            if docker images | grep -q "${{ env.DOCKER_IMAGE }}:latest"; then
-              docker tag ${{ env.DOCKER_IMAGE }}:latest $BACKUP_IMAGE
+            if docker images | grep -q "${DOCKER_IMAGE}:latest"; then
+              docker tag ${DOCKER_IMAGE}:latest $BACKUP_IMAGE
               echo "Backup created: $BACKUP_IMAGE"
             fi
             
@@ -109,17 +127,19 @@ jobs:
             git checkout main
             git reset --hard origin/main
             
-            # Build new image with commit SHA tag
-            echo "🔨 Building new Docker image..."
-            NEW_IMAGE="${{ env.DOCKER_IMAGE }}:$GITHUB_SHA"
-            docker build -t $NEW_IMAGE .
-            docker tag $NEW_IMAGE ${{ env.DOCKER_IMAGE }}:latest
+            # Build new image with layer caching for faster builds
+            echo "🔨 Building Docker image with caching..."
+            docker build \
+              --cache-from ${DOCKER_IMAGE}:latest \
+              --build-arg BUILDKIT_INLINE_CACHE=1 \
+              -t ${DOCKER_IMAGE}:${GITHUB_SHA} \
+              -t ${DOCKER_IMAGE}:latest .
             
             # Function to rollback on failure
             rollback() {
               echo "❌ Deployment failed, rolling back..."
               if docker images | grep -q "$BACKUP_IMAGE"; then
-                docker tag $BACKUP_IMAGE ${{ env.DOCKER_IMAGE }}:latest
+                docker tag $BACKUP_IMAGE ${DOCKER_IMAGE}:latest
                 echo "Rollback image restored"
               fi
               exit 1
@@ -129,7 +149,7 @@ jobs:
             health_check() {
               echo "🔍 Performing health check..."
               for i in {1..30}; do
-                if docker exec ${{ env.CONTAINER_NAME }} curl -f http://localhost:3000/health 2>/dev/null; then
+                if docker exec $CONTAINER_NAME curl -f http://localhost:3000/health 2>/dev/null; then
                   echo "✅ Health check passed"
                   return 0
                 fi
@@ -144,7 +164,7 @@ jobs:
             echo "🔄 Starting zero-downtime deployment..."
             
             # Start new container with temporary name
-            TEMP_CONTAINER="${{ env.CONTAINER_NAME }}-new"
+            TEMP_CONTAINER="${CONTAINER_NAME}-new"
             
             echo "🚀 Starting new container: $TEMP_CONTAINER"
             docker run -d --name $TEMP_CONTAINER \
@@ -156,7 +176,7 @@ jobs:
               --security-opt=no-new-privileges:true \
               -p 127.0.0.1:3001:3000 \
               --env-file .env \
-              --entrypoint sh ${{ env.DOCKER_IMAGE }}:latest \
+              --entrypoint sh ${DOCKER_IMAGE}:latest \
               -c "npx prisma migrate deploy && node dist/src/main.js" || rollback
             
             # Wait for new container to be ready
@@ -171,7 +191,7 @@ jobs:
               rollback
             fi
             
-            # Test new container (modify health check for port 3001)
+            # Test new container
             echo "🔍 Testing new container..."
             for i in {1..30}; do
               if docker exec $TEMP_CONTAINER curl -f http://localhost:3000 2>/dev/null; then
@@ -192,9 +212,9 @@ jobs:
             echo "🔄 Switching to new container..."
             
             # Stop old container
-            if docker ps | grep -q "${{ env.CONTAINER_NAME }}"; then
-              docker stop ${{ env.CONTAINER_NAME }}
-              docker rm ${{ env.CONTAINER_NAME }}
+            if docker ps | grep -q "$CONTAINER_NAME"; then
+              docker stop $CONTAINER_NAME
+              docker rm $CONTAINER_NAME
             fi
             
             # Stop temp container
@@ -203,7 +223,7 @@ jobs:
             
             # Start final container on production port
             echo "🚀 Starting production container..."
-            docker run -d --name ${{ env.CONTAINER_NAME }} \
+            docker run -d --name $CONTAINER_NAME \
               --restart=unless-stopped \
               --cap-drop=ALL \
               --cap-add=CHOWN \
@@ -212,7 +232,7 @@ jobs:
               --security-opt=no-new-privileges:true \
               -p 127.0.0.1:3000:3000 \
               --env-file .env \
-              --entrypoint sh ${{ env.DOCKER_IMAGE }}:latest \
+              --entrypoint sh ${DOCKER_IMAGE}:latest \
               -c "npx prisma migrate deploy && node dist/src/main.js" || rollback
             
             # Final health check
@@ -223,7 +243,7 @@ jobs:
             
             # Clean up old images (keep last 3)
             echo "🧹 Cleaning up old Docker images..."
-            docker images ${{ env.DOCKER_IMAGE }} --format "table {{.Repository}}:{{.Tag}}\t{{.CreatedAt}}" | \
+            docker images $DOCKER_IMAGE --format "table {{.Repository}}:{{.Tag}}\t{{.CreatedAt}}" | \
               grep -v "latest\|backup" | \
               tail -n +4 | \
               awk '{print $1}' | \
@@ -231,35 +251,38 @@ jobs:
             
             echo "✅ Deployment completed successfully!"
             echo "📊 Container status:"
-            docker ps | grep ${{ env.CONTAINER_NAME }}
+            docker ps | grep $CONTAINER_NAME
             
             echo "📝 Recent logs:"
-            docker logs --tail 20 ${{ env.CONTAINER_NAME }}
+            docker logs --tail 20 $CONTAINER_NAME
 
       - name: Verify Deployment
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         with:
           host: ${{ secrets.DO_HOST }}
           username: root
           password: ${{ secrets.DO_PASSWORD }}
+          envs: CONTAINER_NAME
           script: |
             # Final verification
             echo "🔍 Final deployment verification..."
             
             # Check container is running
-            if ! docker ps | grep -q "${{ env.CONTAINER_NAME }}"; then
+            if ! docker ps | grep -q "$CONTAINER_NAME"; then
               echo "❌ Container is not running!"
               exit 1
             fi
             
             # Check application responds
             sleep 5
-            if docker exec ${{ env.CONTAINER_NAME }} curl -f http://localhost:3000 >/dev/null 2>&1; then
+            if docker exec $CONTAINER_NAME curl -f http://localhost:3000 >/dev/null 2>&1; then
               echo "✅ Application is responding"
             else
               echo "❌ Application is not responding"
               echo "Container logs:"
-              docker logs --tail 50 ${{ env.CONTAINER_NAME }}
+              docker logs --tail 50 $CONTAINER_NAME
               exit 1
             fi
             
@@ -268,26 +291,32 @@ jobs:
       - name: Notify Deployment Success
         if: success()
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         with:
           host: ${{ secrets.DO_HOST }}
           username: root
           password: ${{ secrets.DO_PASSWORD }}
+          envs: CONTAINER_NAME
           script: |
             echo "🎉 Deployment of commit ${{ github.sha }} completed successfully!"
             echo "📊 Current status:"
-            docker ps | grep ${{ env.CONTAINER_NAME }}
+            docker ps | grep $CONTAINER_NAME
             echo "🔗 Application should be available at your domain"
 
       - name: Notify Deployment Failure
         if: failure()
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
         with:
           host: ${{ secrets.DO_HOST }}
           username: root
           password: ${{ secrets.DO_PASSWORD }}
+          envs: CONTAINER_NAME
           script: |
             echo "❌ Deployment failed for commit ${{ github.sha }}"
             echo "📊 Current container status:"
-            docker ps -a | grep ${{ env.CONTAINER_NAME }} || echo "No backend container found"
+            docker ps -a | grep $CONTAINER_NAME || echo "No backend container found"
             echo "📝 Recent logs:"
-            docker logs --tail 50 ${{ env.CONTAINER_NAME }} 2>/dev/null || echo "No logs available"
+            docker logs --tail 50 $CONTAINER_NAME 2>/dev/null || echo "No logs available"
