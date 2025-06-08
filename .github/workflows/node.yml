@@ -149,7 +149,7 @@ jobs:
             health_check() {
               echo "🔍 Performing health check..."
               for i in {1..30}; do
-                if docker exec $CONTAINER_NAME curl -f http://localhost:3000/health 2>/dev/null; then
+                if docker exec $CONTAINER_NAME curl -f http://localhost:3000 2>/dev/null; then
                   echo "✅ Health check passed"
                   return 0
                 fi
