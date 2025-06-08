@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -62,7 +63,6 @@ model User {
   CommentLike     CommentLike[]
   reportsResolved Report[]      @relation("ModeratorReports")
   AutoProject     AutoProject[]
-
   notifications    Notification[]
   @@map("user")
 }
@@ -394,6 +394,19 @@ model TrendingPrompt {
   updated_at DateTime @updatedAt
 
   @@map("trending_prompts")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   
+  type      String
+  payload   Json
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
 model Platform {

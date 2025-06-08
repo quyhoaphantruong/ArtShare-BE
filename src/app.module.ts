@@ -33,11 +33,14 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AutoProjectModule } from './auto-project/auto-project.module';
 import { AutoPostModule } from './auto-post/auto-post.module';
 import { PlatformModule } from './platform/platform.module';
+import { NotificationModule } from './notification/notification.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // <-- Makes ConfigService available globally
+      isGlobal: true, // Makes ConfigService available globally
     }),
     EventEmitterModule.forRoot(),
     UserModule,
@@ -56,9 +59,6 @@ import { PlatformModule } from './platform/platform.module';
     StripeModule,
     UsageModule,
     ScheduleModule.forRoot(),
-    ConfigModule.forRoot({
-      isGlobal: true, // ✅ optional but useful
-    }),
     ArtGenerationModule,
     StatisticsModule,
     TrendingModule,
@@ -70,6 +70,7 @@ import { PlatformModule } from './platform/platform.module';
     AutoProjectModule,
     AutoPostModule,
     PlatformModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
