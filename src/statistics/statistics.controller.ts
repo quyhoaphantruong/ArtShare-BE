@@ -13,6 +13,7 @@ export class StatisticsController {
     total_ai_images: StatCount[];
     top_posts_by_ai: any;
     trending_prompts: any[];
+    token_usage: StatCount[];
   }> {
     return this.statisticsService.getAll();
   }

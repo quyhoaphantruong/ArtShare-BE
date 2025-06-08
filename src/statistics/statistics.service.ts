@@ -77,6 +77,14 @@ export class StatisticsService {
     return rows;
   }
 
+  async getTotalTokenUsage(): Promise<StatCount[]> {
+    const rows: Array<{ count: bigint }> = await this.prisma.$queryRaw`
+    SELECT SUM(used_amount) as count
+    FROM user_usage
+    `;
+    return [{ key: 'token_usage', count: Number(rows[0]?.count ?? 0) }];
+  }
+
   async getAll(): Promise<{
     aspectRatios: StatCount[];
     styles: StatCount[];
@@ -84,6 +92,7 @@ export class StatisticsService {
     total_ai_images: StatCount[];
     top_posts_by_ai: any;
     trending_prompts: any[];
+    token_usage: StatCount[];
   }> {
     const [
       aspectRatios,
@@ -91,12 +100,14 @@ export class StatisticsService {
       posts_by_ai,
       total_ai_images,
       top_posts_by_ai,
+      token_usage,
     ] = await Promise.all([
       this.getAspectRatioStats(),
       this.getStyles(),
       this.getPostsByAI(),
       this.getTotalAiImages(),
       this.getTop5PostsByAI(),
+      this.getTotalTokenUsage(),
     ]);
 
     const storedPrompts = await this.getStoredTrendingPrompts(
@@ -110,6 +121,7 @@ export class StatisticsService {
       total_ai_images,
       top_posts_by_ai,
       trending_prompts: storedPrompts ?? [],
+      token_usage,
     };
   }
 
