@@ -6,7 +6,6 @@ import {
   HttpStatus,
   Get,
   Query,
-  BadRequestException,
   Patch,
   Param,
   ParseIntPipe,
@@ -15,8 +14,9 @@ import {
 } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { GetCommentsQueryDto } from './dto/get-comments-query.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Comment, TargetType } from '@prisma/client';
+import { Comment } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
@@ -41,20 +41,17 @@ export class CommentController {
   @Get()
   @Public() 
   async getComments(
-    @Query('target_id', ParseIntPipe) targetId: number,
-    @Query('target_type') targetType: TargetType,
+    @Query() query: GetCommentsQueryDto,
     @CurrentUser() currentUser: CurrentUserType | null, 
-    @Query('parent_comment_id') parentCommentId?: string,
   ) {
-    if (!Object.values(TargetType).includes(targetType)) {
-      throw new BadRequestException('Invalid target_type');
-    }
-
+    console.log('Received query:', query);
+    console.log('Target type:', query.target_type, 'Type:', typeof query.target_type);
+    
     return this.commentService.getComments(
-      targetId,
-      targetType,
+      query.target_id,
+      query.target_type,
       currentUser?.id, 
-      parentCommentId ? parseInt(parentCommentId) : undefined,
+      query.parent_comment_id,
     );
   }
 
