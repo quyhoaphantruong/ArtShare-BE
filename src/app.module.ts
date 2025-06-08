@@ -33,8 +33,6 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AutoProjectModule } from './auto-project/auto-project.module';
 import { AutoPostModule } from './auto-post/auto-post.module';
 import { PlatformModule } from './platform/platform.module';
-import { NotificationModule } from './notification/notification.module';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 
 
 @Module({
