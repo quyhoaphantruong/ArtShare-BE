@@ -1,4 +1,4 @@
-# Use slim variant for smaller attack surface
+# Stage 1: Builder
 FROM node:22-slim AS builder
 
 # Install security updates and required packages
@@ -7,6 +7,7 @@ RUN apt-get update && \
     python3 \
     make \
     g++ \
+    openssl \
     && apt-get upgrade -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -20,7 +21,7 @@ RUN yarn install --frozen-lockfile
 # Copy prisma schema
 COPY prisma ./prisma
 
-# Generate Prisma client
+# Generate Prisma client with correct binary target
 RUN yarn prisma generate
 
 # Copy source code
@@ -29,11 +30,12 @@ COPY . .
 # Build application
 RUN yarn build
 
-# Stage 2: Production dependencies
+# Stage 2: Production dependencies  
 FROM node:22-slim AS deps
 
-# Install security updates
+# Install security updates and openssl
 RUN apt-get update && \
+    apt-get install -y --no-install-recommends openssl && \
     apt-get upgrade -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -48,9 +50,9 @@ RUN yarn prisma generate
 # Stage 3: Production runtime
 FROM node:22-slim
 
-# Install security updates, dumb-init, and curl for health checks
+# Install security updates, dumb-init, curl, and openssl
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends dumb-init curl && \
+    apt-get install -y --no-install-recommends dumb-init curl openssl && \
     apt-get upgrade -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
