@@ -33,6 +33,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AutoProjectModule } from './auto-project/auto-project.module';
 import { AutoPostModule } from './auto-post/auto-post.module';
 import { PlatformModule } from './platform/platform.module';
+import { CacheModule } from './infastructure/simple-cache.module';
 
 
 @Module({
@@ -69,6 +70,7 @@ import { PlatformModule } from './platform/platform.module';
     AutoPostModule,
     PlatformModule,
     NotificationModule,
+    CacheModule,
   ],
   controllers: [AppController],
   providers: [AppService],
