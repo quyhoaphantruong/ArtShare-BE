@@ -12,7 +12,9 @@ export interface StatCount {
 export class StatisticsService {
   private readonly logger = new Logger(StatisticsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
   private async rawStats(
     column: string,
@@ -57,20 +59,70 @@ export class StatisticsService {
     return [{ key: 'posts_by_ai', count: Number(rows[0]?.count ?? 0) }];
   }
 
+  async getTotalAiImages(): Promise<StatCount[]> {
+    const rows: Array<{ count: bigint }> = await this.prisma.$queryRaw`
+    SELECT SUM(number_of_images_generated) as count
+    FROM art_generation
+    `;
+    return [{ key: 'ai_images', count: Number(rows[0]?.count ?? 0) }];
+  }
+
+  async getTop5PostsByAI(): Promise<any> {
+    const rows: Array<{ count: bigint }> = await this.prisma.$queryRaw`
+    SELECT *
+    FROM post
+    WHERE ai_created = true
+    ORDER BY like_count DESC
+    `;
+    return rows;
+  }
+
+  async getTotalTokenUsage(): Promise<StatCount[]> {
+    const rows: Array<{ count: bigint }> = await this.prisma.$queryRaw`
+    SELECT SUM(used_amount) as count
+    FROM user_usage
+    `;
+    return [{ key: 'token_usage', count: Number(rows[0]?.count ?? 0) }];
+  }
+
   async getAll(): Promise<{
     aspectRatios: StatCount[];
-    lightings: StatCount[];
     styles: StatCount[];
     posts_by_ai: StatCount[];
+    total_ai_images: StatCount[];
+    top_posts_by_ai: any;
+    trending_prompts: any[];
+    token_usage: StatCount[];
   }> {
-    const [aspectRatios, lightings, styles, posts_by_ai] = await Promise.all([
+    const [
+      aspectRatios,
+      styles,
+      posts_by_ai,
+      total_ai_images,
+      top_posts_by_ai,
+      token_usage,
+    ] = await Promise.all([
       this.getAspectRatioStats(),
-      this.getLightingStats(),
       this.getStyles(),
       this.getPostsByAI(),
+      this.getTotalAiImages(),
+      this.getTop5PostsByAI(),
+      this.getTotalTokenUsage(),
     ]);
 
-    return { aspectRatios, lightings, styles, posts_by_ai };
+    const storedPrompts = await this.getStoredTrendingPrompts(
+      'trending_prompts_v1',
+    );
+
+    return {
+      aspectRatios,
+      styles,
+      posts_by_ai,
+      total_ai_images,
+      top_posts_by_ai,
+      trending_prompts: storedPrompts ?? [],
+      token_usage,
+    };
   }
 
   async getRawTrendingPrompts(): Promise<string[]> {

@@ -11,6 +11,7 @@ import { CreateReportDto } from './dto/create-report.dto';
 import { Report, ReportTargetType, Prisma, ReportStatus } from '@prisma/client';
 import { ViewTab } from './dto/view-report.dto';
 import { ResolveReportDto } from './dto/resolve-report.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 export type ReportWithDetails = Report & {
   reporter: { id: string; username: string };
@@ -19,13 +20,17 @@ export type ReportWithDetails = Report & {
 
 @Injectable()
 export class ReportService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async createReport(
     createReportDto: CreateReportDto,
     reporterId: string,
   ): Promise<Report> {
-    const { target_id, target_type, reason, target_url, user_id } = createReportDto;
+    const { target_id, target_type, reason, target_url, user_id } =
+      createReportDto;
 
     const existingReport = await this.prisma.report.findFirst({
       where: {
@@ -65,7 +70,7 @@ export class ReportService {
     }
   }
 
-   async findPendingReports(options: {
+  async findPendingReports(options: {
     skip?: number;
     take?: number;
   }): Promise<ReportWithDetails[]> {
@@ -106,13 +111,13 @@ export class ReportService {
       skip: options.skip,
       take: options.take,
     }) as Promise<ReportWithDetails[]>;
-  } 
+  }
 
-   async updateReportStatus(
+  async updateReportStatus(
     reportId: number,
     status: ReportStatus,
     // Optional: if dismissing should also assign a moderator
-    // moderatorId?: string 
+    // moderatorId?: string
   ): Promise<ReportWithDetails> {
     const reportExists = await this.prisma.report.findUnique({
       where: { id: reportId },
@@ -129,13 +134,13 @@ export class ReportService {
         // moderator_id: (status === ReportStatus.DISMISSED && moderatorId) ? moderatorId : reportExists.moderator_id,
         // resolved_at: (status === ReportStatus.DISMISSED) ? new Date() : reportExists.resolved_at, // Or a new 'dismissed_at' field
       },
-      include: { // <<< INCLUDE RELATIONS
+      include: {
+        // <<< INCLUDE RELATIONS
         reporter: { select: { id: true, username: true } },
         moderator: { select: { id: true, username: true } },
       },
     }) as Promise<ReportWithDetails>;
   }
-
 
   async resolveReport(
     reportId: number,
@@ -149,22 +154,35 @@ export class ReportService {
     if (!existingReport) {
       throw new NotFoundException(`Report ${reportId} not found.`);
     }
-    if (existingReport.status === ReportStatus.RESOLVED || existingReport.status === ReportStatus.DISMISSED) {
-      throw new ConflictException(`Report ${reportId} has already been ${existingReport.status.toLowerCase()}.`);
-    }
+    // if (
+    //   existingReport.status === ReportStatus.RESOLVED ||
+    //   existingReport.status === ReportStatus.DISMISSED
+    // ) {
+    //   throw new ConflictException(
+    //     `Report ${reportId} has already been ${existingReport.status.toLowerCase()}.`,
+    //   );
+    // }
 
-    return this.prisma.report.update({
+    const updatedReport = await this.prisma.report.update({
       where: { id: reportId },
       data: {
         status: ReportStatus.RESOLVED,
         resolved_at: new Date(dto.resolve_date),
         resolution_comment: dto.resolution_comment,
-        moderator_id: currentModeratorId, // Set the foreign key
+        moderator_id: currentModeratorId,
       },
-      include: { // <<< INCLUDE RELATIONS
+      include: {
         reporter: { select: { id: true, username: true } },
-        moderator: { select: { id: true, username: true } }, // This will populate the 'moderator' field
+        moderator: { select: { id: true, username: true } },
       },
-    }) as Promise<ReportWithDetails>;
+    });
+
+    this.eventEmitter.emit('report.resolved', {
+      reporterId:  updatedReport.moderator_id,
+      reportId: updatedReport.id,
+      reason: updatedReport.reason,
+      resolvedAt: updatedReport.resolved_at,
+    });
+    return updatedReport;
   }
 }

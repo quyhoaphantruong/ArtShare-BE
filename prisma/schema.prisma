@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -49,19 +50,21 @@ model User {
   blogs           Blog[]
   bookmarks       Bookmark[]
   comments        Comment[]
-  followers       Follow[]      @relation("followers_of_user")
-  followings      Follow[]      @relation("users_following")
+  followers       Follow[]       @relation("followers_of_user")
+  followings      Follow[]       @relation("users_following")
   likes           Like[]
   posts           Post[]
   ratings         Rating[]
-  Report          Report[]      @relation("UserReports")
+  Report          Report[]       @relation("UserReports")
   shares          Share[]
   userAccess      UserAccess?
   roles           UserRole[]
   UserUsage       UserUsage[]
   CommentLike     CommentLike[]
-  reportsResolved Report[]      @relation("ModeratorReports")
+  reportsResolved Report[]       @relation("ModeratorReports")
   AutoProject     AutoProject[]
+  notifications   Notification[]
+  Conversation    Conversation[]
 
   @@map("user")
 }
@@ -395,6 +398,19 @@ model TrendingPrompt {
   @@map("trending_prompts")
 }
 
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  payload   Json
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
 model Platform {
   id               Int            @id @default(autoincrement())
   name             SharePlatform
@@ -448,6 +464,41 @@ model AutoPost {
   autoProject AutoProject @relation(fields: [auto_project_id], references: [id], onDelete: Cascade)
 
   @@map("auto_post")
+}
+
+model Conversation {
+  id            String   @id @default(cuid())
+  userId        String
+  title         String?
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  messages Message[]
+  user     User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, lastMessageAt])
+  @@map("conversation")
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String      @db.Text
+  metadata       Json? // Store generated prompts here
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("message")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
 }
 
 enum PaidAccessLevel {

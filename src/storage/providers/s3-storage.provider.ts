@@ -5,6 +5,7 @@ import { IStorageProvider } from '../storage.interface';
 import { GetPresignedUrlRequestDto } from '../dto/request.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { GetPresignedUrlResponseDto } from '../dto/response.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class S3StorageProvider implements IStorageProvider {
@@ -13,16 +14,16 @@ export class S3StorageProvider implements IStorageProvider {
   private region: string;
   private bucketUrl: string;
 
-  constructor() {
-    this.region = process.env.AWS_REGION || 'ap-southeast-1';
-    this.bucketName = process.env.AWS_S3_BUCKET_NAME || 'artsharing';
+  constructor(private readonly configService: ConfigService) {
+    this.region = this.configService.get<string>('AWS_REGION') || 'ap-southeast-1';
+    this.bucketName = this.configService.get<string>('AWS_S3_BUCKET_NAME') || 'artsharing';
     this.bucketUrl = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/`;
 
     // Configure the S3 client
     this.s3 = new S3({
       region: this.region,
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID'),
+      secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY'),
       signatureVersion: 'v4', // Ensure consistent signature behavior
     });
   }
