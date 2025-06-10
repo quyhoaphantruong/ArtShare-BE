@@ -20,7 +20,7 @@ import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { AutoProjectWriteService } from './auto-project-write.service';
 import { AutoProjectDetailsDto } from './dto/response/auto-project-details.dto';
-import { AutoProjectListItemDto } from './dto/response/auto-project-list-item.dto';
+import { AutoProjectListResponseDto } from './dto/response/auto-project-list-item.dto';
 import { UpdateAutoProjectDto } from './dto/request/update-project.dto';
 
 @Controller('auto-project')
@@ -42,11 +42,20 @@ export class AutoProjectController {
   @Get()
   async findAll(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
-    page_size: number,
+    @Query('page_size', new DefaultValuePipe(10), ParseIntPipe)
+    pageSize: number,
+    @Query('sort_by', new DefaultValuePipe('created_at')) sortBy: string,
+    @Query('sort_order', new DefaultValuePipe('desc'))
+    sortOrder: 'asc' | 'desc',
     @CurrentUser() user: CurrentUserType,
-  ): Promise<AutoProjectListItemDto[]> {
-    return this.autoProjectReadService.findAll(page, page_size, user.id);
+  ): Promise<AutoProjectListResponseDto> {
+    return this.autoProjectReadService.findAll(
+      page,
+      pageSize,
+      user.id,
+      sortBy,
+      sortOrder,
+    );
   }
 
   @Get(':id')
