@@ -17,13 +17,23 @@ export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
 
   async createAndPush(userId: string, type: string, payload: object) {
+    const startTime = Date.now();
+    this.logger.log(`[${startTime}] Creating and pushing notification to user ${userId}, type: ${type}`);
+    
     const notification = await this.create(userId, type, payload);
+    const createTime = Date.now();
+    this.logger.log(`[${createTime}] Notification ${notification.id} created in ${createTime - startTime}ms`);
 
+    this.logger.log(`[${createTime}] Sending notification ${notification.id} to user ${userId} via WebSocket`);
     this.notificationsGateway.sendToUser(
       userId,
       'new-notification',
       notification,
     );
+    
+    const endTime = Date.now();
+    this.logger.log(`[${endTime}] Notification ${notification.id} sent to user ${userId} - Total time: ${endTime - startTime}ms`);
+    return notification;
   }
 
   async create(userId: string, type: string, payload: object) {
@@ -45,6 +55,16 @@ export class NotificationService {
       orderBy: { createdAt: 'desc' },
     });
     return notifications;
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const count = await this.prisma.notification.count({
+      where: {
+        userId,
+        isRead: false,
+      },
+    });
+    return count;
   }
 
   async markAsRead(notificationId: string) {
@@ -73,10 +93,46 @@ export class NotificationService {
 
   async markAsDelivered(notificationId: string) {
     this.logger.log(`markAsDelivered for notification ${notificationId}`);
+    // Note: Currently using isRead for delivery tracking
+    // In the future, consider adding a separate 'delivered' field to the schema
     return this.prisma.notification.update({
       where: { id: notificationId },
       data: { isRead: true },
     });
+  }
+
+  async getConnectionStatus(userId: string) {
+    this.logger.log(`Getting connection status for user ${userId}`);
+    return this.notificationsGateway.getUserConnectionStatus(userId);
+  }
+
+  async sendDebugPing(userId: string, data: any) {
+    this.logger.log(`Sending debug ping to user ${userId}`);
+    this.notificationsGateway.sendToUser(userId, 'debug-ping', data);
+  }
+
+  async getAllConnections() {
+    this.logger.log('Getting all WebSocket connections');
+    const gateway = this.notificationsGateway;
+    const connectedClients = gateway['connectedClients'] as Map<string, Set<any>>;
+    
+    const connections = Array.from(connectedClients.entries()).map(([userId, sockets]) => ({
+      userId,
+      connectionCount: sockets.size,
+      connections: Array.from(sockets).map((socket: any) => ({
+        id: socket.id,
+        connected: socket.connected,
+        address: socket.handshake?.address,
+        userAgent: socket.handshake?.headers?.['user-agent'],
+        origin: socket.handshake?.headers?.origin
+      }))
+    }));
+    
+    return {
+      totalUsers: connections.length,
+      totalConnections: connections.reduce((sum, user) => sum + user.connectionCount, 0),
+      connections
+    };
   }
 
   @OnEvent('report.resolved')
@@ -89,6 +145,27 @@ export class NotificationService {
     this.logger.log('Caught report.resolved event, creating notification...');
 
     const notificationType = 'REPORT_RESOLVED';
+    
+    // Check if a notification for this report resolution already exists
+    // to prevent duplicate notifications
+    const existingNotification = await this.prisma.notification.findFirst({
+      where: {
+        userId: payload.reporterId,
+        type: notificationType,
+        payload: {
+          path: ['reportId'],
+          equals: payload.reportId,
+        },
+      },
+    });
+
+    if (existingNotification) {
+      this.logger.log(
+        `Notification for report ${payload.reportId} already exists for user ${payload.reporterId}, skipping duplicate`
+      );
+      return;
+    }
+
     const notificationPayload = {
       message: `Your report regarding "${payload.reason}" has been reviewed and resolved.`,
       reportId: payload.reportId,

@@ -9,11 +9,16 @@ import helmet from 'helmet';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const compression = require('compression');
 import rateLimit from 'express-rate-limit';
+import { IoAdapter } from '@nestjs/platform-socket.io';
+import { WebSocketJwtAuthGuard } from './auth/websocket-jwt-auth.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'fatal', 'error', 'warn', 'debug', 'verbose'],
   });
+  
+  // Configure Socket.IO adapter for WebSocket support
+  app.useWebSocketAdapter(new IoAdapter(app));
   
   // Trust proxy for rate limiting and IP detection
   const expressApp = app.getHttpAdapter().getInstance();
@@ -33,7 +38,7 @@ async function bootstrap() {
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Note: unsafe-eval may be needed for some libs
         imgSrc: ["'self'", "data:", "https:", "blob:"],
         fontSrc: ["'self'", "https:"],
-        connectSrc: ["'self'", "https:", "wss:"],
+        connectSrc: ["'self'", "https:", "wss:", "ws:"],
         mediaSrc: ["'self'", "https:", "blob:"],
         objectSrc: ["'none'"],
         frameAncestors: ["'self'"],
@@ -190,6 +195,8 @@ async function bootstrap() {
     next();
   });
 
+  const webSocketGuard = app.get(WebSocketJwtAuthGuard);
+  app.useGlobalGuards(webSocketGuard);
   await app.listen(port, '0.0.0.0');
   
   logger.log(`🚀 Application is running on: http://localhost:${port}`);
