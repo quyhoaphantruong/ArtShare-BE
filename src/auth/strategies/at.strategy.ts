@@ -7,13 +7,22 @@ import { JwtPayload } from '../types/jwtPayload.type';
 @Injectable()
 export class AtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(config: ConfigService) {
+    const secret = config.get<string>('AT_SECRET');
+
+    if (!secret) {
+      throw new Error('AT_SECRET is not defined in configuration');
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: config.get<string>('AT_SECRET'),
+      secretOrKey: secret,
     });
   }
 
-  validate(payload: JwtPayload) {
-    return payload;
+  validate(req: Request, payload: JwtPayload) {
+    return {
+      userId: payload.userId,
+      email: payload.email,
+    };
   }
 }
