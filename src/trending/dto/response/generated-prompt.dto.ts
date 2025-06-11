@@ -1,6 +1,5 @@
 export class GeneratedPrompt {
-    prompt: string;
-    theme: string;
+    
 }
   
 export class MessageResponseDto {
