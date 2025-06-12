@@ -13,7 +13,7 @@ import { NotificationService } from './notification.service';
 @WebSocketGateway({ 
   namespace: '/notifications', 
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:1574', 'http://localhost:3000'],
+    origin: true, // We'll configure this properly in the constructor
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -34,10 +34,40 @@ export class NotificationsGateway
     @Inject(forwardRef(() => NotificationService)) private readonly notificationService: NotificationService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    // Configure CORS with environment variables after the server is initialized
+    setTimeout(() => {
+      if (this.server) {
+        const allowedOrigins = [
+          this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173',
+          this.configService.get<string>('ADMIN_FRONTEND_URL') || 'http://localhost:1574',
+        ];
+
+        // Add production URLs if they exist
+        const productionFrontendUrl = this.configService.get<string>('PRODUCTION_FRONTEND_URL');
+        const productionAdminUrl = this.configService.get<string>('PRODUCTION_ADMIN_URL');
+        
+        if (productionFrontendUrl) allowedOrigins.push(productionFrontendUrl);
+        if (productionAdminUrl) allowedOrigins.push(productionAdminUrl);
+
+        // Remove any duplicates and empty strings
+        const uniqueOrigins = [...new Set(allowedOrigins.filter(origin => origin))];
+
+        this.logger.log(`Configuring WebSocket CORS with origins: ${uniqueOrigins.join(', ')}`);
+
+        // Update the server's CORS configuration
+        this.server.engine.opts.cors = {
+          origin: uniqueOrigins,
+          methods: ['GET', 'POST'],
+          credentials: true,
+        };
+      }
+    }, 0);
+  }
 
   async handleConnection(client: Socket) {
     this.logger.log(`WebSocket connection attempt from: ${client.handshake.address}`);
+    this.logger.log(`Origin: ${client.handshake.headers.origin}`);
     
     try {
       // Manually verify the JWT token since guards have timing issues with handleConnection
