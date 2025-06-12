@@ -31,20 +31,21 @@ model UserRole {
 }
 
 model User {
-  id                  String    @id
-  username            String    @unique
-  email               String    @unique
+  id                  String     @id
+  username            String     @unique
+  email               String     @unique
   full_name           String?
   profile_picture_url String?
   bio                 String?
-  created_at          DateTime  @default(now())
-  updated_at          DateTime? @updatedAt
+  created_at          DateTime   @default(now())
+  updated_at          DateTime?  @updatedAt
   refresh_token       String?
-  birthday            DateTime? @db.Date
-  followers_count     Int       @default(0)
-  followings_count    Int       @default(0)
-  stripe_customer_id  String?   @unique
-  is_onboard          Boolean   @default(false)
+  birthday            DateTime?  @db.Date
+  followers_count     Int        @default(0)
+  followings_count    Int        @default(0)
+  stripe_customer_id  String?    @unique
+  is_onboard          Boolean    @default(false)
+  status              UserStatus @default(ACTIVE)
 
   collections     Collection[]
   blogs           Blog[]
@@ -584,4 +585,10 @@ enum AutoPostStatus {
 enum PlatformStatus {
   ACTIVE
   INACTIVE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
 }

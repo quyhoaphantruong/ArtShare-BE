@@ -63,7 +63,7 @@ export class UserAdminController {
   @SwaggerApiResponse({
     status: HttpStatus.OK,
     description: 'Paginated list of users with their details.',
-    type: PaginatedUsersResponseDto, // Use the new paginated DTO
+    type: PaginatedUsersResponseDto,
   })
   @SwaggerApiResponse({
     status: HttpStatus.FORBIDDEN,
@@ -72,7 +72,6 @@ export class UserAdminController {
   async adminFindAllUsers(
     @Query() paginationQuery: PaginationQueryDto,
   ): Promise<PaginatedUsersResponseDto> {
-    // Return the paginated DTO
     return this.userAdminService.findAllWithDetailsPaginated(paginationQuery);
   }
 
