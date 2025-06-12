@@ -122,7 +122,6 @@ async function bootstrap() {
       },
       whitelist: true,
       forbidNonWhitelisted: true,
-      forbidUnknownValues: true,
       disableErrorMessages: isProduction, // Hide detailed validation errors in production
       validateCustomDecorators: true,
       always: true,
