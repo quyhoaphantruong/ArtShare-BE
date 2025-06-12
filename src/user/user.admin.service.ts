@@ -6,8 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
-import { User, UserAccess, Prisma } from '@prisma/client';
+import { User, UserAccess, Prisma, PrismaClient } from '@prisma/client';
 import { DeleteUsersDTO } from './dto/delete-users.dto';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { Role } from 'src/auth/enums/role.enum';
@@ -25,7 +24,7 @@ export class UserAdminService {
   private readonly logger = new Logger(UserAdminService.name);
 
   constructor(
-    private prisma: PrismaService,
+    private prisma: PrismaClient,
     private readonly firebaseAuth: Auth,
   ) {}
 

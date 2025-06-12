@@ -6,12 +6,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as admin from 'firebase-admin'; // Firebase Admin SDK
-import { PrismaService } from 'src/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { JwtPayload } from './types/jwtPayload.type';
 import { Tokens } from './types/tokens.type';
-import { PaidAccessLevel, Prisma } from '@prisma/client';
+import { PaidAccessLevel, Prisma, PrismaClient } from '@prisma/client';
 import { Role } from './enums/role.enum';
 import { nanoid } from 'nanoid';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
@@ -19,7 +18,7 @@ import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
+    private prisma: PrismaClient,
     private jwtService: JwtService,
     private config: ConfigService,
   ) {}

@@ -1,17 +1,18 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CategoryResponseDto } from './dto/response/category.dto';
-import { PrismaService } from 'src/prisma.service';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { plainToInstance } from 'class-transformer';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class CategoriesSearchService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) { }
+  constructor(private readonly prisma: PrismaClient) {}
 
   @TryCatch()
-  async findAll(page: number, page_size: number): Promise<CategoryResponseDto[]> {
+  async findAll(
+    page: number,
+    page_size: number,
+  ): Promise<CategoryResponseDto[]> {
     const categories = await this.prisma.category.findMany({
       skip: (page - 1) * page_size,
       take: page_size,

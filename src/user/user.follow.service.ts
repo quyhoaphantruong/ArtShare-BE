@@ -7,7 +7,6 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { ApiResponse as CustomApiResponse } from 'src/common/api-response';
 import {
@@ -16,12 +15,13 @@ import {
   UnfollowUserResponseDto,
 } from 'src/common/dto/api-response.dto';
 import { FollowerDto } from './dto/follower.dto';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class UserFollowService {
   private readonly logger = new Logger(UserFollowService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaClient) {}
 
   async followUser(
     followerId: string,

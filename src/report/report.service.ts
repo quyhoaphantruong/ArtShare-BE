@@ -6,9 +6,8 @@ import {
   InternalServerErrorException,
   ConflictException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
 import { CreateReportDto } from './dto/create-report.dto';
-import { Report, ReportTargetType, Prisma, ReportStatus } from '@prisma/client';
+import { Report, ReportTargetType, Prisma, ReportStatus, PrismaClient } from '@prisma/client';
 import { ViewTab } from './dto/view-report.dto';
 import { ResolveReportDto } from './dto/resolve-report.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -21,7 +20,7 @@ export type ReportWithDetails = Report & {
 @Injectable()
 export class ReportService {
   constructor(
-    private prisma: PrismaService,
+    private prisma: PrismaClient,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 

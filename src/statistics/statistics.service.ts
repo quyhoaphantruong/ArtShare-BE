@@ -1,7 +1,6 @@
 // src/statistics/statistics.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from 'src/prisma.service';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 export interface StatCount {
   key: string;
@@ -12,9 +11,7 @@ export interface StatCount {
 export class StatisticsService {
   private readonly logger = new Logger(StatisticsService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   private async rawStats(
     column: string,

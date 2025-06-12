@@ -5,16 +5,15 @@ import {
   InternalServerErrorException,
   ForbiddenException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
-import { Comment, TargetType } from '@prisma/client';
+import { Comment, PrismaClient, TargetType } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CommentDto } from './dto/get-comment.dto';
 
 @Injectable()
 export class CommentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaClient) {}
 
   async create(dto: CreateCommentDto, userId: string): Promise<Comment> {
     const { content, target_id, target_type, parent_comment_id } = dto;

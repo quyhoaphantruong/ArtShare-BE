@@ -5,16 +5,20 @@ import {
   Logger,
 } from '@nestjs/common';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
-import { PrismaService } from 'src/prisma.service';
 import { UserAccessWithPlan } from './types/user-access.type';
 import { TryCatch } from 'src/common/try-catch.decorator';
-import { PaidAccessLevel, Prisma, UserUsage } from '@prisma/client';
+import {
+  PaidAccessLevel,
+  Prisma,
+  UserUsage,
+  PrismaClient,
+} from '@prisma/client';
 import { startOfDay } from 'date-fns';
 
 @Injectable()
 export class UsageService {
-  constructor(private readonly prismaService: PrismaService) { }
-  
+  constructor(private readonly prisma: PrismaClient) {}
+
   private logger = new Logger(UsageService.name);
 
   @TryCatch()
@@ -26,7 +30,7 @@ export class UsageService {
     const userAccess = await this.getUserAccess(userId);
     const userUsage = await this.getUserUsage(userId, featureKey, userAccess);
 
-    const updated = await this.prismaService.userUsage.updateMany({
+    const updated = await this.prisma.userUsage.updateMany({
       where: {
         id: userUsage.id,
         // ensure there’s enough headroom
@@ -45,7 +49,11 @@ export class UsageService {
     }
   }
 
-  private async getUserUsage(userId: string, featureKey: FeatureKey, userAccess: UserAccessWithPlan): Promise<UserUsage> {
+  private async getUserUsage(
+    userId: string,
+    featureKey: FeatureKey,
+    userAccess: UserAccessWithPlan,
+  ): Promise<UserUsage> {
     const todayStart = startOfDay(new Date());
 
     // build a `where` filter that only includes `cycleStartedAt` for paid plans
@@ -57,7 +65,7 @@ export class UsageService {
         : {}),
     };
 
-    const usage = await this.prismaService.userUsage.findFirst({
+    const usage = await this.prisma.userUsage.findFirst({
       where: baseWhere,
       orderBy: { cycleStartedAt: 'desc' },
     });
@@ -75,7 +83,7 @@ export class UsageService {
   }
 
   private async getUserAccess(userId: string): Promise<UserAccessWithPlan> {
-    const userAccess = await this.prismaService.userAccess.findUnique({
+    const userAccess = await this.prisma.userAccess.findUnique({
       where: {
         userId: userId,
       },

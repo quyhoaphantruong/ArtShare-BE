@@ -4,7 +4,6 @@ import {
   ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
 import { CreateBlogDto } from './dto/request/create-blog.dto';
 import { UpdateBlogDto } from './dto/request/update-blog.dto';
 import { BlogDetailsResponseDto } from './dto/response/blog-details.dto';
@@ -17,11 +16,12 @@ import { ProtectResponseDto } from './dto/response/protect-response.dto';
 import { RatingResponseDto } from './dto/response/rating-response.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { BlogEmbeddingService } from './blog-embedding.service';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class BlogManagementService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaClient,
     private readonly blogEmbeddingService: BlogEmbeddingService,
   ) {}
 
@@ -150,7 +150,7 @@ export class BlogManagementService {
         'You do not have permission to delete this blog.',
       );
     }
-    const result =await this.prisma.blog.delete({ where: { id } });
+    const result = await this.prisma.blog.delete({ where: { id } });
     return result;
   }
 

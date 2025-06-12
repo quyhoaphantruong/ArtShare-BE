@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
 import { CreateLikeDto } from './dto/request/create-like.dto';
-import { TargetType } from '@prisma/client';
+import { PrismaClient, TargetType } from '@prisma/client';
 import { plainToClass } from 'class-transformer';
 import { LikeDetailsDto } from './dto/response/like-details.dto';
 import { RemoveLikeDto } from './dto/request/remove-like.dto';
@@ -10,7 +9,7 @@ import { LikingUserResponseDto } from './dto/response/liking-user-response.dto';
 
 @Injectable()
 export class LikesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   @TryCatch('create like failed')
   async createLike(

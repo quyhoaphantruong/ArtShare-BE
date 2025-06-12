@@ -8,12 +8,12 @@ import {
   Platform,
   PlatformStatus,
   Prisma,
+  PrismaClient,
   SharePlatform,
 } from '@prisma/client';
 import { PlatformPageConfig } from './dtos/platform-config.interface';
 import { CreatePlatformDto } from './dtos/create-platform.dto';
 import { SyncPlatformInputDto } from './dtos/sync-platform-input.dto';
-import { PrismaService } from 'src/prisma.service';
 import { EncryptionService } from 'src/encryption/encryption.service';
 import { PublicPlatformOutputDto } from './dtos/public-platform-output.dto';
 import { UpdatePlatformConfigDto } from './dtos/update-platform-config.dto';
@@ -23,7 +23,7 @@ export class PlatformService {
   private readonly logger = new Logger(PlatformService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaClient,
     private readonly encryptionService: EncryptionService,
   ) {}
 

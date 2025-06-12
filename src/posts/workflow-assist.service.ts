@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-metadata.dto';
-import { PrismaService } from 'src/prisma.service';
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';
@@ -12,6 +11,7 @@ import { UsageService } from 'src/usage/usage.service';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { ConfigService } from '@nestjs/config';
+import { PrismaClient } from '@prisma/client';
 
 const PostMetadata = z.object({
   title: z.string(),
@@ -24,7 +24,7 @@ export class WorkflowAssistService {
   aiCreditCost = 2;
 
   constructor(
-    private readonly prismaService: PrismaService,
+    private readonly prisma: PrismaClient,
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
     private readonly usageService: UsageService,
@@ -45,8 +45,12 @@ export class WorkflowAssistService {
     if (!imageFiles || imageFiles.length === 0) {
       throw new BadRequestException('No images provided');
     }
-    
-    await this.usageService.handleCreditUsage(userId, FeatureKey.AI_CREDITS, this.aiCreditCost);
+
+    await this.usageService.handleCreditUsage(
+      userId,
+      FeatureKey.AI_CREDITS,
+      this.aiCreditCost,
+    );
 
     const [{ title, description }, matchedCategories] = await Promise.all([
       this.generateTitleAndDescription(imageFiles),
@@ -54,7 +58,7 @@ export class WorkflowAssistService {
     ]);
 
     // query categories based on the categories returned from generating
-    const categories = await this.prismaService.category.findMany({
+    const categories = await this.prisma.category.findMany({
       where: {
         id: {
           in: matchedCategories.map((c) => c.id),

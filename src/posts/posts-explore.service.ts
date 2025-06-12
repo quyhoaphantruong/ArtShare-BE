@@ -1,8 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PostListItemResponseDto } from './dto/response/post-list-item.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
-import { PrismaService } from 'src/prisma.service';
-import { Post, Prisma } from '@prisma/client';
+import { Post, Prisma, PrismaClient } from '@prisma/client';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
@@ -16,7 +15,7 @@ import {
 @Injectable()
 export class PostsExploreService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaClient,
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
   ) {}
@@ -269,7 +268,10 @@ export class PostsExploreService {
   }
 
   @TryCatch()
-  async getAiTrendingPosts(page: number, page_size: number): Promise<PostListItemResponseDto[]> {
+  async getAiTrendingPosts(
+    page: number,
+    page_size: number,
+  ): Promise<PostListItemResponseDto[]> {
     const skip = (page - 1) * page_size;
 
     const customIncludes: Prisma.PostInclude = {
@@ -282,10 +284,9 @@ export class PostsExploreService {
       ...customIncludes,
     };
 
-
     const posts = await this.prisma.post.findMany({
       where: { ai_created: true },
-      orderBy: [{ view_count: 'desc'}, { share_count: 'desc' }, { id: 'asc' }],
+      orderBy: [{ view_count: 'desc' }, { share_count: 'desc' }, { id: 'asc' }],
       take: page_size,
       skip,
       // common includes with custom includes for art generation

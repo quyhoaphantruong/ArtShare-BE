@@ -11,12 +11,12 @@ import {
   AutoPostStatus,
   Prisma,
   AutoPost as PrismaAutoPost,
+  PrismaClient,
   SharePlatform,
 } from '@prisma/client';
 
 import { firstValueFrom } from 'rxjs';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from 'src/prisma.service';
 import { AxiosError } from 'axios';
 import { EncryptionService } from 'src/encryption/encryption.service';
 import {
@@ -40,7 +40,7 @@ export class AutoPostService {
   private readonly n8nExecutePostWebhookUrl?: string;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaClient,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly encryptionService: EncryptionService,

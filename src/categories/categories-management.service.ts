@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/request/create-category.dto';
 import { UpdateCategoryDto } from './dto/request/update-category.dto';
-import { PrismaService } from 'src/prisma.service';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { CategoryResponseDto } from './dto/response/category.dto';
 import { plainToInstance } from 'class-transformer';
@@ -9,13 +8,13 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { VECTOR_DIMENSION } from 'src/embedding/embedding.utils';
 import { SyncEmbeddingResponseDto } from '../common/response/sync-embedding.dto';
-import { Category } from '@prisma/client';
+import { Category, PrismaClient } from '@prisma/client';
 import { QdrantService } from 'src/embedding/qdrant.service';
 
 @Injectable()
 export class CategoriesManagementService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaClient,
     private readonly qdrantClient: QdrantClient,
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantService: QdrantService,
@@ -27,7 +26,9 @@ export class CategoriesManagementService {
   private readonly categoriesCollectionName = 'categories';
 
   private async ensureCategoriesCollectionExists() {
-    const collectionExists = await this.qdrantService.collectionExists(this.categoriesCollectionName);
+    const collectionExists = await this.qdrantService.collectionExists(
+      this.categoriesCollectionName,
+    );
     if (!collectionExists) {
       await this.qdrantClient.createCollection(this.categoriesCollectionName, {
         vectors: {

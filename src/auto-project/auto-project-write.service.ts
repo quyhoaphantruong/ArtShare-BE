@@ -5,10 +5,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
 import { CreateAutoProjectDto } from './dto/request/create-project.dto';
 import { AutoPostGenerateService } from 'src/auto-post/auto-post-generate.service';
-import { Platform } from '@prisma/client';
+import { Platform, PrismaClient } from '@prisma/client';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { plainToInstance } from 'class-transformer';
 import { AutoProjectDetailsDto } from './dto/response/auto-project-details.dto';
@@ -19,9 +18,9 @@ import { UpdateAutoProjectDto } from './dto/request/update-project.dto';
 @Injectable()
 export class AutoProjectWriteService {
   private readonly logger: Logger;
-  
+
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaClient,
     private readonly autoPostGenerateService: AutoPostGenerateService,
     private readonly usageService: UsageService,
   ) {}

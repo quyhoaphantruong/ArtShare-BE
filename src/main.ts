@@ -10,44 +10,52 @@ import helmet from 'helmet';
 const compression = require('compression');
 import rateLimit from 'express-rate-limit';
 
+declare const module: any;
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'fatal', 'error', 'warn', 'debug', 'verbose'],
   });
-  
+
+  app.enableShutdownHooks();
+
   // Trust proxy for rate limiting and IP detection
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
-  
+
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') ?? 3000;
   const isProduction = configService.get<string>('NODE_ENV') === 'production';
   const logger = new Logger('Bootstrap');
 
   // Security Headers with Helmet
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Note: unsafe-eval may be needed for some libs
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        fontSrc: ["'self'", "https:"],
-        connectSrc: ["'self'", "https:", "wss:"],
-        mediaSrc: ["'self'", "https:", "blob:"],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'self'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'"],
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Note: unsafe-eval may be needed for some libs
+          imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+          fontSrc: ["'self'", 'https:'],
+          connectSrc: ["'self'", 'https:', 'wss:'],
+          mediaSrc: ["'self'", 'https:', 'blob:'],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'self'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+        },
       },
-    },
-    crossOriginEmbedderPolicy: false, // Disable if you have cross-origin resources
-    hsts: isProduction ? {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true
-    } : false,
-  }));
+      crossOriginEmbedderPolicy: false, // Disable if you have cross-origin resources
+      hsts: isProduction
+        ? {
+            maxAge: 31536000,
+            includeSubDomains: true,
+            preload: true,
+          }
+        : false,
+    }),
+  );
 
   // Compression
   app.use(compression());
@@ -58,7 +66,7 @@ async function bootstrap() {
     max: isProduction ? 1000 : 10000, // Limit each IP to 1000 requests per windowMs in production
     message: {
       error: 'Too many requests from this IP, please try again later.',
-      retryAfter: '15 minutes'
+      retryAfter: '15 minutes',
     },
     standardHeaders: true,
     legacyHeaders: false,
@@ -71,7 +79,7 @@ async function bootstrap() {
     max: isProduction ? 500 : 5000, // Limit each IP to 500 API requests per windowMs in production
     message: {
       error: 'Too many API requests from this IP, please try again later.',
-      retryAfter: '15 minutes'
+      retryAfter: '15 minutes',
     },
     skip: (req: express.Request) => req.path.startsWith('/api/stripe/webhook'), // Skip webhook endpoints
   });
@@ -79,12 +87,16 @@ async function bootstrap() {
 
   // Enable CORS with security considerations
   app.enableCors({
-    origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
       const allowedOrigins = [
         configService.get<string>('FRONTEND_URL') || 'http://localhost:5173',
-        configService.get<string>('ADMIN_FRONTEND_URL') || 'http://localhost:1574',
+        configService.get<string>('ADMIN_FRONTEND_URL') ||
+          'http://localhost:1574',
       ];
-      
+
       // Allow same-origin requests and specified origins
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
@@ -101,13 +113,13 @@ async function bootstrap() {
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
+      'Content-Type',
+      'Authorization',
       'X-Requested-With',
       'Accept',
       'Origin',
       'Cache-Control',
-      'X-File-Name'
+      'X-File-Name',
     ],
     credentials: true,
     maxAge: 86400, // Cache preflight response for 24 hours
@@ -122,7 +134,6 @@ async function bootstrap() {
       },
       whitelist: true,
       forbidNonWhitelisted: true,
-      forbidUnknownValues: true,
       disableErrorMessages: isProduction, // Hide detailed validation errors in production
       validateCustomDecorators: true,
       always: true,
@@ -130,20 +141,25 @@ async function bootstrap() {
   );
 
   // Request size limits
-  app.use(express.json({ 
-    limit: '10mb',
-    verify: (req: any, res, buf) => {
-      // Log large requests in production
-      if (isProduction && buf.length > 1024 * 1024) { // > 1MB
-        logger.warn(`Large request body: ${buf.length} bytes from ${req.ip}`);
-      }
-    }
-  }));
-  
-  app.use(express.urlencoded({ 
-    extended: true, 
-    limit: '10mb' 
-  }));
+  app.use(
+    express.json({
+      limit: '10mb',
+      verify: (req: any, res, buf) => {
+        // Log large requests in production
+        if (isProduction && buf.length > 1024 * 1024) {
+          // > 1MB
+          logger.warn(`Large request body: ${buf.length} bytes from ${req.ip}`);
+        }
+      },
+    }),
+  );
+
+  app.use(
+    express.urlencoded({
+      extended: true,
+      limit: '10mb',
+    }),
+  );
 
   // Swagger setup (disable in production for security)
   if (!isProduction) {
@@ -154,7 +170,7 @@ async function bootstrap() {
       .addTag('artsharing')
       .addBearerAuth() // Add authentication to swagger
       .build();
-    
+
     const documentFactory = () => SwaggerModule.createDocument(app, config);
     await SwaggerModule.loadPluginMetadata(metadata);
     SwaggerModule.setup('api', app, documentFactory, {
@@ -169,31 +185,54 @@ async function bootstrap() {
   const webhookRawBodyMiddleware = express.raw({ type: 'application/json' });
   app.use(
     '/api/stripe/webhook',
-    (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    (
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
       // Enhanced webhook logging
-      logger.log(`Webhook request received: ${req.method} ${req.originalUrl} from ${req.ip}`);
+      logger.log(
+        `Webhook request received: ${req.method} ${req.originalUrl} from ${req.ip}`,
+      );
       webhookRawBodyMiddleware(req, res, next);
     },
   );
 
   // Security logging
-  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-    // Log suspicious requests
-    if (req.headers['user-agent']?.includes('bot') || 
+  app.use(
+    (
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      // Log suspicious requests
+      if (
+        req.headers['user-agent']?.includes('bot') ||
         req.headers['user-agent']?.includes('crawler') ||
         req.path.includes('admin') ||
         req.path.includes('..') ||
         req.path.includes('wp-') ||
-        req.path.includes('php')) {
-      logger.warn(`Suspicious request: ${req.method} ${req.path} from ${req.ip} - User-Agent: ${req.headers['user-agent']}`);
-    }
-    next();
-  });
+        req.path.includes('php')
+      ) {
+        logger.warn(
+          `Suspicious request: ${req.method} ${req.path} from ${req.ip} - User-Agent: ${req.headers['user-agent']}`,
+        );
+      }
+      next();
+    },
+  );
 
   await app.listen(port, '0.0.0.0');
-  
+
+  if (module.hot) {
+    module.hot.accept();
+    module.hot.dispose(() => app.close());
+  }
+
   logger.log(`🚀 Application is running on: http://localhost:${port}`);
-  logger.log(`🔒 Security: ${isProduction ? 'Production' : 'Development'} mode`);
+  logger.log(
+    `🔒 Security: ${isProduction ? 'Production' : 'Development'} mode`,
+  );
   logger.log(`📊 Environment: ${configService.get<string>('NODE_ENV')}`);
 }
 

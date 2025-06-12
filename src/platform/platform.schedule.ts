@@ -1,12 +1,11 @@
-import { PlatformStatus } from '@prisma/client';
+import { PlatformStatus, PrismaClient } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
-import { PrismaService } from 'src/prisma.service';
 import { Logger } from '@nestjs/common';
 
 export class PlatformScheduler {
   private readonly logger = new Logger(PlatformScheduler.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   @Cron('0 3 * * *')
   async handleExpiredTokens() {

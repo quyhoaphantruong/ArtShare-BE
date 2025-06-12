@@ -3,22 +3,22 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
 import { subscriptionInfoResponseMapper } from './mapper/subscription.mapper';
 import { SubscriptionInfoResponseDto } from './dto/response/subscription-info.dto';
 import { endOfDay, startOfDay } from 'date-fns';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class SubscriptionService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   private logger = new Logger(SubscriptionService.name);
 
   async getSubscriptionInfo(
     userId: string,
   ): Promise<SubscriptionInfoResponseDto> {
-    const user = await this.prismaService.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,

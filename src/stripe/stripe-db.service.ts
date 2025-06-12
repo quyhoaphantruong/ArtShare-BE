@@ -1,12 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
-import { PaidAccessLevel, Plan, User, UserAccess } from '@prisma/client';
+import {
+  PaidAccessLevel,
+  Plan,
+  PrismaClient,
+  User,
+  UserAccess,
+} from '@prisma/client';
 
 @Injectable()
 export class StripeDbService {
   private logger = new Logger(StripeDbService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async findUserByStripeData(
     stripeCustomerId?: string | null,

@@ -4,9 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
-import { StorageService } from 'src/storage/storage.service'; import { MediaType, Post } from '@prisma/client';
+import { StorageService } from 'src/storage/storage.service';
+import { MediaType, Post, PrismaClient } from '@prisma/client';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
@@ -22,12 +22,12 @@ export class PostsManagementService {
   private readonly qdrantCollectionName = 'posts';
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaClient,
     private readonly storageService: StorageService,
     private readonly qdrantService: QdrantService,
     private readonly postEmbeddingService: PostsEmbeddingService,
     private readonly postsManagementValidator: PostsManagementValidator,
-  ) { }
+  ) {}
 
   @TryCatch()
   async createPost(
@@ -37,10 +37,11 @@ export class PostsManagementService {
   ): Promise<PostDetailsResponseDto> {
     const { cate_ids = [], video_url, prompt_id, ...rest } = request;
 
-    const { parsedCropMeta } = await this.postsManagementValidator.validateCreateRequest(
-      request,
-      images,
-    );
+    const { parsedCropMeta } =
+      await this.postsManagementValidator.validateCreateRequest(
+        request,
+        images,
+      );
 
     if (prompt_id) {
       await this.validateAiArtExistence(prompt_id);

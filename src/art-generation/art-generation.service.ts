@@ -9,11 +9,11 @@ import { StorageService } from 'src/storage/storage.service';
 import { FileUploadResponse } from 'src/storage/dto/response.dto';
 import { ImageGenerationDto } from './dto/request/image-generation.dto';
 import { ImageGenerationResponseDto } from './dto/response/image-generation.dto';
-import { PrismaService } from 'src/prisma.service';
 import { UsageService } from 'src/usage/usage.service';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 import { AspectRatio } from './enum/aspect-ratio';
 import { plainToInstance } from 'class-transformer';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class ArtGenerationService {
@@ -24,7 +24,7 @@ export class ArtGenerationService {
     @Inject('IMAGE_GENERATORS')
     private readonly generators: ImageGeneratorStrategy[],
     private readonly storageService: StorageService,
-    private readonly prismaService: PrismaService,
+    private readonly prisma: PrismaClient,
     private readonly usageService: UsageService,
   ) {
     this.strategies = Object.fromEntries(
@@ -116,7 +116,7 @@ export class ArtGenerationService {
     const urls = uploads.map((upload) => upload.url);
 
     // save info to the database
-    const generatedArt = await this.prismaService.artGeneration.create({
+    const generatedArt = await this.prisma.artGeneration.create({
       data: {
         user_id: userId,
         user_prompt: prompt,

@@ -21,13 +21,13 @@ import {
   format,
   eachDayOfInterval,
 } from 'date-fns';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaClient } from '@prisma/client';
 
 const HOURS_IN_MILLISECOND = 1000 * 60 * 60;
 
 @Injectable()
 export class AnalyticsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaClient) {}
 
   async getOverallUserStats(): Promise<OverallUserStatsDto> {
     const totalUsers = await this.prisma.user.count();

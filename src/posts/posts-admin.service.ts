@@ -1,6 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { UpdatePostDto } from './dto/request/update-post.dto';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UserResponseDto } from './dto/response/user.dto';
@@ -46,7 +45,7 @@ type PrismaPostForList = Prisma.PostGetPayload<{
 export class PostsAdminService {
   private readonly logger = new Logger(PostsAdminService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   private mapPrismaPostToPostDetailsDto(
     post: PrismaPostForDetails,

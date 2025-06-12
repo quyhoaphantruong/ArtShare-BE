@@ -1,12 +1,12 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { NotificationsGateway } from './notification.gateway';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class NotificationService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaClient,
     @Inject(
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       forwardRef(() => require('./notification.gateway').NotificationsGateway),
@@ -40,7 +40,7 @@ export class NotificationService {
     const notifications = await this.prisma.notification.findMany({
       where: {
         userId,
-         isRead: false,
+        isRead: false,
       },
       orderBy: { createdAt: 'desc' },
     });

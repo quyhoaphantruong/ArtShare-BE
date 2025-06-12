@@ -6,8 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
-import { User, Prisma } from '@prisma/client';
+import { User, Prisma, PrismaClient } from '@prisma/client';
 import { UserProfileDTO } from './dto/user-profile.dto';
 import { UpdateUserDTO } from './dto/update-users.dto';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
@@ -19,7 +18,7 @@ import { UserProfileMeDTO } from './dto/get-user-me.dto';
 export class UserService {
   private readonly logger = new Logger(UserService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaClient) {}
 
   async getUserProfile(
     userId: string,

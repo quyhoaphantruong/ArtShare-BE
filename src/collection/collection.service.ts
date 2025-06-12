@@ -5,8 +5,7 @@ import {
   InternalServerErrorException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma.service';
-import { Collection, Prisma } from '@prisma/client';
+import { Collection, Prisma, PrismaClient } from '@prisma/client';
 import {
   mapCollectionToDto,
   collectionWithPostsSelect,
@@ -19,7 +18,7 @@ import { UpdateCollectionDto } from './dto/request/update-collection.dto';
 
 @Injectable()
 export class CollectionService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * Fetches all collections belonging to a specific user, including their posts.

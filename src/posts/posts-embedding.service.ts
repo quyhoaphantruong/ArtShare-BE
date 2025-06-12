@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MediaType } from '@prisma/client';
+import { MediaType, PrismaClient } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import axios from 'axios';
 import { nanoid } from 'nanoid';
@@ -8,7 +8,6 @@ import { TryCatch } from 'src/common/try-catch.decorator';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { VECTOR_DIMENSION } from 'src/embedding/embedding.utils';
 import { QdrantService } from 'src/embedding/qdrant.service';
-import { PrismaService } from 'src/prisma.service';
 import { Readable } from 'stream';
 
 class VectorParams {
@@ -23,7 +22,7 @@ export class PostsEmbeddingService {
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
     private readonly qdrantService: QdrantService,
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaClient,
   ) {}
 
   private readonly collectionName = 'posts';
@@ -39,22 +38,19 @@ export class PostsEmbeddingService {
     const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
       await this.getVectorParams(title, description, imageFiles);
 
-    const operationInfo = await this.qdrantClient.upsert(
-      this.collectionName,
-      {
-        wait: true,
-        points: [
-          {
-            id: postId,
-            vector: {
-              title: titleEmbedding,
-              description: descriptionEmbedding,
-              images: imagesEmbedding,
-            } as Record<string, number[]>,
-          },
-        ],
-      },
-    );
+    const operationInfo = await this.qdrantClient.upsert(this.collectionName, {
+      wait: true,
+      points: [
+        {
+          id: postId,
+          vector: {
+            title: titleEmbedding,
+            description: descriptionEmbedding,
+            images: imagesEmbedding,
+          } as Record<string, number[]>,
+        },
+      ],
+    });
 
     console.log('Upsert operation info:', operationInfo);
   }
@@ -126,7 +122,7 @@ export class PostsEmbeddingService {
   @TryCatch()
   async syncPostEmbeddings(): Promise<SyncEmbeddingResponseDto> {
     await this.qdrantService.deleteAllPoints(this.collectionName);
-  
+
     const posts = await this.prisma.post.findMany({
       include: { medias: true },
     });
@@ -168,13 +164,10 @@ export class PostsEmbeddingService {
       }),
     );
 
-    const operationInfo = await this.qdrantClient.upsert(
-      this.collectionName,
-      {
-        wait: true,
-        points: points,
-      },
-    );
+    const operationInfo = await this.qdrantClient.upsert(this.collectionName, {
+      wait: true,
+      points: points,
+    });
 
     console.log('Upsert result:', operationInfo);
     return {

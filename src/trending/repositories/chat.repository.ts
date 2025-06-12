@@ -3,12 +3,11 @@ import {
   IChatRepository,
   CreateMessageData,
 } from '../interfaces/chat-repository.interface';
-import { Conversation, Message } from '@prisma/client';
-import { PrismaService } from 'src/prisma.service';
+import { Conversation, Message, PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class ChatRepository implements IChatRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async createConversation(
     userId: string,
@@ -99,6 +98,8 @@ export class ChatRepository implements IChatRepository {
       take: 30,
     });
 
-    return artGenerations.map((ag: { final_prompt: string; }) => ag.final_prompt);
+    return artGenerations.map(
+      (ag: { final_prompt: string }) => ag.final_prompt,
+    );
   }
 }

@@ -1,11 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PaidAccessLevel } from '@prisma/client';
+import { PaidAccessLevel, PrismaClient } from '@prisma/client';
 import { endOfDay, startOfDay } from 'date-fns';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 import { TryCatch } from 'src/common/try-catch.decorator';
-import { PrismaService } from 'src/prisma.service';
 import Stripe from 'stripe';
 
 @Injectable()
@@ -14,7 +13,7 @@ export class UsageScheduler {
   private stripe: Stripe;
 
   constructor(
-    private prisma: PrismaService,
+    private prisma: PrismaClient,
     private configService: ConfigService,
   ) {
     const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
