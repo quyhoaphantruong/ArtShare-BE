@@ -14,7 +14,7 @@ import { SimpleCacheService } from 'src/infastructure/simple-cache.service';
 @Injectable()
 export class ChatService {
   private readonly PROMPT_HISTORY_DAYS = 7;
-  private readonly CONVERSATION_CONTEXT_LIMIT = 10; // Last 10 messages for context
+  private readonly CONVERSATION_CONTEXT_LIMIT = 10;
   private readonly CACHE_TTL = 3600; // 1 hour
   private readonly logger = new Logger(ChatService.name);
 
@@ -56,7 +56,6 @@ export class ChatService {
     const conversationContext =
       await this.getConversationContext(conversationId);
 
-    // Get user's prompt history with caching
     const promptHistory = await this.getCachedUserPromptHistory(userId);
 
     const generatedPrompts = await this.generateChatResponse(
@@ -65,7 +64,6 @@ export class ChatService {
       promptHistory,
     );
 
-    // Create assistant response
     const assistantMessage = await this.chatRepository.createMessage({
       conversationId,
       role: MessageRole.ASSISTANT,
@@ -115,18 +113,18 @@ export class ChatService {
       Your task is to:
       1. Understand the user's creative intent from their message
       2. Consider their past preferences from prompt history
-      3. Generate 5 unique, inspiring prompts that either:
+      3. Generate 3 unique, inspiring prompts that either:
          - Refine their current idea
          - Explore variations of their concept
          - Suggest new creative directions based on their interests
       
       Each prompt should be:
-      - Clear and detailed (20-50 words)
+      - Clear and detailed (20-30 words)
       - Visually descriptive
       - Technically achievable with AI art generation
       - Diverse in style, mood, or perspective
       
-      Output format: JSON array of 5 string prompts.
+      Output format: json array of 3 string prompts.
       Example: [prompt1, prompt2, ...]
     `;
 
@@ -145,9 +143,7 @@ export class ChatService {
       This is prompt history of system: ${promptHistoryStr}
       
       ${conversationContextStr}      
-      User's current message: "${userMessage}"
-      
-      Generate 5 creative prompts based on this context:
+      User's current message: "${userMessage}"      
     `;
 
     try {
@@ -156,15 +152,14 @@ export class ChatService {
       const cleanedResponse = responseText.replace(/```json|```/g, '').trim();
 
       const parsed = JSON.parse(cleanedResponse);
-      if (!Array.isArray(parsed) || parsed.length !== 5) {
+      if (!Array.isArray(parsed)) {
         throw new Error('Invalid response format');
       }
 
       return parsed;
     } catch (error) {
       console.error('Failed to generate chat response:', error);
-      // Fallback to simple prompt generation
-      return this.generateFallbackPrompts(userMessage);
+      return this.generateFallbackPrompts();
     }
   }
 
@@ -182,29 +177,25 @@ export class ChatService {
   }
 
   private async getCachedUserPromptHistory(userId: string): Promise<string[]> {
-    // const cacheKey = `user_prompt_history:${userId}`;
+    const cacheKey = `user_prompt_history:${userId}`;
 
-    // // Try to get from cache
-    // const cached = await this.cacheService.get<string[]>(cacheKey);
-    // if (cached) {
-    //   this.logger.log(`Found cache userPromptHistory ${cached}`);
-    //   return cached;
-    // }
+    const cached = await this.cacheService.get<string[]>(cacheKey);
+    if (cached) {
+      this.logger.log(`Found cache userPromptHistory ${cached}`);
+      return cached;
+    }
 
-    // Fetch from database
     const prompts = await this.chatRepository.getRecentUserPrompts(
       userId,
       this.PROMPT_HISTORY_DAYS,
     );
 
-    // Cache the result
-    // await this.cacheService.set(cacheKey, prompts, this.CACHE_TTL);
+    await this.cacheService.set(cacheKey, prompts, this.CACHE_TTL);
 
     return prompts;
   }
 
-  private generateFallbackPrompts(userMessage: string): GeneratedPrompt[] {
-    // Simple fallback logic
+  private generateFallbackPrompts(): string[] {
     const styles = [
       'realistic',
       'abstract',
@@ -213,21 +204,8 @@ export class ChatService {
       'surreal',
     ];
 
-    return styles.map((style) => ({
-      prompt: `${userMessage} in ${style} style, highly detailed, professional artwork`,
-      theme: `${style.charAt(0).toUpperCase() + style.slice(1)} Interpretation`,
-    }));
+    return styles;
   }
-
-//   private formatAssistantResponse(prompts: GeneratedPrompt[]): string {
-//     const intro =
-//       "I've generated 5 creative prompts based on your request and artistic preferences:\n\n";
-//     const promptList = prompts
-//       .map((p, i) => `${i + 1}. **${p.theme}**\n   ${p.prompt}`)
-//       .join('\n\n');
-
-//     return intro + promptList;
-//   }
 
   private generateConversationTitle(firstMessage: string): string {
     // Simple title generation from first message
