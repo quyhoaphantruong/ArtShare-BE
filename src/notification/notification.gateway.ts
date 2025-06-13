@@ -161,8 +161,12 @@ export class NotificationsGateway
       
       // Update the set with only connected sockets
       if (connectedSockets.length !== userConnections.size) {
-        userConnections.clear();
-        connectedSockets.forEach(socket => userConnections.add(socket));
+        // Incrementally remove stale sockets
+        for (const socket of userConnections) {
+          if (!socket.connected) {
+            userConnections.delete(socket);
+          }
+        }
         
         // Remove the user entry if no connections remain
         if (connectedSockets.length === 0) {
