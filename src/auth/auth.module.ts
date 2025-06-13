@@ -41,7 +41,6 @@ import { WebSocketJwtAuthGuard } from './websocket-jwt-auth.guard';
     FacebookAuthService,
     EncryptionService,
     WebSocketJwtAuthGuard,
-    ConfigService, 
   ],
   controllers: [AuthController, FacebookController],
   exports: [AuthService, JwtModule, WebSocketJwtAuthGuard],
