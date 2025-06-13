@@ -43,6 +43,7 @@ export class CommentService {
     }
 
     let owner_post_id = null;
+    let post_title = null;
 
     if (target_type === TargetType.POST) {
       const post = await this.prisma.post.findUnique({
@@ -52,6 +53,7 @@ export class CommentService {
         throw new NotFoundException(`Post ${target_id} not found.`);
       }
       owner_post_id = post.user_id;
+      post_title = post.title;
     } else if (target_type === TargetType.BLOG) {
       const blog = await this.prisma.blog.findUnique({
         where: { id: target_id },
@@ -112,6 +114,8 @@ export class CommentService {
             from: userId,
             to: userIsReplied == null ? owner_post_id : userIsReplied,
             type: 'artwork_commented',
+            artwork: { title: post_title ? post_title : "post"},
+            comment: { text: dto.content },
             createdAt: new Date(),
           });
           
