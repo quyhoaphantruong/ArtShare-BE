@@ -44,7 +44,7 @@ export class LikesService {
             from: userId,
             to: postUpdated.user_id,
             type: 'artwork_liked',
-            artwork: { id: postUpdated.id, title: 'Digital Portrait' },
+            artwork: { id: postUpdated.id, title: postUpdated.title },
             createdAt: new Date(),
           });
         } else {

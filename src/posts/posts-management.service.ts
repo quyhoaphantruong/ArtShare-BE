@@ -80,11 +80,12 @@ export class PostsManagementService {
 
     for (const follower of followers) {
       if (follower.id === userId) continue;
-      
+
       this.eventEmitter.emit('push-notification', {
         from: userId,
         to: follower.id,
         type: 'artwork_published',
+        arkwork: {title: createdPost.title},
         createdAt: new Date(),
       });
     }
