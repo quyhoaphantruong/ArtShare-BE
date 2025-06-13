@@ -13,5 +13,6 @@ import { UserAdminController } from './user.admin.controller';
   imports: [AuthModule, ConfigModule, StorageModule],
   controllers: [UserController, UserAdminController],
   providers: [UserService, UserAdminService, UserFollowService, AuthService],
+  exports: [UserFollowService],
 })
 export class UserModule {}

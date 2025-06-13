@@ -3,6 +3,26 @@ import { PrismaService } from 'src/prisma.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { NotificationsGateway } from './notification.gateway';
 
+interface NotificationTemplate {
+  template: string;
+  fallback?: string;
+}
+
+interface PushNotificationPayload {
+  from: string;
+  to: string;
+  type: string; // 'artwork_published', 'artwork_liked', 'artwork_commented', 'user_followed', etc.
+  content?: string; // Optional fallback content
+  createdAt: string;
+  // Dynamic data for templates
+  [key: string]: any;
+}
+
+interface InterpolationContext {
+  users?: Record<string, string>;
+  [key: string]: any;
+}
+
 @Injectable()
 export class NotificationService {
   constructor(
@@ -16,6 +36,49 @@ export class NotificationService {
 
   private readonly logger = new Logger(NotificationService.name);
 
+  // Template definitions based on notification type
+  private readonly templates: Record<string, NotificationTemplate> = {
+    artwork_published: {
+      template: '{{user:from}} published new artwork',
+      fallback: 'New artwork published',
+    },
+    artwork_liked: {
+      template: '{{user:from}} liked your artwork "{{artwork.title}}"',
+      fallback: 'Someone liked your artwork',
+    },
+    artwork_commented: {
+      template:
+        '{{user:from}} commented on your artwork "{{artwork.title}}": "{{comment.text}}"',
+      fallback: 'Someone commented on your artwork',
+    },
+    user_followed: {
+      template: '{{user:from}} started following you',
+      fallback: 'You have a new follower',
+    },
+    artwork_shared: {
+      template: '{{user:from}} shared your artwork "{{artwork.title}}"',
+      fallback: 'Someone shared your artwork',
+    },
+    collection_added: {
+      template:
+        '{{user:from}} added your artwork "{{artwork.title}}" to their collection',
+      fallback: 'Your artwork was added to a collection',
+    },
+    commission_requested: {
+      template: '{{user:from}} sent you a commission request',
+      fallback: 'You have a new commission request',
+    },
+    report_resolved: {
+      template:
+        'Your report regarding "{{reason}}" has been reviewed and resolved',
+      fallback: 'Your report has been resolved',
+    },
+    // Add more templates as needed
+  };
+
+  /**
+   * Create notification with template interpolation and push via WebSocket
+   */
   async createAndPush(userId: string, type: string, payload: object) {
     const startTime = Date.now();
     this.logger.debug(`[${startTime}] Creating and pushing notification to user ${userId}, type: ${type}`);
@@ -37,20 +100,151 @@ export class NotificationService {
   }
 
   async create(userId: string, type: string, payload: object) {
+    const message = await this.interpolateMessage(type, payload);
+
     return this.prisma.notification.create({
       data: {
         userId: userId,
         type,
-        payload,
+        payload: {
+          ...payload,
+          message, // Add interpolated message to payload
+        },
       },
     });
   }
+
+  private extractUserIdsFromContext(template: string, context: any): string[] {
+    const userPlaceholderPattern = /\{\{user:(\w+)\}\}/g;
+    const matches = Array.from(template.matchAll(userPlaceholderPattern));
+    const userIds: string[] = [];
+
+    for (const match of matches) {
+      const placeholder = match[1]; // e.g., 'from', 'to', etc.
+      const userId = context[placeholder];
+
+      if (userId && typeof userId === 'string') {
+        userIds.push(userId);
+      }
+    }
+
+    return [...new Set(userIds)];
+  }
+
+  private async interpolateMessage(
+    type: string,
+    context: any,
+  ): Promise<string> {
+    const template = this.templates[type];
+
+    if (!template) {
+      return context.content || context.message || `New ${type} notification`;
+    }
+
+    const userIds = this.extractUserIdsFromContext(template.template, context);
+    // const userIds = [context.from, context.to];
+
+    if (userIds.length === 0) {
+      return this.simpleInterpolate(template.template, context);
+    }
+
+    const userMap = await this.fetchUsernames(userIds);
+
+    if (Object.keys(userMap).length === 0 && userIds.length > 0) {
+      return template.fallback || context.content || `New ${type} notification`;
+    }
+
+    const fullContext: InterpolationContext = {
+      ...context,
+      users: userMap,
+    };
+
+    const resultString =  this.interpolateWithContext(template.template, fullContext);
+    return resultString;
+  }
+
+  /**
+   * Batch fetch usernames from database
+   */
+  private async fetchUsernames(
+    userIds: string[],
+  ): Promise<Record<string, string>> {
+    if (userIds.length === 0) return {};
+
+    try {
+      const users = await this.prisma.user.findMany({
+        where: {
+          id: { in: userIds },
+        },
+        select: {
+          id: true,
+          username: true,
+        },
+      });
+
+      return users.reduce(
+        (acc, user) => {
+          acc[user.id] = user.username;
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
+    } catch (error) {
+      this.logger.error('Failed to fetch usernames:', error);
+      return {};
+    }
+  }
+
+  private interpolateWithContext(
+    template: string,
+    context: InterpolationContext,
+  ): string {
+    return template.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+      if (key.startsWith('user:')) {
+        const placeholder = key.substring(5);
+        const userId = context[placeholder]; // Get the actual user ID from context
+
+        if (userId && context.users?.[userId]) {
+          return context.users[userId]; // Return the username
+        }
+
+        return placeholder;
+      }
+
+      const value = this.resolveContextValue(key, context);
+      return value !== undefined ? String(value) : match;
+    });
+  }
+
+  /**
+   * Simple interpolation without user resolution
+   */
+  private simpleInterpolate(template: string, context: any): string {
+    return template.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+      const value = this.resolveContextValue(key, context);
+      return value !== undefined ? String(value) : match;
+    });
+  }
+
+  /**
+   * Resolve context value supporting nested keys
+   */
+  private resolveContextValue(key: string, context: InterpolationContext): any {
+    if (key.startsWith('user:')) {
+      const userId = key.substring(5);
+      return context.users?.[userId];
+    }
+
+    return key.split('.').reduce((obj, prop) => obj?.[prop], context);
+  }
+
+  // === Existing methods remain unchanged ===
 
   async getUserNotifications(userId: string) {
     const notifications = await this.prisma.notification.findMany({
       where: {
         userId,
-         isRead: false,
+        isRead: false,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -76,7 +270,6 @@ export class NotificationService {
 
   async markAllAsRead(userId: string) {
     this.logger.log(`markAllAsRead for user ${userId}`);
-
     await this.prisma.notification.updateMany({
       where: { userId: userId, isRead: false },
       data: { isRead: true },
@@ -173,17 +366,38 @@ export class NotificationService {
     };
 
     try {
-      await this.createAndPush(
-        payload.reporterId,
-        notificationType,
-        notificationPayload,
-      );
+      await this.createAndPush(payload.reporterId, 'report_resolved', payload);
       this.logger.log(
         `Notification successfully created & pushed to user ${payload.reporterId}`,
       );
     } catch (error) {
       this.logger.error(
         `Failed to create/push notification for user ${payload.reporterId}:`,
+        (error as Error).stack,
+      );
+    }
+  }
+
+  @OnEvent('push-notification')
+  async handlePushNotification(payload: PushNotificationPayload) {
+    this.logger.log(
+      `Caught push-notification event (type: ${payload.type}), creating notification...`,
+    );
+
+    try {
+      // The template interpolation happens automatically in create() method
+      // based on the payload.type
+      await this.createAndPush(
+        payload.to,
+        payload.type, // Use the specific type for template selection
+        payload,
+      );
+      this.logger.log(
+        `Notification (${payload.type}) successfully created & pushed to user ${payload.to}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to create/push notification for user ${payload.to}:`,
         (error as Error).stack,
       );
     }
