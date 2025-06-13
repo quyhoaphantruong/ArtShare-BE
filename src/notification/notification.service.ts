@@ -18,13 +18,13 @@ export class NotificationService {
 
   async createAndPush(userId: string, type: string, payload: object) {
     const startTime = Date.now();
-    this.logger.log(`[${startTime}] Creating and pushing notification to user ${userId}, type: ${type}`);
+    this.logger.debug(`[${startTime}] Creating and pushing notification to user ${userId}, type: ${type}`);
     
     const notification = await this.create(userId, type, payload);
     const createTime = Date.now();
-    this.logger.log(`[${createTime}] Notification ${notification.id} created in ${createTime - startTime}ms`);
+    this.logger.debug(`[${createTime}] Notification ${notification.id} created in ${createTime - startTime}ms`);
 
-    this.logger.log(`[${createTime}] Sending notification ${notification.id} to user ${userId} via WebSocket`);
+    this.logger.debug(`[${createTime}] Sending notification ${notification.id} to user ${userId} via WebSocket`);
     this.notificationsGateway.sendToUser(
       userId,
       'new-notification',
