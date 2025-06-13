@@ -7,10 +7,13 @@ import { LikeDetailsDto } from './dto/response/like-details.dto';
 import { RemoveLikeDto } from './dto/request/remove-like.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { LikingUserResponseDto } from './dto/response/liking-user-response.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class LikesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,
+              private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   @TryCatch('create like failed')
   async createLike(
@@ -32,9 +35,17 @@ export class LikesService {
 
         // 2️⃣ bump counter only on successful insert
         if (dto.target_type === TargetType.POST) {
-          await tx.post.update({
+          const postUpdated = await tx.post.update({
             where: { id: dto.target_id },
             data: { like_count: { increment: 1 } },
+          });
+
+          this.eventEmitter.emit('push-notification', {
+            from: userId,
+            to: postUpdated.user_id,
+            type: 'artwork_liked',
+            artwork: { id: postUpdated.id, title: 'Digital Portrait' },
+            createdAt: new Date(),
           });
         } else {
           await tx.blog.update({
