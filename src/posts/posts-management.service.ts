@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
-import { StorageService } from 'src/storage/storage.service'; import { MediaType, Post } from '@prisma/client';
+import { StorageService } from 'src/storage/storage.service';
+import { MediaType, Post } from '@prisma/client';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
@@ -16,18 +17,17 @@ import { QdrantService } from 'src/embedding/qdrant.service';
 import { CreatePostRequestDto } from './dto/request/create-post.dto';
 import { PostsEmbeddingService } from './posts-embedding.service';
 import { PostsManagementValidator } from './validator/posts-management.validator';
+import { postsCollectionName } from 'src/embedding/embedding.utils';
 
 @Injectable()
 export class PostsManagementService {
-  private readonly qdrantCollectionName = 'posts';
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly qdrantService: QdrantService,
     private readonly postEmbeddingService: PostsEmbeddingService,
     private readonly postsManagementValidator: PostsManagementValidator,
-  ) { }
+  ) {}
 
   @TryCatch()
   async createPost(
@@ -37,10 +37,11 @@ export class PostsManagementService {
   ): Promise<PostDetailsResponseDto> {
     const { cate_ids = [], video_url, prompt_id, ...rest } = request;
 
-    const { parsedCropMeta } = await this.postsManagementValidator.validateCreateRequest(
-      request,
-      images,
-    );
+    const { parsedCropMeta } =
+      await this.postsManagementValidator.validateCreateRequest(
+        request,
+        images,
+      );
 
     if (prompt_id) {
       await this.validateAiArtExistence(prompt_id);
@@ -122,6 +123,11 @@ export class PostsManagementService {
     images: Express.Multer.File[],
     userId: string,
   ): Promise<PostDetailsResponseDto> {
+    // wait 5 secs for testing purposes
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // // return an error for testing purposes
+    // throw new BadRequestException('Testing error handling in deletePost');
     const existingPost = await this.prisma.post.findUnique({
       where: { id: postId },
       include: { medias: true },
@@ -265,7 +271,7 @@ export class PostsManagementService {
     if (urls.length) {
       await this.storageService.deleteFiles(urls);
     }
-    await this.qdrantService.deletePoints(this.qdrantCollectionName, [postId]);
+    await this.qdrantService.deletePoints(postsCollectionName, [postId]);
   }
 
   async updateThumbnailCropMeta(

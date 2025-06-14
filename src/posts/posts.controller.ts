@@ -51,7 +51,7 @@ export class PostsController {
     private readonly postsEmbeddingService: PostsEmbeddingService,
     private readonly likesService: LikesService,
     private readonly postsAdminService: PostsAdminService,
-  ) { }
+  ) {}
 
   @Post()
   @UseInterceptors(FilesInterceptor('images'))
@@ -84,13 +84,14 @@ export class PostsController {
     return this.postsManagementService.deletePost(postId);
   }
 
-  @Post('search')
+  @Public()
+  @Get('search')
   @Public()
   async searchPosts(
-    @Body() body: SearchPostDto,
+    @Query() query: SearchPostDto,
     @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.searchPosts(body, user?.id ?? '');
+    return this.postsExploreService.searchPosts(query, user?.id ?? '');
   }
 
   @Post('for-you')
@@ -130,10 +131,7 @@ export class PostsController {
     @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
     pageSize: number,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.getAiTrendingPosts(
-      page,
-      pageSize,
-    );
+    return this.postsExploreService.getAiTrendingPosts(page, pageSize);
   }
 
   @Public()
