@@ -8,9 +8,11 @@ export class StatisticsController {
   @Get()
   async getAll(): Promise<{
     aspectRatios: StatCount[];
-    lightings: StatCount[];
     styles: StatCount[];
     posts_by_ai: StatCount[];
+    total_ai_images: StatCount[];
+    top_posts_by_ai: any;
+    trending_prompts: any[];
   }> {
     return this.statisticsService.getAll();
   }
