@@ -10,6 +10,7 @@ import {
   IsEnum,
 } from 'class-validator';
 import { Role as RoleEnum } from 'src/auth/enums/role.enum';
+import { UserStatus } from '@prisma/client';
 
 export class CreateUserAdminDTO {
   @ApiProperty({
@@ -61,4 +62,14 @@ export class CreateUserAdminDTO {
   @ArrayNotEmpty()
   @IsEnum(RoleEnum, { each: true })
   roles: RoleEnum[];
+
+  @ApiProperty({
+    enum: UserStatus,
+    required: false,
+    example: UserStatus.ACTIVE,
+    description: "The user's account status.",
+  })
+  @IsOptional()
+  @IsEnum(UserStatus)
+  status?: UserStatus;
 }

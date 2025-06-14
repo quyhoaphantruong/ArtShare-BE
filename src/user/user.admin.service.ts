@@ -48,6 +48,7 @@ export class UserAdminService {
       followersCount: userWithRelations.followers_count,
       followingsCount: userWithRelations.followings_count,
       roles: userWithRelations.roles.map((ur) => ur.role.role_name as Role),
+      status: userWithRelations.status,
     };
   }
 
@@ -151,6 +152,7 @@ export class UserAdminService {
       bio,
       birthday,
       roles: roleNames,
+      status,
     } = dto;
 
     const existingUserById = await this.prisma.user.findUnique({
@@ -194,6 +196,7 @@ export class UserAdminService {
           profile_picture_url: profile_picture_url || null,
           bio: bio || null,
           birthday: birthday ? new Date(birthday) : null,
+          status: status,
           roles: {
             create: dbRoles.map((role) => ({
               role_id: role.role_id,
@@ -261,6 +264,7 @@ export class UserAdminService {
     if (dto.email !== undefined) dataToUpdate.email = dto.email;
     if (dto.fullName !== undefined) dataToUpdate.full_name = dto.fullName;
     if (dto.bio !== undefined) dataToUpdate.bio = dto.bio;
+    if (dto.status !== undefined) dataToUpdate.status = dto.status;
     if (dto.birthday !== undefined) {
       if (dto.birthday === null || dto.birthday === '') {
         dataToUpdate.birthday = null;

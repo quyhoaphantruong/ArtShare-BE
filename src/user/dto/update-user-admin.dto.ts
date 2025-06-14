@@ -10,6 +10,7 @@ import {
   IsDateString,
 } from 'class-validator';
 import { Role } from 'src/auth/enums/role.enum';
+import { UserStatus } from '@prisma/client';
 
 export class UpdateUserAdminDTO {
   @ApiProperty({ example: 'new_username', required: false })
@@ -88,4 +89,14 @@ export class UpdateUserAdminDTO {
     { message: 'Birthday must be a valid date string in YYYY-MM-DD format.' },
   )
   birthday?: string | null;
+
+  @ApiProperty({
+    enum: UserStatus,
+    required: false,
+    example: UserStatus.ACTIVE,
+    description: "Update the user's account status.",
+  })
+  @IsOptional()
+  @IsEnum(UserStatus)
+  status?: UserStatus;
 }
