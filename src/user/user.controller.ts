@@ -8,8 +8,8 @@ import {
   Patch,
   HttpCode,
   HttpStatus,
-  Logger,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserProfileDTO } from './dto/user-profile.dto';
@@ -33,18 +33,31 @@ import {
 import { FollowerDto } from './dto/follower.dto';
 import { UserFollowService } from './user.follow.service';
 import { UserProfileMeDTO } from './dto/get-user-me.dto';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { UserReadService } from './user-read.service';
+import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
+import { PublicUserSearchResponseDto } from './dto/response/search-users.dto';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @ApiTags('Users')
 @Controller('users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 export class UserController {
-  private readonly logger = new Logger(UserController.name);
-
   constructor(
     private readonly userService: UserService,
     private readonly userFollowService: UserFollowService,
+    private readonly userReadService: UserReadService,
   ) {}
+
+  @Get('search')
+  @Public()
+  async searchUsers(
+    @Query() paginationQuery: PaginationQueryDto,
+    @CurrentUser() user: CurrentUserType,
+  ): Promise<PaginatedResponseDto<PublicUserSearchResponseDto>> {
+    return this.userReadService.searchUsers(paginationQuery, user?.id);
+  }
 
   @Get('profile/:userId')
   @HttpCode(HttpStatus.OK)
