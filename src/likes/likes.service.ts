@@ -40,15 +40,18 @@ export class LikesService {
             data: { like_count: { increment: 1 } },
           });
 
-          this.eventEmitter.emit('push-notification', {
-            from: userId,
-            to: postUpdated.user_id,
-            type: 'artwork_liked',
-            post: { id: postUpdated.id, title: postUpdated.title },
-            postId: postUpdated.id.toString(),
-            postTitle: postUpdated.title,
-            createdAt: new Date(),
-          });
+          // Only send notification if the user is not liking their own post
+          if (userId !== postUpdated.user_id) {
+            this.eventEmitter.emit('push-notification', {
+              from: userId,
+              to: postUpdated.user_id,
+              type: 'artwork_liked',
+              post: { id: postUpdated.id, title: postUpdated.title },
+              postId: postUpdated.id.toString(),
+              postTitle: postUpdated.title,
+              createdAt: new Date(),
+            });
+          }
         } else {
           await tx.blog.update({
             where: { id: dto.target_id },

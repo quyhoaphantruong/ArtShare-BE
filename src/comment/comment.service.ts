@@ -109,18 +109,22 @@ export class CommentService {
                 select: {user_id: true}}
             )
           }
-              
-          this.eventEmitter.emit('push-notification', {
-            from: userId,
-            to: userIsReplied == null ? owner_post_id : userIsReplied,
-            type: 'artwork_commented',
-            post: { title: post_title ? post_title : "post"},
-            comment: { text: dto.content },
-            postId: target_id.toString(),
-            commentId: newComment.id.toString(),
-            postTitle: post_title ? post_title : "post",
-            createdAt: new Date(),
-          });
+
+          // Only send notification if the user is not commenting on their own post
+          const targetUserId = userIsReplied == null ? owner_post_id : userIsReplied.user_id;
+          if (userId !== targetUserId) {
+            this.eventEmitter.emit('push-notification', {
+              from: userId,
+              to: targetUserId,
+              type: 'artwork_commented',
+              post: { title: post_title ? post_title : "post"},
+              comment: { text: dto.content },
+              postId: target_id.toString(),
+              commentId: newComment.id.toString(),
+              postTitle: post_title ? post_title : "post",
+              createdAt: new Date(),
+            });
+          }
           
         } else {
           await tx.blog.update({
