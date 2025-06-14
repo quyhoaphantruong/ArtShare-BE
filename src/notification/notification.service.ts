@@ -14,6 +14,10 @@ interface PushNotificationPayload {
   type: string; // 'artwork_published', 'artwork_liked', 'artwork_commented', 'user_followed', etc.
   content?: string; // Optional fallback content
   createdAt: string;
+  // Navigation data
+  postId?: string;
+  commentId?: string;
+  postTitle?: string;
   // Dynamic data for templates
   [key: string]: any;
 }
@@ -39,30 +43,29 @@ export class NotificationService {
   // Template definitions based on notification type
   private readonly templates: Record<string, NotificationTemplate> = {
     artwork_published: {
-      template: '{{user:from}} published new artwork',
-      fallback: 'New artwork published',
+      template: '{{user:from}} published new post: "{{post.title}}"',
+      fallback: 'New post published',
     },
     artwork_liked: {
-      template: '{{user:from}} liked your artwork "{{artwork.title}}"',
-      fallback: 'Someone liked your artwork',
+      template: '{{user:from}} liked your post',
+      fallback: 'Someone liked your post',
     },
     artwork_commented: {
-      template:
-        '{{user:from}} commented on your artwork "{{artwork.title}}": "{{comment.text}}"',
-      fallback: 'Someone commented on your artwork',
+      template: '{{user:from}} commented on your post',
+      fallback: 'Someone commented on your post',
     },
     user_followed: {
       template: '{{user:from}} started following you',
       fallback: 'You have a new follower',
     },
     artwork_shared: {
-      template: '{{user:from}} shared your artwork "{{artwork.title}}"',
-      fallback: 'Someone shared your artwork',
+      template: '{{user:from}} shared your post "{{post.title}}"',
+      fallback: 'Someone shared your post',
     },
     collection_added: {
       template:
-        '{{user:from}} added your artwork "{{artwork.title}}" to their collection',
-      fallback: 'Your artwork was added to a collection',
+        '{{user:from}} added your post "{{post.title}}" to their collection',
+      fallback: 'Your post was added to a collection',
     },
     commission_requested: {
       template: '{{user:from}} sent you a commission request',
@@ -244,9 +247,9 @@ export class NotificationService {
     const notifications = await this.prisma.notification.findMany({
       where: {
         userId,
-        isRead: false,
       },
       orderBy: { createdAt: 'desc' },
+      take: 50, // Limit to last 50 notifications
     });
     return notifications;
   }
@@ -358,12 +361,6 @@ export class NotificationService {
       );
       return;
     }
-
-    const notificationPayload = {
-      message: `Your report regarding "${payload.reason}" has been reviewed and resolved.`,
-      reportId: payload.reportId,
-      resolvedAt: payload.resolvedAt,
-    };
 
     try {
       await this.createAndPush(payload.reporterId, 'report_resolved', payload);

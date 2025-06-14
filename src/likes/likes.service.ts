@@ -44,7 +44,9 @@ export class LikesService {
             from: userId,
             to: postUpdated.user_id,
             type: 'artwork_liked',
-            artwork: { id: postUpdated.id, title: postUpdated.title },
+            post: { id: postUpdated.id, title: postUpdated.title },
+            postId: postUpdated.id.toString(),
+            postTitle: postUpdated.title,
             createdAt: new Date(),
           });
         } else {

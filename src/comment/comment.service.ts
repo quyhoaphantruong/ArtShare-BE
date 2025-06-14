@@ -114,8 +114,11 @@ export class CommentService {
             from: userId,
             to: userIsReplied == null ? owner_post_id : userIsReplied,
             type: 'artwork_commented',
-            artwork: { title: post_title ? post_title : "post"},
+            post: { title: post_title ? post_title : "post"},
             comment: { text: dto.content },
+            postId: target_id.toString(),
+            commentId: newComment.id.toString(),
+            postTitle: post_title ? post_title : "post",
             createdAt: new Date(),
           });
           

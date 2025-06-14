@@ -85,7 +85,9 @@ export class PostsManagementService {
         from: userId,
         to: follower.id,
         type: 'artwork_published',
-        arkwork: {title: createdPost.title},
+        post: {title: createdPost.title},
+        postId: createdPost.id.toString(),
+        postTitle: createdPost.title,
         createdAt: new Date(),
       });
     }
