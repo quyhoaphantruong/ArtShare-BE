@@ -381,6 +381,11 @@ export class NotificationService {
       `Caught push-notification event (type: ${payload.type}), creating notification...`,
     );
 
+    // Prevent self-notifications as a safety net
+    if (payload.from && payload.to && payload.from === payload.to) {
+      return;
+    }
+
     try {
       // The template interpolation happens automatically in create() method
       // based on the payload.type
