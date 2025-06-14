@@ -38,6 +38,7 @@ export class UserService {
         followings_count: true,
         birthday: true,
         is_onboard: true,
+        created_at: true,
         roles: {
           select: {
             role: {
@@ -81,6 +82,7 @@ export class UserService {
       roles: roleNames,
       isFollowing,
       is_onboard: user.is_onboard,
+      created_at: user.created_at,
     };
   }
 
@@ -100,6 +102,7 @@ export class UserService {
         followings_count: true,
         birthday: true,
         is_onboard: true,
+        created_at: true,
         roles: {
           select: {
             role: {
@@ -129,6 +132,7 @@ export class UserService {
       roles: roleNames,
       isFollowing: false, // By definition, you don't follow yourself in this context
       is_onboard: user.is_onboard,
+      created_at: user.created_at,
     };
   }
 
