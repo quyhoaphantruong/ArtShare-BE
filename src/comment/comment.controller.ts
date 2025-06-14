@@ -6,7 +6,6 @@ import {
   HttpStatus,
   Get,
   Query,
-  BadRequestException,
   Patch,
   Param,
   ParseIntPipe,
@@ -15,15 +14,15 @@ import {
 } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Comment, TargetType } from '@prisma/client';
+import { ApiOperation } from '@nestjs/swagger';
+import { Comment } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CurrentUserType } from 'src/auth/types/current-user.type';
 import { CurrentUser } from 'src/auth/decorators/users.decorator';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { GetCommentsDto } from './dto/request/get-comments.dto';
 
-@ApiTags('comments')
 @UseGuards(JwtAuthGuard)
 @Controller('comments')
 export class CommentController {
@@ -39,22 +38,16 @@ export class CommentController {
   }
 
   @Get()
-  @Public() 
+  @Public()
   async getComments(
-    @Query('target_id', ParseIntPipe) targetId: number,
-    @Query('target_type') targetType: TargetType,
-    @CurrentUser() currentUser: CurrentUserType | null, 
-    @Query('parent_comment_id') parentCommentId?: string,
+    @Query() query: GetCommentsDto,
+    @CurrentUser() currentUser?: CurrentUserType,
   ) {
-    if (!Object.values(TargetType).includes(targetType)) {
-      throw new BadRequestException('Invalid target_type');
-    }
-
     return this.commentService.getComments(
-      targetId,
-      targetType,
-      currentUser?.id, 
-      parentCommentId ? parseInt(parentCommentId) : undefined,
+      query.target_id,
+      query.target_type,
+      currentUser?.id,
+      query.parent_comment_id,
     );
   }
 

@@ -11,6 +11,7 @@ import { Comment, TargetType } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CommentDto } from './dto/get-comment.dto';
+import { TryCatch } from 'src/common/try-catch.decorator';
 
 @Injectable()
 export class CommentService {
@@ -58,59 +59,60 @@ export class CommentService {
     }
 
     try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        const newComment = await tx.comment.create({
-          data: {
-            content,
-            user_id: userId,
-            target_id,
-            target_type,
-            parent_comment_id,
-          },
-          include: {
-            user: {
-              select: { id: true, username: true, profile_picture_url: true },
+      const created = await this.prisma.$transaction(
+        async (tx) => {
+          const newComment = await tx.comment.create({
+            data: {
+              content,
+              user_id: userId,
+              target_id,
+              target_type,
+              parent_comment_id,
             },
-            replies: {
-              select: {
-                id: true,
-                content: true,
-                created_at: true,
-                like_count: true,
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                    profile_picture_url: true,
+            include: {
+              user: {
+                select: { id: true, username: true, profile_picture_url: true },
+              },
+              replies: {
+                select: {
+                  id: true,
+                  content: true,
+                  created_at: true,
+                  like_count: true,
+                  user: {
+                    select: {
+                      id: true,
+                      username: true,
+                      profile_picture_url: true,
+                    },
                   },
                 },
               },
             },
-          },
-        });
-
-        if (target_type === TargetType.POST) {
-          await tx.post.update({
-            where: { id: target_id },
-            data: { comment_count: { increment: 1 } },
           });
-        } else {
-          await tx.blog.update({
-            where: { id: target_id },
-            data: { comment_count: { increment: 1 } },
-          });
-        }
 
-        return newComment;
-      },
-      {
-        maxWait: 5000,   // wait up to 5 s to acquire a connection (default 2 s)
-        timeout: 15000,  // allow up to 15 s for the transaction to complete
-      });
+          if (target_type === TargetType.POST) {
+            await tx.post.update({
+              where: { id: target_id },
+              data: { comment_count: { increment: 1 } },
+            });
+          } else {
+            await tx.blog.update({
+              where: { id: target_id },
+              data: { comment_count: { increment: 1 } },
+            });
+          }
 
-   
-       return created; 
-          } catch (err: any) {
+          return newComment;
+        },
+        {
+          maxWait: 5000, // wait up to 5 s to acquire a connection (default 2 s)
+          timeout: 15000, // allow up to 15 s for the transaction to complete
+        },
+      );
+
+      return created;
+    } catch (err: any) {
       if (err instanceof PrismaClientKnownRequestError) {
         if (err.code === 'P2003') {
           throw new NotFoundException(
@@ -123,13 +125,14 @@ export class CommentService {
     }
   }
 
-   async getComments(
+  @TryCatch()
+  async getComments(
     targetId: number,
     targetType: TargetType,
     currentUserId?: string,
     parentCommentId?: number,
   ): Promise<CommentDto[]> {
-  const comments = await this.prisma.comment.findMany({
+    const comments = await this.prisma.comment.findMany({
       where: {
         target_id: targetId,
         target_type: targetType,
@@ -137,35 +140,38 @@ export class CommentService {
       },
       orderBy: { created_at: 'desc' },
       include: {
-        user: { select: { id: true, username: true, profile_picture_url: true } },
-      _count: { select: { replies: true } },
+        user: {
+          select: { id: true, username: true, profile_picture_url: true },
+        },
+        _count: { select: { replies: true } },
       },
     });
 
     //* gather IDs of comments **and** their included replies */
-  const ids: number[] = [];
-        comments.forEach((c: any) => {
-    ids.push(c.id);
-          c.replies?.forEach((r: any) => ids.push(r.id));
+    const ids: number[] = [];
+    comments.forEach((c: any) => {
+      ids.push(c.id);
+      c.replies?.forEach((r: any) => ids.push(r.id));
     });
-  const likedRows = currentUserId ? await this.prisma.commentLike.findMany({
-  where: { user_id: currentUserId, comment_id: { in: ids } },
-  select: { comment_id: true },
-}) : [];
+    const likedRows = currentUserId
+      ? await this.prisma.commentLike.findMany({
+          where: { user_id: currentUserId, comment_id: { in: ids } },
+          select: { comment_id: true },
+        })
+      : [];
     const likedSet = new Set(likedRows.map((l) => l.comment_id));
 
-     /* ❷ map every record to DTO, surfacing `reply_count` ---------- */
+    /* ❷ map every record to DTO, surfacing `reply_count` ---------- */
     return comments.map((commentPrisma): CommentDto => {
       const { _count: prismaCount, ...restOfCommentFields } = commentPrisma;
 
       return {
-        ...restOfCommentFields, 
+        ...restOfCommentFields,
         likedByCurrentUser: likedSet.has(commentPrisma.id),
-        reply_count: prismaCount.replies, 
+        reply_count: prismaCount.replies,
       };
     });
   }
-
 
   async update(
     commentId: number,
