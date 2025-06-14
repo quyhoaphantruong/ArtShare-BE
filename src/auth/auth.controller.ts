@@ -1,6 +1,6 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { AuthGuard } from './auth.guard'; // Guard bảo vệ các route
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -43,7 +43,7 @@ export class AuthController {
   }
 
   // Route xác minh token (bảo vệ route)
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post('verify-token')
   async verifyToken(@Body() body: { token: string }) {
     return this.authService.verifyToken(body.token);

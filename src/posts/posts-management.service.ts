@@ -16,6 +16,9 @@ import { QdrantService } from 'src/embedding/qdrant.service';
 import { CreatePostRequestDto } from './dto/request/create-post.dto';
 import { PostsEmbeddingService } from './posts-embedding.service';
 import { PostsManagementValidator } from './validator/posts-management.validator';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserFollowService } from 'src/user/user.follow.service';
+import { FollowerDto } from 'src/user/dto/follower.dto';
 
 @Injectable()
 export class PostsManagementService {
@@ -27,6 +30,8 @@ export class PostsManagementService {
     private readonly qdrantService: QdrantService,
     private readonly postEmbeddingService: PostsEmbeddingService,
     private readonly postsManagementValidator: PostsManagementValidator,
+    private readonly followService: UserFollowService,
+    private readonly eventEmitter: EventEmitter2,
   ) { }
 
   @TryCatch()
@@ -70,6 +75,22 @@ export class PostsManagementService {
       createdPost.description ?? undefined,
       images,
     );
+
+    const followers: FollowerDto[] = await this.followService.getFollowersListByUserId(userId);
+
+    for (const follower of followers) {
+      if (follower.id === userId) continue;
+
+      this.eventEmitter.emit('push-notification', {
+        from: userId,
+        to: follower.id,
+        type: 'artwork_published',
+        post: {title: createdPost.title},
+        postId: createdPost.id.toString(),
+        postTitle: createdPost.title,
+        createdAt: new Date(),
+      });
+    }
 
     return plainToInstance(PostDetailsResponseDto, createdPost);
   }
