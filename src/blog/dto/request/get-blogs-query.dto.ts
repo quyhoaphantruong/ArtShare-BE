@@ -6,13 +6,13 @@ export class GetBlogsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  take?: number = 10;
+  limit?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(0)
-  skip?: number = 0;
+  @Min(1)
+  page?: number;
 
   @IsOptional()
   @IsString()

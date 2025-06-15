@@ -38,6 +38,7 @@ import { LikingUserResponseDto } from 'src/likes/dto/response/liking-user-respon
 import { TargetType } from 'src/common/enum/target-type.enum';
 import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
 import { BlogEmbeddingService } from './blog-embedding.service';
+import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('blogs')
@@ -50,37 +51,15 @@ export class BlogController {
   ) {}
 
   /**
-   * GET /blogs - Get list of published blogs (paginated, searchable)
-   */
-  @Get()
-  @Public()
-  async getBlogs(
-    @Query() query: GetBlogsQueryDto,
-  ): Promise<BlogListItemResponseDto[]> {
-    const { take, skip, search } = query;
-    const finalTake = take ?? 10;
-    const finalSkip = skip ?? 0;
-    return this.blogExploreService.getBlogs(finalTake, finalSkip, search);
-  }
-
-  /**
    * GET /blogs/trending - Get globally trending blogs, optionally filtered by categories
    */
   @Get('trending')
+  @Public()
   async getTrendingBlogs(
     @Query() query: GetBlogsQueryDto,
     @CurrentUser() user?: CurrentUserType,
   ): Promise<BlogListItemResponseDto[]> {
-    const { take, skip, categories } = query;
-    const finalTake = take ?? 10;
-    const finalSkip = skip ?? 0;
-
-    return this.blogExploreService.getTrendingBlogs(
-      finalTake,
-      finalSkip,
-      categories,
-      user?.id,
-    );
+    return this.blogExploreService.getTrendingBlogs(query, user?.id);
   }
 
   /**
@@ -91,31 +70,18 @@ export class BlogController {
     @Query() query: GetBlogsQueryDto,
     @CurrentUser() user: CurrentUserType,
   ): Promise<BlogListItemResponseDto[]> {
-    const { take, skip, categories } = query;
-    const finalTake = take ?? 10;
-    const finalSkip = skip ?? 0;
-
-    return this.blogExploreService.getFollowingBlogs(
-      user.id,
-      finalTake,
-      finalSkip,
-      categories,
-    );
+    return this.blogExploreService.getFollowingBlogs(query, user.id);
   }
 
   /**
-   * GET /blogs/search - Search blogs by query param 'q'
-   */
-  @Get('search')
+   * GET /blogs - Get list of published blogs (paginated, searchable)
+   * */
+  @Get()
   @Public()
-  async searchBlogs(
+  async fetchBlogs(
     @Query() queryDto: GetBlogsQueryDto,
-  ): Promise<BlogListItemResponseDto[]> {
-    const { take, skip, search } = queryDto;
-    const finalTake = take ?? 10;
-    const finalSkip = skip ?? 0;
-
-    return this.blogExploreService.getBlogs(finalTake, finalSkip, search);
+  ): Promise<PaginatedResponseDto<BlogListItemResponseDto>> {
+    return this.blogExploreService.getBlogs(queryDto);
   }
 
   /**
@@ -262,10 +228,10 @@ export class BlogController {
   @Public()
   async getRelevantBlogs(
     @Param('blogId', ParseIntPipe) blogId: number,
-    @Query('take', new DefaultValuePipe(10), ParseIntPipe) take: number,
-    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
-  ): Promise<BlogListItemResponseDto[]> {
-    return this.blogExploreService.getRelevantBlogs(blogId, take, skip);
+    @Query('page', new DefaultValuePipe(0), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+  ): Promise<PaginatedResponseDto<BlogListItemResponseDto>> {
+    return this.blogExploreService.getRelevantBlogs(blogId, page, limit);
   }
 
   /** GET /blogs/:id/likes?skip=0&take=20 */

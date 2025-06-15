@@ -12,6 +12,12 @@ import {
 import { BlogDetailsResponseDto } from './dto/response/blog-details.dto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { TryCatch } from 'src/common/try-catch.decorator';
+import { GetBlogsQueryDto } from './dto/request/get-blogs-query.dto';
+import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
+import {
+  generatePaginatedResponse,
+  generatePaginatedResponseWithUnknownTotal,
+} from 'src/common/helpers/pagination.helper';
 
 @Injectable()
 export class BlogExploreService {
@@ -46,35 +52,40 @@ export class BlogExploreService {
 
   @TryCatch()
   async getBlogs(
-    take: number,
-    skip: number,
-    search?: string,
-  ): Promise<BlogListItemResponseDto[]> {
+    queryDto: GetBlogsQueryDto,
+  ): Promise<PaginatedResponseDto<BlogListItemResponseDto>> {
+    const { page = 1, limit = 10, search } = queryDto;
+
     const whereClause: Prisma.BlogWhereInput = {
       is_published: true,
       is_protected: false,
     };
 
     if (search) {
-      // whereClause.OR = [
-      //   { title: { contains: search, mode: 'insensitive' } },
-      //   { content: { contains: search, mode: 'insensitive' } },
-      // ];
-
-      return this.getBlogsByQueryEmbedding(search, take, skip);
+      return await this.getBlogsByQueryEmbedding(search, page, limit);
     }
 
-    const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
-      where: whereClause,
-      select: blogListItemSelect,
-      orderBy: [{ created_at: 'desc' }],
-      take: take,
-      skip: skip,
-    });
+    const [blogs, totalBlogs] = await this.prisma.$transaction([
+      this.prisma.blog.findMany({
+        where: whereClause,
+        select: blogListItemSelect,
+        orderBy: [{ created_at: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.blog.count({
+        where: whereClause,
+      }),
+    ]);
 
-    return blogs
+    const mappedBlogs = blogs
       .map(mapBlogToListItemDto)
       .filter((b): b is BlogListItemResponseDto => b !== null);
+
+    return generatePaginatedResponse(mappedBlogs, totalBlogs, {
+      page,
+      limit,
+    });
   }
 
   async findMyBlogs(userId: string): Promise<BlogListItemResponseDto[]> {
@@ -184,11 +195,10 @@ export class BlogExploreService {
   }
 
   async getTrendingBlogs(
-    take: number,
-    skip: number,
-    categories?: string[],
+    queryDto: GetBlogsQueryDto,
     requestingUserId?: string | null,
   ): Promise<BlogListItemResponseDto[]> {
+    const { page = 1, limit = 10, categories } = queryDto;
     const baseWhere: Prisma.BlogWhereInput = {
       is_published: true,
       is_protected: false,
@@ -208,8 +218,8 @@ export class BlogExploreService {
         { comment_count: 'desc' },
         { created_at: 'desc' },
       ],
-      take: take,
-      skip: skip,
+      skip: (page - 1) * limit,
+      take: limit,
     });
     return blogs
       .map(mapBlogToListItemDto)
@@ -217,11 +227,10 @@ export class BlogExploreService {
   }
 
   async getFollowingBlogs(
+    queryDto: GetBlogsQueryDto,
     userId: string,
-    take: number,
-    skip: number,
-    categories?: string[],
   ): Promise<BlogListItemResponseDto[]> {
+    const { page = 1, limit = 10, categories } = queryDto;
     const followedUsers = await this.prisma.follow.findMany({
       where: { follower_id: userId },
       select: { following_id: true },
@@ -246,8 +255,8 @@ export class BlogExploreService {
       where: finalWhere,
       select: blogListItemSelect,
       orderBy: { created_at: 'desc' },
-      take: take,
-      skip: skip,
+      skip: (page - 1) * limit,
+      take: limit,
     });
     return blogs
       .map(mapBlogToListItemDto)
@@ -283,9 +292,9 @@ export class BlogExploreService {
   @TryCatch()
   async getRelevantBlogs(
     blogId: number,
-    take: number,
-    skip: number,
-  ): Promise<BlogListItemResponseDto[]> {
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResponseDto<BlogListItemResponseDto>> {
     const blog = await this.prisma.blog.findUnique({
       where: { id: blogId },
     });
@@ -294,69 +303,72 @@ export class BlogExploreService {
     }
 
     const relevantQueryText = blog.title + ' ' + blog.content;
-    
-    // MODIFICATION 1: Pass the blogId to be excluded down to the next function.
-    return await this.getBlogsByQueryEmbedding(relevantQueryText, take, skip, blogId);
+
+    const result = await this.getBlogsByQueryEmbedding(
+      relevantQueryText,
+      page,
+      limit,
+    );
+
+    // filter out the current blog from results
+    const filteredBlogs = result.data.filter((b) => b.id !== blogId);
+    return generatePaginatedResponseWithUnknownTotal(filteredBlogs, {
+      page: result.page,
+      limit: result.limit,
+    });
   }
 
   private async getBlogsByQueryEmbedding(
-  searchQuery: string,
-  take: number,
-  skip: number,
-  excludeId?: number, 
-): Promise<BlogListItemResponseDto[]> {
-  const queryEmbedding =
-    await this.embeddingService.generateEmbeddingFromText(searchQuery);
-    
-  const searchResponse = await this.qdrantClient.query(
-    this.qdrantCollectionName,
-    {
-      prefetch: [
-        {
-          query: queryEmbedding,
-          using: 'title',
+    searchQuery: string,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResponseDto<BlogListItemResponseDto>> {
+    const queryEmbedding =
+      await this.embeddingService.generateEmbeddingFromText(searchQuery);
+
+    const searchResponse = await this.qdrantClient.query(
+      this.qdrantCollectionName,
+      {
+        prefetch: [
+          {
+            query: queryEmbedding,
+            using: 'title',
+          },
+          {
+            query: queryEmbedding,
+            using: 'content',
+          },
+        ],
+        query: {
+          fusion: 'dbsf',
         },
-        {
-          query: queryEmbedding,
-          using: 'content',
-        },
-      ],
-      query: {
-        fusion: 'dbsf',
+
+        offset: (page - 1) * limit,
+        // get extra since we can't have exact total count
+        limit: limit + 1, // +1 to check if there's a next page
       },
-      
-      // Only add filter if excludeId is provided
-      ...(excludeId && {
-        filter: {
-          must_not: [
-            {
-              has_id: [excludeId], 
-            },
-          ],
-        },
-      }),
-      
-      offset: skip,
-      limit: take,
-    },
-  );
+    );
 
-  const pointIds: number[] = searchResponse.points.map((point) =>
-    Number(point.id),
-  );
+    const pointIds: number[] = searchResponse.points.map((point) =>
+      Number(point.id),
+    );
 
-  const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
-    where: { id: { in: pointIds } },
-    select: blogListItemSelect,
-  });
+    const blogs: BlogForListItemPayload[] = await this.prisma.blog.findMany({
+      where: { id: { in: pointIds } },
+      select: blogListItemSelect,
+    });
 
-  const sortedBlogs: BlogForListItemPayload[] = pointIds
-    .map((id) => blogs.find((blog) => blog.id === id))
-    .filter((blog) => blog !== undefined);
+    const sortedBlogs: BlogForListItemPayload[] = pointIds
+      .map((id) => blogs.find((blog) => blog.id === id))
+      .filter((blog) => blog !== undefined);
 
-  return sortedBlogs
-    .map(mapBlogToListItemDto)
-    .filter((b): b is BlogListItemResponseDto => b !== null);
-}
+    const mappedBlogs = sortedBlogs
+      .map(mapBlogToListItemDto)
+      .filter((b): b is BlogListItemResponseDto => b !== null);
 
+    return generatePaginatedResponseWithUnknownTotal(mappedBlogs, {
+      page,
+      limit,
+    });
+  }
 }
