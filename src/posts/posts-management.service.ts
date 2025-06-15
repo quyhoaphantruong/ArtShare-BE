@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
@@ -28,6 +29,8 @@ export class PostsManagementService {
     private readonly postEmbeddingService: PostsEmbeddingService,
     private readonly postsManagementValidator: PostsManagementValidator,
   ) {}
+
+  private readonly logger = new Logger(PostsManagementService.name);
 
   @TryCatch()
   async createPost(
@@ -123,10 +126,7 @@ export class PostsManagementService {
     images: Express.Multer.File[],
     userId: string,
   ): Promise<PostDetailsResponseDto> {
-    // wait 5 secs for testing purposes
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    // // return an error for testing purposes
+    // return an error for testing purposes
     // throw new BadRequestException('Testing error handling in deletePost');
     const existingPost = await this.prisma.post.findUnique({
       where: { id: postId },
@@ -145,6 +145,7 @@ export class PostsManagementService {
       ...postUpdateData
     } = updatePostDto;
 
+    // images to retain
     const existingImageUrlsSet = new Set(existing_image_urls);
 
     /** ────────────── HANDLE IMAGE DELETION ────────────── */
@@ -159,10 +160,16 @@ export class PostsManagementService {
     // 1️⃣ Delete the old thumbnail if it’s been replaced
     const oldThumb = existingPost.thumbnail_url;
     if (thumbnail_url && oldThumb && thumbnail_url !== oldThumb) {
+      this.logger.log(
+        `Deleting old thumbnail in s3 for post ${postId} with URL: ${oldThumb}`,
+      );
       await this.storageService.deleteFiles([oldThumb]);
     }
 
     if (imagesToDelete.length > 0) {
+      this.logger.log(
+        `Deleting ${imagesToDelete.length} old images in s3 for post ${postId}`,
+      );
       await Promise.all([
         this.prisma.media.deleteMany({
           where: {
@@ -176,6 +183,9 @@ export class PostsManagementService {
     /** ────────────── HANDLE NEW IMAGE UPLOADS ────────────── */
     let newImageUploads: FileUploadResponse[] = [];
     if (images && images.length > 0) {
+      this.logger.log(
+        `Uploading ${images.length} new images to s3 for post ${postId}`,
+      );
       newImageUploads = await this.storageService.uploadFiles(images, 'posts');
     }
 
@@ -194,6 +204,9 @@ export class PostsManagementService {
 
     /* 3️⃣ delete the old video row + file only when needed */
     if (wantsDeletion || wantsReplace) {
+      this.logger.log(
+        `Deleting existing video in s3 for post ${postId} with URL: ${existingVideo?.url}`,
+      );
       await Promise.all([
         this.prisma.media.delete({ where: { id: existingVideo.id } }),
         this.storageService.deleteFiles([existingVideo.url]),
@@ -233,11 +246,24 @@ export class PostsManagementService {
       include: { medias: true, user: true, categories: true },
     });
 
-    this.postEmbeddingService.upsertPostEmbedding(
+    const currentImageUrls = updatedPost.medias
+      .filter((m) => m.media_type === MediaType.image)
+      .map((m) => m.url);
+
+    console.log(
+      `description ${updatePostDto.description === ''}, ${existingPost.description}, ${updatePostDto.description === existingPost.description}`,
+    );
+    this.postEmbeddingService.updatePostEmbedding(
       updatedPost.id,
-      updatedPost.title,
-      updatedPost.description ?? undefined,
-      images,
+      updatePostDto.title === existingPost.title
+        ? undefined
+        : updatePostDto.title,
+      updatePostDto.description === existingPost.description
+        ? undefined
+        : updatePostDto.description,
+      imagesToDelete.length > 0 || images.length > 0
+        ? currentImageUrls
+        : undefined,
     );
 
     return plainToInstance(PostDetailsResponseDto, updatedPost);
