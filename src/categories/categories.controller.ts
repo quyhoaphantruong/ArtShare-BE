@@ -19,6 +19,8 @@ import { RolesGuard } from 'src/auth/roles.guard';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CategoriesSearchService } from './categories-search.service';
 import { SyncEmbeddingResponseDto } from '../common/response/sync-embedding.dto';
+import { Public } from 'src/auth/decorators/public.decorator';
+import { FindManyCategoriesDto } from './dto/request/find-many.dto';
 
 @Controller('categories')
 export class CategoriesController {
@@ -45,6 +47,14 @@ export class CategoriesController {
     return this.categoriesSearchService.findAll(page, page_size);
   }
 
+  @Get('v2')
+  @Public()
+  async findAllV2(
+    @Query() query: FindManyCategoriesDto,
+  ): Promise<CategoryResponseDto[]> {
+    return this.categoriesSearchService.findAllV2(query);
+  }
+
   @Get(':id')
   async findOne(
     @Param('id', ParseIntPipe) id: number,
@@ -59,16 +69,15 @@ export class CategoriesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updateCategoryDto: UpdateCategoryDto,
   ): Promise<CategoryResponseDto> {
-    return this.categoriesManagementService.update(
-      id,
-      updateCategoryDto,
-    );
+    return this.categoriesManagementService.update(id, updateCategoryDto);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles(Role.ADMIN) // TODO: uncomment when huy fix
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<CategoryResponseDto> {
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<CategoryResponseDto> {
     return this.categoriesManagementService.remove(id);
   }
 

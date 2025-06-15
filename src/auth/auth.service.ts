@@ -129,7 +129,7 @@ export class AuthService {
       });
       if (!userFromDb) {
         throw new Error(
-          `User with email ${decodedToken.email} not found in database`,
+          `User with email ${decodedToken.email}, and id ${decodedToken.uid} not found in database`,
         );
       }
 
