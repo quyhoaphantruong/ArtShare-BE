@@ -171,7 +171,7 @@ jobs:
             # Health check function
             health_check() {
               echo "🔍 Performing health check..."
-              for i in {1..15}; do  # Reduced from 30 to 15
+              for i in {1..30}; do  
                 if docker exec $CONTAINER_NAME curl -f http://localhost:3000 2>/dev/null; then
                   echo "✅ Health check passed"
                   return 0
