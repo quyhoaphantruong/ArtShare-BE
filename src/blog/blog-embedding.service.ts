@@ -39,7 +39,7 @@ export class BlogEmbeddingService {
       },
     );
 
-    console.log('Creating blog embeddings completed:', operationInfo);
+    this.logger.log('Creating blog embeddings completed:', operationInfo);
   }
 
   private async buildVectorToCreate(

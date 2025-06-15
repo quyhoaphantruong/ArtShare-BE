@@ -250,9 +250,6 @@ export class PostsManagementService {
       .filter((m) => m.media_type === MediaType.image)
       .map((m) => m.url);
 
-    console.log(
-      `description ${updatePostDto.description === ''}, ${existingPost.description}, ${updatePostDto.description === existingPost.description}`,
-    );
     this.postEmbeddingService.updatePostEmbedding(
       updatedPost.id,
       updatePostDto.title === existingPost.title

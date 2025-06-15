@@ -188,9 +188,6 @@ export class PostsExploreService {
       score_threshold: 0.54,
     });
 
-    console.log('Search response for query:', q);
-    console.dir(searchResponse, { depth: null });
-
     const pointIds: number[] = searchResponse.points
       .map((point) => Number(point.id))
       .filter((pointId) => !isNaN(pointId));

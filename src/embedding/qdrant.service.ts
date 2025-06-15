@@ -44,7 +44,7 @@ export class QdrantService {
         must: [],
       },
     });
-    console.log(`Deleted all points in collection '${collectionName}'.`);
+    this.logger.log(`Deleted all points in collection '${collectionName}'.`);
   }
 
   /**
