@@ -45,8 +45,12 @@ export class WorkflowAssistService {
     if (!imageFiles || imageFiles.length === 0) {
       throw new BadRequestException('No images provided');
     }
-    
-    await this.usageService.handleCreditUsage(userId, FeatureKey.AI_CREDITS, this.aiCreditCost);
+
+    await this.usageService.handleCreditUsage(
+      userId,
+      FeatureKey.AI_CREDITS,
+      this.aiCreditCost,
+    );
 
     const [{ title, description }, matchedCategories] = await Promise.all([
       this.generateTitleAndDescription(imageFiles),
@@ -127,7 +131,7 @@ export class WorkflowAssistService {
             new Blob([file.buffer]),
           ),
           using: 'description',
-          // score_threshold: 0.225,
+          score_threshold: 0.22,
           limit: 1,
           with_payload: true,
         };

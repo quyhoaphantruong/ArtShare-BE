@@ -9,7 +9,7 @@ export class EmbeddingService {
   private textModelPromise;
 
   constructor() {
-    const modelName = 'Xenova/clip-vit-base-patch16';
+    const modelName = 'Xenova/clip-vit-large-patch14';
 
     // Use Function constructor to ensure ESM import is not transformed to require()
     const importTransformers = () =>
@@ -44,7 +44,7 @@ export class EmbeddingService {
     const textInputs = tokenizer([text], { padding: true, truncation: true });
     const { text_embeds } = await textModel(textInputs);
 
-    return Object.values(text_embeds.data);
+    return Array.from(text_embeds.data);
   }
 
   async generateEmbeddingFromImageUrl(image_url: string): Promise<number[]> {

@@ -194,7 +194,7 @@ jobs:
             
             # Wait for new container to be ready
             echo "⏳ Waiting for new container to be ready..."
-            sleep 10
+            sleep 20
             
             # Check if new container is running
             if ! docker ps | grep -q $TEMP_CONTAINER; then

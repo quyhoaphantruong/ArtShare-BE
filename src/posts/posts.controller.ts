@@ -84,13 +84,14 @@ export class PostsController {
     return this.postsManagementService.deletePost(postId);
   }
 
-  @Post('search')
+  @Public()
+  @Get('search')
   @Public()
   async searchPosts(
-    @Body() body: SearchPostDto,
+    @Query() query: SearchPostDto,
     @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.searchPosts(body, user?.id ?? '');
+    return this.postsExploreService.searchPosts(query, user?.id ?? '');
   }
 
   @Public()
@@ -192,7 +193,7 @@ export class PostsController {
 
   @Post('sync-embeddings')
   async syncPostsEmbedding(): Promise<SyncEmbeddingResponseDto> {
-    return this.postsEmbeddingService.syncPostEmbeddings();
+    return this.postsEmbeddingService.syncPostsEmbeddings();
   }
 
   @Post('generate-metadata')
