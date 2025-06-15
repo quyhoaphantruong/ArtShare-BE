@@ -144,7 +144,7 @@ export class CategoriesEmbeddingService {
           description: { size: this.vectorDimension, distance: 'Cosine' },
         },
       });
-      console.log('Collection categories created successfully');
+      this.logger.log('Collection categories created successfully');
     }
   }
 }

@@ -1,11 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { ConfigService, ConfigType } from '@nestjs/config';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { plainToInstance } from 'class-transformer';
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 import { TryCatch } from 'src/common/try-catch.decorator';
+import embeddingConfig from 'src/config/embedding.config';
 import { EmbeddingService } from 'src/embedding/embedding.service';
 import { PrismaService } from 'src/prisma.service';
 import { UsageService } from 'src/usage/usage.service';
@@ -20,10 +21,13 @@ const PostMetadata = z.object({
 
 @Injectable()
 export class WorkflowAssistService {
+  private readonly categoriesCollectionName: string;
   private readonly openai: OpenAI;
   aiCreditCost = 2;
 
   constructor(
+    @Inject(embeddingConfig.KEY)
+    private embeddingConf: ConfigType<typeof embeddingConfig>,
     private readonly prismaService: PrismaService,
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
@@ -33,9 +37,9 @@ export class WorkflowAssistService {
     this.openai = new OpenAI({
       apiKey: this.configService.get<string>('OPEN_AI_SECRET_KEY'),
     });
-  }
 
-  private readonly categoriesCollectionName = 'categories';
+    this.categoriesCollectionName = this.embeddingConf.categoriesCollectionName;
+  }
 
   @TryCatch()
   async generatePostMetadata(
@@ -144,7 +148,6 @@ export class WorkflowAssistService {
           query: {
             fusion: 'dbsf',
           },
-          // score_threshold: 0.22,
           limit: 1,
           with_payload: true,
         };

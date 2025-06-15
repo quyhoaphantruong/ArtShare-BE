@@ -32,7 +32,9 @@ export class BlogManagementService {
     private readonly qdrantService: QdrantService,
     @Inject(embeddingConfig.KEY)
     private embeddingConf: ConfigType<typeof embeddingConfig>,
-  ) {}
+  ) {
+    this.blogsCollectionName = this.embeddingConf.blogsCollectionName;
+  }
 
   @TryCatch()
   async createBlog(
