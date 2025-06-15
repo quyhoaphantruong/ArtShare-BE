@@ -4,7 +4,6 @@ import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
-  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { CreateReportDto } from './dto/create-report.dto';
@@ -12,6 +11,7 @@ import { Report, ReportTargetType, Prisma, ReportStatus } from '@prisma/client';
 import { ViewTab } from './dto/view-report.dto';
 import { ResolveReportDto } from './dto/resolve-report.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserService } from 'src/user/user.service';
 
 export type ReportWithDetails = Report & {
   reporter: { id: string; username: string };
@@ -23,28 +23,15 @@ export class ReportService {
   constructor(
     private prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly userService: UserService,
   ) {}
 
   async createReport(
     createReportDto: CreateReportDto,
     reporterId: string,
   ): Promise<Report> {
-    const { target_id, target_type, reason, target_url, user_id } =
+    const { target_id, target_type, reason, target_url, user_id, target_title } =
       createReportDto;
-
-    const existingReport = await this.prisma.report.findFirst({
-      where: {
-        reporter_id: reporterId,
-        target_type: target_type,
-        status: ReportStatus.PENDING,
-        ...(user_id ? { user_id: user_id } : { target_id: target_id }),
-      },
-    });
-    if (existingReport) {
-      throw new ConflictException(
-        'You have already submitted a report for this item.',
-      );
-    }
 
     try {
       const newReport = await this.prisma.report.create({
@@ -54,8 +41,37 @@ export class ReportService {
           target_type: target_type,
           reason: reason,
           target_url: target_url,
+          user_id: user_id ? user_id : null,
         },
       });
+
+      const adminUserIds = await this.userService.getAdminUserIds();
+
+      for (const adminId of adminUserIds) {
+        this.eventEmitter.emit('push-notification', {
+          from: reporterId,
+          to: adminId,
+          type: 'report_created',
+          report: {
+            id: newReport.id,
+            target_type: target_type,
+            target_title: target_title,
+          },
+          createdAt: new Date(),
+        });
+      }
+
+      this.eventEmitter.emit('push-notification', {
+        from: reporterId,
+        type: 'report_created',
+        target: {
+          report_id: newReport.id,
+          target_type: target_type,
+          target_title: target_title,
+        },
+        createdAt: new Date(),
+      });
+
       return newReport;
     } catch (error) {
       console.error(`Failed to create report: ${error}`);
@@ -78,8 +94,6 @@ export class ReportService {
       where: { status: ReportStatus.PENDING },
       include: {
         reporter: { select: { id: true, username: true } },
-        // No moderator needed for PENDING, but if you fetch all statuses, include it
-        // moderator: { select: { id: true, username: true } },
       },
       orderBy: { created_at: 'asc' },
       skip: options.skip,
@@ -98,8 +112,6 @@ export class ReportService {
         where.target_type = tab.toUpperCase() as ReportTargetType;
       }
     }
-    // If filtering by status on frontend, you might not need specific status logic here
-    // unless it's for optimization or specific tabs like "Resolved".
 
     return this.prisma.report.findMany({
       where,
@@ -178,7 +190,7 @@ export class ReportService {
     });
 
     this.eventEmitter.emit('report.resolved', {
-      reporterId:  updatedReport.moderator_id,
+      reporterId:  updatedReport.reporter_id,
       reportId: updatedReport.id,
       reason: updatedReport.reason,
       resolvedAt: updatedReport.resolved_at,
