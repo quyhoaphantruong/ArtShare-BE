@@ -58,7 +58,7 @@ export class BlogController {
   async getTrendingBlogs(
     @Query() query: GetBlogsQueryDto,
     @CurrentUser() user?: CurrentUserType,
-  ): Promise<BlogListItemResponseDto[]> {
+  ): Promise<PaginatedResponseDto<BlogListItemResponseDto>> {
     return this.blogExploreService.getTrendingBlogs(query, user?.id);
   }
 
@@ -69,7 +69,7 @@ export class BlogController {
   async getFollowingBlogs(
     @Query() query: GetBlogsQueryDto,
     @CurrentUser() user: CurrentUserType,
-  ): Promise<BlogListItemResponseDto[]> {
+  ): Promise<PaginatedResponseDto<BlogListItemResponseDto>> {
     return this.blogExploreService.getFollowingBlogs(query, user.id);
   }
 
