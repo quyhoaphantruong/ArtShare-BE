@@ -1,15 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { EmbeddingService } from 'src/embedding/embedding.service';
+import { blogsCollectionName } from 'src/embedding/embedding.utils';
+import { QdrantService } from 'src/embedding/qdrant.service';
+import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class BlogEmbeddingService {
   constructor(
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
-  ) { }
-  
+    private readonly qdrantService: QdrantService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  private readonly logger = new Logger(BlogEmbeddingService.name);
   private readonly qdrantCollectionName = 'blogs';
 
   @TryCatch()
@@ -18,11 +25,6 @@ export class BlogEmbeddingService {
     title: string,
     content: string,
   ): Promise<void> {
-    const [titleEmbedding, contentEmbedding] = await Promise.all([
-      this.embeddingService.generateEmbeddingFromText(title),
-      this.embeddingService.generateEmbeddingFromText(content),
-    ]);
-
     const operationInfo = await this.qdrantClient.upsert(
       this.qdrantCollectionName,
       {
@@ -30,16 +32,90 @@ export class BlogEmbeddingService {
         points: [
           {
             id: blogId,
-            vector: {
-              title: titleEmbedding,
-              content: contentEmbedding,
-            },
+            vector: await this.buildVectorToCreate(title, content),
             payload: { blogId: blogId },
           },
         ],
       },
     );
 
-    console.log('Upsert operation info:', operationInfo);
+    console.log('Creating blog embeddings completed:', operationInfo);
+  }
+
+  private async buildVectorToCreate(
+    title: string,
+    content: string,
+  ): Promise<Record<string, number[]>> {
+    const [titleEmbedding, contentEmbedding] = await Promise.all([
+      this.embeddingService.generateEmbeddingFromText(title),
+      this.embeddingService.generateEmbeddingFromText(content),
+    ]);
+    return {
+      title: titleEmbedding,
+      content: contentEmbedding,
+    };
+  }
+
+  @TryCatch()
+  async updateBlogEmbeddings(
+    blogId: number,
+    newTitle?: string,
+    newContent?: string,
+  ): Promise<void> {
+    const [titleEmbedding, contentEmbedding] = await Promise.all([
+      newTitle
+        ? this.embeddingService.generateEmbeddingFromText(newTitle)
+        : Promise.resolve(null),
+      newContent
+        ? this.embeddingService.generateEmbeddingFromText(newContent)
+        : Promise.resolve(null),
+    ]);
+
+    const vectorPayload: Record<string, number[]> = {};
+
+    if (titleEmbedding) {
+      vectorPayload.title = titleEmbedding;
+    }
+    if (contentEmbedding) {
+      vectorPayload.description = contentEmbedding;
+    }
+
+    if (Object.keys(vectorPayload).length === 0) {
+      this.logger.log(
+        `No vectors to update for blog ${blogId}. Skipping update.`,
+      );
+      return;
+    }
+
+    const operationInfo = await this.qdrantClient.updateVectors(
+      blogsCollectionName,
+      {
+        wait: true,
+        points: [
+          {
+            id: blogId,
+            vector: vectorPayload,
+          },
+        ],
+      },
+    );
+
+    this.logger.log(
+      `Blog with id ${blogId} has update its vectors: ${Object.keys(vectorPayload).join(', ')}`,
+      operationInfo,
+    );
+  }
+
+  @TryCatch()
+  async syncBlogsEmbeddings(): Promise<SyncEmbeddingResponseDto> {
+    return this.qdrantService._syncEmbeddingsForModel(
+      blogsCollectionName,
+      'blog',
+      () => this.prisma.blog.findMany(),
+      async (blog) => ({
+        id: blog.id,
+        vector: await this.buildVectorToCreate(blog.title, blog.content),
+      }),
+    );
   }
 }

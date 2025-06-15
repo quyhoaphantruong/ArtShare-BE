@@ -192,7 +192,7 @@ export class PostsController {
 
   @Post('sync-embeddings')
   async syncPostsEmbedding(): Promise<SyncEmbeddingResponseDto> {
-    return this.postsEmbeddingService.syncPostEmbeddings();
+    return this.postsEmbeddingService.syncPostsEmbeddings();
   }
 
   @Post('generate-metadata')

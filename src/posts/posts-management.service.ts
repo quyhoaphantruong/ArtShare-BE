@@ -283,7 +283,7 @@ export class PostsManagementService {
       where: { id: postId },
     });
 
-    this.cleanupExternalResources(
+    void this.cleanupExternalResources(
       postId,
       post.medias.map((m) => m.url),
     ).catch((err) => {

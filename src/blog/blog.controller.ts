@@ -36,6 +36,8 @@ import { Public } from 'src/auth/decorators/public.decorator';
 import { LikesService } from 'src/likes/likes.service';
 import { LikingUserResponseDto } from 'src/likes/dto/response/liking-user-response.dto';
 import { TargetType } from 'src/common/enum/target-type.enum';
+import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
+import { BlogEmbeddingService } from './blog-embedding.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('blogs')
@@ -43,7 +45,8 @@ export class BlogController {
   constructor(
     private readonly blogManagementService: BlogManagementService,
     private readonly blogExploreService: BlogExploreService,
-    private readonly likesService: LikesService
+    private readonly likesService: LikesService,
+    private readonly blogEmbeddingService: BlogEmbeddingService,
   ) {}
 
   /**
@@ -126,37 +129,44 @@ export class BlogController {
   }
 
   /**
- * GET /blogs/{id} - Get blog details by ID
- */
-@Public()
-@Get(':id')
-async findBlogById(
-  @Param('id', ParseIntPipe) id: number,
-  @CurrentUser() user?: CurrentUserType,
-): Promise<BlogDetailsResponseDto> {
-  const blog = await this.blogExploreService.findBlogById(id, user?.id);
-  
-  if (!blog) {
-    // Get more specific error information
-    const accessInfo = await this.blogExploreService.checkBlogAccess(id, user?.id);
-    
-    if (!accessInfo.exists) {
-      throw new NotFoundException(`Blog with ID ${id} not found.`);
+   * GET /blogs/{id} - Get blog details by ID
+   */
+  @Public()
+  @Get(':id')
+  async findBlogById(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user?: CurrentUserType,
+  ): Promise<BlogDetailsResponseDto> {
+    const blog = await this.blogExploreService.findBlogById(id, user?.id);
+
+    if (!blog) {
+      // Get more specific error information
+      const accessInfo = await this.blogExploreService.checkBlogAccess(
+        id,
+        user?.id,
+      );
+
+      if (!accessInfo.exists) {
+        throw new NotFoundException(`Blog with ID ${id} not found.`);
+      }
+
+      // Provide specific error messages based on access reason
+      switch (accessInfo.reason) {
+        case 'not_published':
+          throw new ForbiddenException('This blog is not published yet.');
+        case 'protected':
+          throw new ForbiddenException(
+            'This blog is protected and you do not have access to view it.',
+          );
+        default:
+          throw new NotFoundException(
+            `Blog with ID ${id} not found or access denied.`,
+          );
+      }
     }
-    
-    // Provide specific error messages based on access reason
-    switch (accessInfo.reason) {
-      case 'not_published':
-        throw new ForbiddenException('This blog is not published yet.');
-      case 'protected':
-        throw new ForbiddenException('This blog is protected and you do not have access to view it.');
-      default:
-        throw new NotFoundException(`Blog with ID ${id} not found or access denied.`);
-    }
+
+    return blog;
   }
-  
-  return blog;
-}
 
   /**
    * POST /blogs - Create a new blog post (Standard REST, replaces /blogs/create)
@@ -274,5 +284,10 @@ async findBlogById(
       skip,
       take,
     );
+  }
+
+  @Post('sync-embeddings')
+  async syncPostsEmbedding(): Promise<SyncEmbeddingResponseDto> {
+    return this.blogEmbeddingService.syncBlogsEmbeddings();
   }
 }

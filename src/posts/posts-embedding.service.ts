@@ -65,39 +65,34 @@ export class PostsEmbeddingService {
       ],
     });
 
-    this.logger.log('Upsert post info', operationInfo);
+    this.logger.log('Creating post embeddings completed', operationInfo);
   }
 
   @TryCatch()
   async updatePostEmbedding(
     postId: number,
-    updatedTitle: string | undefined,
-    updatedDescription: string | undefined,
-    updatedImageUrls: string[] | undefined,
+    newTitle?: string,
+    newDescription?: string,
+    newImageUrls?: string[],
   ): Promise<void> {
     await Promise.all([
-      this.updateVectors(
-        postId,
-        updatedTitle,
-        updatedDescription,
-        updatedImageUrls,
-      ),
-      this.deleteVectors(postId, updatedDescription, updatedImageUrls),
+      this.updateVectors(postId, newTitle, newDescription, newImageUrls),
+      this.deleteVectors(postId, newDescription, newImageUrls),
     ]);
 
-    this.logger.log('Updated post embedding completed');
+    this.logger.log('Updated post embeddings completed');
   }
 
   async updateVectors(
     postId: number,
-    updatedTitle: string | undefined,
-    updatedDescription: string | undefined,
-    updatedImageUrls: string[] | undefined,
+    newTitle?: string,
+    newDescription?: string,
+    newImageUrls?: string[],
   ) {
     const vectorPayload = await this.buildVectorPayload(
-      updatedTitle,
-      updatedDescription,
-      updatedImageUrls,
+      newTitle,
+      newDescription,
+      newImageUrls,
     );
 
     if (Object.keys(vectorPayload).length === 0) {
@@ -127,9 +122,9 @@ export class PostsEmbeddingService {
   }
 
   private async buildVectorPayload(
-    title: string | undefined,
-    description: string | undefined,
-    imageUrls: string[] | undefined,
+    title?: string,
+    description?: string,
+    imageUrls?: string[],
   ): Promise<Record<string, number[]>> {
     const [titleEmbedding, descriptionEmbedding, imagesEmbedding] =
       await Promise.all([
@@ -166,14 +161,14 @@ export class PostsEmbeddingService {
 
   async deleteVectors(
     postId: number,
-    updatedDescription: string | undefined,
-    updatedImageUrls: string[] | undefined,
+    newDescription?: string,
+    newImageUrls?: string[],
   ) {
     const vectorsToDelete = [];
-    if (updatedDescription !== undefined && updatedDescription.trim() === '') {
+    if (newDescription !== undefined && newDescription.trim() === '') {
       vectorsToDelete.push('description');
     }
-    if (updatedImageUrls && updatedImageUrls.length === 0) {
+    if (newImageUrls && newImageUrls.length === 0) {
       vectorsToDelete.push('images');
     }
 
@@ -212,30 +207,12 @@ export class PostsEmbeddingService {
   }
 
   @TryCatch()
-  async syncPostEmbeddings(): Promise<SyncEmbeddingResponseDto> {
-    this.logger.log(
-      `Clearing all points from collection: ${postsCollectionName}`,
-    );
-    await this.qdrantService.deleteAllPoints(postsCollectionName);
-
-    const posts = await this.prisma.post.findMany({
-      include: { medias: true },
-    });
-
-    if (!posts || posts.length === 0) {
-      this.logger.log('No posts found to sync.');
-      return {
-        message: 'No posts found to sync',
-        count: 0,
-        syncedItems: [],
-      };
-    }
-
-    this.logger.log(`Found ${posts.length} posts. Processing all at once...`);
-
-    // 3. Process all posts concurrently using Promise.allSettled for resilience
-    const results = await Promise.allSettled(
-      posts.map(async (post) => ({
+  async syncPostsEmbeddings(): Promise<SyncEmbeddingResponseDto> {
+    return this.qdrantService._syncEmbeddingsForModel(
+      postsCollectionName,
+      'post',
+      () => this.prisma.post.findMany({ include: { medias: true } }),
+      async (post) => ({
         id: post.id,
         vector: await this.buildVectorPayload(
           post.title,
@@ -244,49 +221,7 @@ export class PostsEmbeddingService {
             .filter((m) => m.media_type === MediaType.image)
             .map((m) => m.url),
         ),
-      })),
+      }),
     );
-
-    // 5. Filter out any posts that failed during the embedding process
-    const successfulPoints: { id: number; vector: Record<string, number[]> }[] =
-      [];
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        successfulPoints.push(result.value);
-      } else {
-        this.logger.error(
-          `Failed to process post ID ${posts[index].id}:`,
-          result.reason,
-        );
-      }
-    });
-
-    // 6. Upsert all successful points in a single request (Payload Size Risk!)
-    if (successfulPoints.length > 0) {
-      this.logger.log(
-        `Upserting ${successfulPoints.length} points to Qdrant...`,
-      );
-      const operationInfo = await this.qdrantClient.upsert(
-        postsCollectionName,
-        {
-          wait: true,
-          points: successfulPoints,
-        },
-      );
-      this.logger.log('Upsert result:', operationInfo);
-    }
-
-    const totalSyncedCount = successfulPoints.length;
-    const totalFailedCount = posts.length - totalSyncedCount;
-
-    this.logger.log(
-      `Sync complete. Total synced: ${totalSyncedCount}. Failed: ${totalFailedCount}.`,
-    );
-
-    return {
-      message: `Sync finished. ${totalSyncedCount} posts synced, ${totalFailedCount} failed.`,
-      count: totalSyncedCount,
-      syncedItems: successfulPoints.map((point) => point.id.toString()),
-    };
   }
 }

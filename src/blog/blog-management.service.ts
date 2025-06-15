@@ -17,12 +17,15 @@ import { ProtectResponseDto } from './dto/response/protect-response.dto';
 import { RatingResponseDto } from './dto/response/rating-response.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { BlogEmbeddingService } from './blog-embedding.service';
+import { QdrantService } from 'src/embedding/qdrant.service';
+import { blogsCollectionName } from 'src/embedding/embedding.utils';
 
 @Injectable()
 export class BlogManagementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly blogEmbeddingService: BlogEmbeddingService,
+    private readonly qdrantService: QdrantService,
   ) {}
 
   @TryCatch()
@@ -87,7 +90,6 @@ export class BlogManagementService {
   ): Promise<BlogDetailsResponseDto> {
     const existingBlog = await this.prisma.blog.findUnique({
       where: { id },
-      select: { user_id: true },
     });
     if (!existingBlog) {
       throw new NotFoundException(`Blog with ID ${id} not found.`);
@@ -129,10 +131,14 @@ export class BlogManagementService {
       );
     }
 
-    void this.blogEmbeddingService.upsertBlogEmbeddings(
+    void this.blogEmbeddingService.updateBlogEmbeddings(
       updatedBlog.id,
-      updatedBlog.title,
-      updatedBlog.content,
+      updateBlogDto.title === existingBlog.title
+        ? undefined
+        : updateBlogDto.title,
+      updateBlogDto.content === existingBlog.content
+        ? undefined
+        : updatedBlog.content,
     );
     return mappedBlog;
   }
@@ -150,7 +156,11 @@ export class BlogManagementService {
         'You do not have permission to delete this blog.',
       );
     }
-    const result =await this.prisma.blog.delete({ where: { id } });
+
+    const result = await this.prisma.blog.delete({ where: { id } });
+
+    void this.qdrantService.deletePoints(blogsCollectionName, [id]);
+
     return result;
   }
 
