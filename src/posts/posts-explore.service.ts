@@ -269,7 +269,10 @@ export class PostsExploreService {
   }
 
   @TryCatch()
-  async getAiTrendingPosts(page: number, page_size: number): Promise<PostListItemResponseDto[]> {
+  async getAiTrendingPosts(
+    page: number,
+    page_size: number,
+  ): Promise<PostListItemResponseDto[]> {
     const skip = (page - 1) * page_size;
 
     const customIncludes: Prisma.PostInclude = {
@@ -282,10 +285,9 @@ export class PostsExploreService {
       ...customIncludes,
     };
 
-
     const posts = await this.prisma.post.findMany({
       where: { ai_created: true },
-      orderBy: [{ view_count: 'desc'}, { share_count: 'desc' }, { id: 'asc' }],
+      orderBy: [{ view_count: 'desc' }, { share_count: 'desc' }, { id: 'asc' }],
       take: page_size,
       skip,
       // common includes with custom includes for art generation
