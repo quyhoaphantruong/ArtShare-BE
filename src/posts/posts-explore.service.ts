@@ -156,8 +156,6 @@ export class PostsExploreService {
   ): Promise<PostListItemResponseDto[]> {
     const { q, page = 1, page_size = 25, filter } = body;
 
-    // const templatedQuery = `a photo of a ${q}`;
-
     const queryEmbedding =
       await this.embeddingService.generateEmbeddingFromText(q);
     const searchResponse = await this.qdrantClient.query(postsCollectionName, {

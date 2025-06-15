@@ -77,7 +77,7 @@ export class BlogEmbeddingService {
       vectorPayload.title = titleEmbedding;
     }
     if (contentEmbedding) {
-      vectorPayload.description = contentEmbedding;
+      vectorPayload.content = contentEmbedding;
     }
 
     if (Object.keys(vectorPayload).length === 0) {
