@@ -1,13 +1,48 @@
-import { AutoProjectStatus } from 'src/auto-project/enum/auto-project-status.enum';
-import { SharePlatform } from 'src/common/enum/share-platform.enum';
+import { AutoProjectStatus, SharePlatform } from '@prisma/client';
+import { Expose, Transform, Type } from 'class-transformer';
+
+class PlatformInfo {
+  @Expose()
+  name: SharePlatform;
+}
+
+class ProjectCounts {
+  @Expose()
+  autoPosts: number;
+}
 
 export class AutoProjectListItemDto {
+  @Expose()
   id: number;
+
+  @Expose()
   title: string;
-  description: string;
+
+  @Expose()
   status: AutoProjectStatus;
-  platformName: SharePlatform;
-  created_at: Date;
-  updated_at: Date;
-  userId: string;
+
+  @Expose()
+  platform: PlatformInfo;
+
+  @Expose()
+  @Transform(({ obj }) => (obj.platform ? [{ platform: obj.platform }] : []), {
+    toClassOnly: true,
+  })
+  platforms: { platform: PlatformInfo }[];
+
+  @Expose()
+  @Type(() => ProjectCounts)
+  _count: ProjectCounts;
+
+  @Expose()
+  nextPostAt: Date | null;
+}
+
+export class AutoProjectListResponseDto {
+  @Expose()
+  @Type(() => AutoProjectListItemDto)
+  projects: AutoProjectListItemDto[];
+
+  @Expose()
+  total: number;
 }

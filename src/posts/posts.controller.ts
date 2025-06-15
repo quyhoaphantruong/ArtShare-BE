@@ -51,7 +51,7 @@ export class PostsController {
     private readonly postsEmbeddingService: PostsEmbeddingService,
     private readonly likesService: LikesService,
     private readonly postsAdminService: PostsAdminService,
-  ) { }
+  ) {}
 
   @Post()
   @UseInterceptors(FilesInterceptor('images'))
@@ -84,24 +84,26 @@ export class PostsController {
     return this.postsManagementService.deletePost(postId);
   }
 
-  @Post('search')
+  @Public()
+  @Get('search')
   @Public()
   async searchPosts(
-    @Body() body: SearchPostDto,
+    @Query() query: SearchPostDto,
     @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.searchPosts(body, user?.id ?? '');
+    return this.postsExploreService.searchPosts(query, user?.id ?? '');
   }
 
+  @Public()
   @Post('for-you')
   async getForYouPosts(
     @Body() body: { page: number; page_size: number; filter: string[] },
-    @CurrentUser() user: CurrentUserType,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
     const { page = 1, page_size = 25, filter } = body;
 
     return this.postsExploreService.getForYouPosts(
-      user.id,
+      user?.id ?? '',
       page,
       page_size,
       filter,
@@ -130,10 +132,7 @@ export class PostsController {
     @Query('page_size', new DefaultValuePipe(25), ParseIntPipe)
     pageSize: number,
   ): Promise<PostListItemResponseDto[]> {
-    return this.postsExploreService.getAiTrendingPosts(
-      page,
-      pageSize,
-    );
+    return this.postsExploreService.getAiTrendingPosts(page, pageSize);
   }
 
   @Public()
@@ -194,7 +193,7 @@ export class PostsController {
 
   @Post('sync-embeddings')
   async syncPostsEmbedding(): Promise<SyncEmbeddingResponseDto> {
-    return this.postsEmbeddingService.syncPostEmbeddings();
+    return this.postsEmbeddingService.syncPostsEmbeddings();
   }
 
   @Post('generate-metadata')

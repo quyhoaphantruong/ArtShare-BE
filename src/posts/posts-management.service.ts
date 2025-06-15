@@ -2,11 +2,13 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { plainToInstance } from 'class-transformer';
-import { StorageService } from 'src/storage/storage.service'; import { MediaType, Post } from '@prisma/client';
+import { StorageService } from 'src/storage/storage.service';
+import { MediaType, Post } from '@prisma/client';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { PostDetailsResponseDto } from './dto/response/post-details.dto';
 import { UpdatePostDto } from './dto/request/update-post.dto';
@@ -19,11 +21,11 @@ import { PostsManagementValidator } from './validator/posts-management.validator
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserFollowService } from 'src/user/user.follow.service';
 import { FollowerDto } from 'src/user/dto/follower.dto';
+import { NotificationUtils } from '../common/utils/notification.utils';
+import { postsCollectionName } from 'src/embedding/embedding.utils';
 
 @Injectable()
 export class PostsManagementService {
-  private readonly qdrantCollectionName = 'posts';
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
@@ -32,7 +34,9 @@ export class PostsManagementService {
     private readonly postsManagementValidator: PostsManagementValidator,
     private readonly followService: UserFollowService,
     private readonly eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
+
+  private readonly logger = new Logger(PostsManagementService.name);
 
   @TryCatch()
   async createPost(
@@ -42,10 +46,11 @@ export class PostsManagementService {
   ): Promise<PostDetailsResponseDto> {
     const { cate_ids = [], video_url, prompt_id, ...rest } = request;
 
-    const { parsedCropMeta } = await this.postsManagementValidator.validateCreateRequest(
-      request,
-      images,
-    );
+    const { parsedCropMeta } =
+      await this.postsManagementValidator.validateCreateRequest(
+        request,
+        images,
+      );
 
     if (prompt_id) {
       await this.validateAiArtExistence(prompt_id);
@@ -76,16 +81,21 @@ export class PostsManagementService {
       images,
     );
 
-    const followers: FollowerDto[] = await this.followService.getFollowersListByUserId(userId);
+    const followers: FollowerDto[] =
+      await this.followService.getFollowersListByUserId(userId);
 
-    for (const follower of followers) {
-      if (follower.id === userId) continue;
+    // Filter out the post author from followers and send notifications
+    const notificationRecipients =
+      NotificationUtils.filterNotificationRecipients(followers, userId);
 
+    for (const follower of notificationRecipients) {
       this.eventEmitter.emit('push-notification', {
         from: userId,
         to: follower.id,
         type: 'artwork_published',
-        arkwork: {title: createdPost.title},
+        post: { title: createdPost.title },
+        postId: createdPost.id.toString(),
+        postTitle: createdPost.title,
         createdAt: new Date(),
       });
     }
@@ -141,6 +151,8 @@ export class PostsManagementService {
     images: Express.Multer.File[],
     userId: string,
   ): Promise<PostDetailsResponseDto> {
+    // return an error for testing purposes
+    // throw new BadRequestException('Testing error handling in deletePost');
     const existingPost = await this.prisma.post.findUnique({
       where: { id: postId },
       include: { medias: true },
@@ -158,6 +170,7 @@ export class PostsManagementService {
       ...postUpdateData
     } = updatePostDto;
 
+    // images to retain
     const existingImageUrlsSet = new Set(existing_image_urls);
 
     /** ────────────── HANDLE IMAGE DELETION ────────────── */
@@ -172,10 +185,16 @@ export class PostsManagementService {
     // 1️⃣ Delete the old thumbnail if it’s been replaced
     const oldThumb = existingPost.thumbnail_url;
     if (thumbnail_url && oldThumb && thumbnail_url !== oldThumb) {
+      this.logger.log(
+        `Deleting old thumbnail in s3 for post ${postId} with URL: ${oldThumb}`,
+      );
       await this.storageService.deleteFiles([oldThumb]);
     }
 
     if (imagesToDelete.length > 0) {
+      this.logger.log(
+        `Deleting ${imagesToDelete.length} old images in s3 for post ${postId}`,
+      );
       await Promise.all([
         this.prisma.media.deleteMany({
           where: {
@@ -189,6 +208,9 @@ export class PostsManagementService {
     /** ────────────── HANDLE NEW IMAGE UPLOADS ────────────── */
     let newImageUploads: FileUploadResponse[] = [];
     if (images && images.length > 0) {
+      this.logger.log(
+        `Uploading ${images.length} new images to s3 for post ${postId}`,
+      );
       newImageUploads = await this.storageService.uploadFiles(images, 'posts');
     }
 
@@ -207,6 +229,9 @@ export class PostsManagementService {
 
     /* 3️⃣ delete the old video row + file only when needed */
     if (wantsDeletion || wantsReplace) {
+      this.logger.log(
+        `Deleting existing video in s3 for post ${postId} with URL: ${existingVideo?.url}`,
+      );
       await Promise.all([
         this.prisma.media.delete({ where: { id: existingVideo.id } }),
         this.storageService.deleteFiles([existingVideo.url]),
@@ -246,11 +271,21 @@ export class PostsManagementService {
       include: { medias: true, user: true, categories: true },
     });
 
-    this.postEmbeddingService.upsertPostEmbedding(
+    const currentImageUrls = updatedPost.medias
+      .filter((m) => m.media_type === MediaType.image)
+      .map((m) => m.url);
+
+    this.postEmbeddingService.updatePostEmbedding(
       updatedPost.id,
-      updatedPost.title,
-      updatedPost.description ?? undefined,
-      images,
+      updatePostDto.title === existingPost.title
+        ? undefined
+        : updatePostDto.title,
+      updatePostDto.description === existingPost.description
+        ? undefined
+        : updatePostDto.description,
+      imagesToDelete.length > 0 || images.length > 0
+        ? currentImageUrls
+        : undefined,
     );
 
     return plainToInstance(PostDetailsResponseDto, updatedPost);
@@ -270,7 +305,7 @@ export class PostsManagementService {
       where: { id: postId },
     });
 
-    this.cleanupExternalResources(
+    void this.cleanupExternalResources(
       postId,
       post.medias.map((m) => m.url),
     ).catch((err) => {
@@ -284,7 +319,7 @@ export class PostsManagementService {
     if (urls.length) {
       await this.storageService.deleteFiles(urls);
     }
-    await this.qdrantService.deletePoints(this.qdrantCollectionName, [postId]);
+    await this.qdrantService.deletePoints(postsCollectionName, [postId]);
   }
 
   async updateThumbnailCropMeta(

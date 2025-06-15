@@ -1,21 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { MediaType } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
-import axios from 'axios';
-import { nanoid } from 'nanoid';
 import { SyncEmbeddingResponseDto } from 'src/common/response/sync-embedding.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { EmbeddingService } from 'src/embedding/embedding.service';
-import { VECTOR_DIMENSION } from 'src/embedding/embedding.utils';
+import { postsCollectionName } from 'src/embedding/embedding.utils';
 import { QdrantService } from 'src/embedding/qdrant.service';
 import { PrismaService } from 'src/prisma.service';
-import { Readable } from 'stream';
-
-class VectorParams {
-  titleEmbedding: number[];
-  descriptionEmbedding: number[];
-  imagesEmbedding: number[];
-}
 
 @Injectable()
 export class PostsEmbeddingService {
@@ -26,7 +17,7 @@ export class PostsEmbeddingService {
     private readonly prisma: PrismaService,
   ) {}
 
-  private readonly collectionName = 'posts';
+  private readonly logger = new Logger(PostsEmbeddingService.name); // Create an instance of Logger for this service
 
   @TryCatch()
   async upsertPostEmbedding(
@@ -35,80 +26,172 @@ export class PostsEmbeddingService {
     description: string | undefined,
     imageFiles: Express.Multer.File[],
   ): Promise<void> {
-    await this.ensurePostCollectionExists();
-    const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
-      await this.getVectorParams(title, description, imageFiles);
-
-    const operationInfo = await this.qdrantClient.upsert(
-      this.collectionName,
-      {
-        wait: true,
-        points: [
-          {
-            id: postId,
-            vector: {
-              title: titleEmbedding,
-              description: descriptionEmbedding,
-              images: imagesEmbedding,
-            } as Record<string, number[]>,
-          },
-        ],
-      },
-    );
-
-    console.log('Upsert operation info:', operationInfo);
-  }
-
-  @TryCatch('something went wrong with ensuring post collection exists')
-  private async ensurePostCollectionExists() {
-    const collectionExists = this.qdrantService.collectionExists(
-      this.collectionName,
-    );
-
-    if (!collectionExists) {
-      await this.qdrantClient.createCollection(this.collectionName, {
-        vectors: {
-          title: { size: VECTOR_DIMENSION, distance: 'Cosine' },
-          description: { size: VECTOR_DIMENSION, distance: 'Cosine' },
-          images: { size: VECTOR_DIMENSION, distance: 'Dot' },
-        },
-      });
-
-      console.log(
-        `Created Qdrant collection '${this.collectionName}' with named vectors`,
-      );
-    }
-  }
-
-  private async getVectorParams(
-    title: string,
-    description: string | undefined,
-    imageFiles: Express.Multer.File[],
-  ): Promise<VectorParams> {
-    const [titleEmbedding, descriptionEmbedding, imagesEmbedding]: number[][] =
+    const [titleEmbedding, descriptionEmbedding, imagesEmbedding] =
       await Promise.all([
         this.embeddingService.generateEmbeddingFromText(title),
 
         description
           ? this.embeddingService.generateEmbeddingFromText(description)
-          : Promise.resolve(new Array(VECTOR_DIMENSION).fill(0)),
+          : Promise.resolve(null),
 
-        imageFiles && imageFiles.length > 0
+        imageFiles?.length > 0
           ? Promise.all(
               imageFiles.map((image) =>
                 this.embeddingService.generateEmbeddingFromImageBlob(
                   new Blob([image.buffer]),
                 ),
               ),
-            ).then((embeds: number[][]) => this.averageEmbeddings(embeds))
-          : Promise.resolve(new Array(VECTOR_DIMENSION).fill(0)),
+            ).then((embeds) => this.averageEmbeddings(embeds))
+          : Promise.resolve(null),
       ]);
 
-    return {
-      titleEmbedding: titleEmbedding,
-      descriptionEmbedding: descriptionEmbedding,
-      imagesEmbedding: imagesEmbedding,
+    const vectorPayload: Record<string, number[]> = {
+      title: titleEmbedding,
     };
+    if (descriptionEmbedding) {
+      vectorPayload.description = descriptionEmbedding;
+    }
+    if (imagesEmbedding) {
+      vectorPayload.images = imagesEmbedding;
+    }
+
+    const operationInfo = await this.qdrantClient.upsert(postsCollectionName, {
+      wait: true,
+      points: [
+        {
+          id: postId,
+          vector: vectorPayload,
+        },
+      ],
+    });
+
+    this.logger.log('Creating post embeddings completed', operationInfo);
+  }
+
+  @TryCatch()
+  async updatePostEmbedding(
+    postId: number,
+    newTitle?: string,
+    newDescription?: string,
+    newImageUrls?: string[],
+  ): Promise<void> {
+    await Promise.all([
+      this.updateVectors(postId, newTitle, newDescription, newImageUrls),
+      this.deleteVectors(postId, newDescription, newImageUrls),
+    ]);
+
+    this.logger.log('Updated post embeddings completed');
+  }
+
+  async updateVectors(
+    postId: number,
+    newTitle?: string,
+    newDescription?: string,
+    newImageUrls?: string[],
+  ) {
+    const vectorPayload = await this.buildVectorPayload(
+      newTitle,
+      newDescription,
+      newImageUrls,
+    );
+
+    if (Object.keys(vectorPayload).length === 0) {
+      this.logger.log(
+        `No vectors to update for post ${postId}. Skipping update.`,
+      );
+      return;
+    }
+
+    const operationInfo = await this.qdrantClient.updateVectors(
+      postsCollectionName,
+      {
+        wait: true,
+        points: [
+          {
+            id: postId,
+            vector: vectorPayload,
+          },
+        ],
+      },
+    );
+
+    this.logger.log(
+      `Post with id ${postId} has update its vectors`,
+      operationInfo,
+    );
+  }
+
+  private async buildVectorPayload(
+    title?: string,
+    description?: string,
+    imageUrls?: string[],
+  ): Promise<Record<string, number[]>> {
+    const [titleEmbedding, descriptionEmbedding, imagesEmbedding] =
+      await Promise.all([
+        title
+          ? await this.embeddingService.generateEmbeddingFromText(title)
+          : Promise.resolve(null),
+
+        description && description.trim().length > 0
+          ? this.embeddingService.generateEmbeddingFromText(description)
+          : Promise.resolve(null),
+
+        imageUrls && imageUrls.length > 0
+          ? Promise.all(
+              imageUrls.map((url) =>
+                this.embeddingService.generateEmbeddingFromImageUrl(url),
+              ),
+            ).then((embeds) => this.averageEmbeddings(embeds))
+          : Promise.resolve(null),
+      ]);
+
+    const vectorPayload: Record<string, number[]> = {};
+
+    if (titleEmbedding) {
+      vectorPayload.title = titleEmbedding;
+    }
+    if (descriptionEmbedding) {
+      vectorPayload.description = descriptionEmbedding;
+    }
+    if (imagesEmbedding) {
+      vectorPayload.images = imagesEmbedding;
+    }
+    return vectorPayload;
+  }
+
+  async deleteVectors(
+    postId: number,
+    newDescription?: string,
+    newImageUrls?: string[],
+  ) {
+    const vectorsToDelete = [];
+    if (newDescription !== undefined && newDescription.trim() === '') {
+      vectorsToDelete.push('description');
+    }
+    if (newImageUrls && newImageUrls.length === 0) {
+      vectorsToDelete.push('images');
+    }
+
+    if (vectorsToDelete.length === 0) {
+      this.logger.log(
+        `No vectors to delete for post ${postId}. Skipping deletion.`,
+      );
+      return;
+    }
+
+    const operationInfo = await this.qdrantClient.deleteVectors(
+      postsCollectionName,
+      {
+        wait: true,
+        points: [postId],
+        vector: vectorsToDelete,
+      },
+    );
+
+    this.logger.log(
+      `Post with id ${postId} has delete vectors ${vectorsToDelete.join(', ')}`,
+      operationInfo,
+    );
   }
 
   private averageEmbeddings(embeddings: number[][]): number[] {
@@ -124,90 +207,20 @@ export class PostsEmbeddingService {
   }
 
   @TryCatch()
-  async syncPostEmbeddings(): Promise<SyncEmbeddingResponseDto> {
-    await this.qdrantService.deleteAllPoints(this.collectionName);
-  
-    const posts = await this.prisma.post.findMany({
-      include: { medias: true },
-    });
-
-    if (!posts || posts.length === 0) {
-      console.log('No posts found.');
-      return {
-        message: 'No posts found to sync',
-        count: 0,
-        syncedItems: [],
-      };
-    }
-    console.log(`Found ${posts.length} posts to sync.`);
-
-    const points = await Promise.all(
-      posts.map(async (post) => {
-        const imageMedias = post.medias.filter(
-          (m) => m.media_type === MediaType.image,
-        );
-        const imageFiles: Express.Multer.File[] =
-          await this.buildImageFilesFromUrls(imageMedias.map((m) => m.url));
-
-        // get your embeddings
-        const { titleEmbedding, descriptionEmbedding, imagesEmbedding } =
-          await this.getVectorParams(
-            post.title,
-            post.description ?? undefined,
-            imageFiles,
-          );
-
-        return {
-          id: post.id,
-          vector: {
-            title: titleEmbedding,
-            description: descriptionEmbedding,
-            images: imagesEmbedding,
-          } as Record<string, number[]>,
-        };
-      }),
-    );
-
-    const operationInfo = await this.qdrantClient.upsert(
-      this.collectionName,
-      {
-        wait: true,
-        points: points,
-      },
-    );
-
-    console.log('Upsert result:', operationInfo);
-    return {
-      message: 'Post embeddings synced successfully',
-      count: points.length,
-      syncedItems: points.map((point) => point.id.toString()),
-    };
-  }
-
-  private async buildImageFilesFromUrls(
-    imageUrls: string[],
-  ): Promise<Express.Multer.File[]> {
-    return await Promise.all(
-      imageUrls.map(async (url) => {
-        const res = await axios.get<ArrayBuffer>(url, {
-          responseType: 'arraybuffer',
-        });
-
-        console.log(`Fetched image from ${url}: ${res}`);
-        const buffer = Buffer.from(res.data);
-        const ext = url.split('.').pop() ?? 'png';
-        return {
-          fieldname: 'file',
-          originalname: `${nanoid()}.${ext}`,
-          encoding: '7bit',
-          mimetype: `image/${ext}`,
-          buffer,
-          size: buffer.length,
-          destination: '',
-          filename: '',
-          path: '',
-          stream: Readable.from(buffer),
-        } as Express.Multer.File;
+  async syncPostsEmbeddings(): Promise<SyncEmbeddingResponseDto> {
+    return this.qdrantService._syncEmbeddingsForModel(
+      postsCollectionName,
+      'post',
+      () => this.prisma.post.findMany({ include: { medias: true } }),
+      async (post) => ({
+        id: post.id,
+        vector: await this.buildVectorPayload(
+          post.title,
+          post.description ?? undefined,
+          post.medias
+            .filter((m) => m.media_type === MediaType.image)
+            .map((m) => m.url),
+        ),
       }),
     );
   }

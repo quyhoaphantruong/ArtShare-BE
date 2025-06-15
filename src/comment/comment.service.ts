@@ -12,11 +12,14 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CommentDto } from './dto/get-comment.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotificationUtils } from '../common/utils/notification.utils';
+import { TryCatch } from 'src/common/try-catch.decorator';
 
 @Injectable()
 export class CommentService {
-  constructor(private prisma: PrismaService,
-              private readonly eventEmitter: EventEmitter2,
+  constructor(
+    private prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(dto: CreateCommentDto, userId: string): Promise<Comment> {
@@ -45,6 +48,9 @@ export class CommentService {
     let owner_post_id = null;
     let post_title = null;
 
+    let owner_post_id = null;
+    let post_title = null;
+
     if (target_type === TargetType.POST) {
       const post = await this.prisma.post.findUnique({
         where: { id: target_id },
@@ -52,6 +58,8 @@ export class CommentService {
       if (!post) {
         throw new NotFoundException(`Post ${target_id} not found.`);
       }
+      owner_post_id = post.user_id;
+      post_title = post.title;
       owner_post_id = post.user_id;
       post_title = post.title;
     } else if (target_type === TargetType.BLOG) {
@@ -66,76 +74,87 @@ export class CommentService {
     }
 
     try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        const newComment = await tx.comment.create({
-          data: {
-            content,
-            user_id: userId,
-            target_id,
-            target_type,
-            parent_comment_id,
-          },
-          include: {
-            user: {
-              select: { id: true, username: true, profile_picture_url: true },
+      const created = await this.prisma.$transaction(
+        async (tx) => {
+          const newComment = await tx.comment.create({
+            data: {
+              content,
+              user_id: userId,
+              target_id,
+              target_type,
+              parent_comment_id,
             },
-            replies: {
-              select: {
-                id: true,
-                content: true,
-                created_at: true,
-                like_count: true,
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                    profile_picture_url: true,
+            include: {
+              user: {
+                select: { id: true, username: true, profile_picture_url: true },
+              },
+              replies: {
+                select: {
+                  id: true,
+                  content: true,
+                  created_at: true,
+                  like_count: true,
+                  user: {
+                    select: {
+                      id: true,
+                      username: true,
+                      profile_picture_url: true,
+                    },
                   },
                 },
               },
             },
-          },
-        });
-
-        if (target_type === TargetType.POST) {
-          await tx.post.update({
-            where: { id: target_id },
-            data: { comment_count: { increment: 1 } },
           });
-          let userIsReplied = null;
-          if (dto.parent_comment_id != null) {
-            userIsReplied = await this.prisma.comment.findFirst(
-              {where : {parent_comment_id: dto.parent_comment_id},
-                select: {user_id: true}}
-            )
+
+          if (target_type === TargetType.POST) {
+            await tx.post.update({
+              where: { id: target_id },
+              data: { comment_count: { increment: 1 } },
+            });
+            let userIsReplied = null;
+            if (dto.parent_comment_id != null) {
+              userIsReplied = await this.prisma.comment.findFirst({
+                where: { parent_comment_id: dto.parent_comment_id },
+                select: { user_id: true },
+              });
+            }
+
+            // Only send notification if the user is not commenting on their own post
+            const targetUserId =
+              userIsReplied == null ? owner_post_id : userIsReplied.user_id;
+            if (
+              targetUserId &&
+              NotificationUtils.shouldSendNotification(userId, targetUserId)
+            ) {
+              this.eventEmitter.emit('push-notification', {
+                from: userId,
+                to: targetUserId,
+                type: 'artwork_commented',
+                post: { title: post_title ? post_title : 'post' },
+                comment: { text: dto.content },
+                postId: target_id.toString(),
+                commentId: newComment.id.toString(),
+                postTitle: post_title ? post_title : 'post',
+                createdAt: new Date(),
+              });
+            }
+          } else {
+            await tx.blog.update({
+              where: { id: target_id },
+              data: { comment_count: { increment: 1 } },
+            });
           }
-              
-          this.eventEmitter.emit('push-notification', {
-            from: userId,
-            to: userIsReplied == null ? owner_post_id : userIsReplied,
-            type: 'artwork_commented',
-            artwork: { title: post_title ? post_title : "post"},
-            comment: { text: dto.content },
-            createdAt: new Date(),
-          });
-          
-        } else {
-          await tx.blog.update({
-            where: { id: target_id },
-            data: { comment_count: { increment: 1 } },
-          });
-        }
 
-        return newComment;
-      },
-      {
-        maxWait: 5000,   // wait up to 5 s to acquire a connection (default 2 s)
-        timeout: 15000,  // allow up to 15 s for the transaction to complete
-      });
+          return newComment;
+        },
+        {
+          maxWait: 5000, // wait up to 5 s to acquire a connection (default 2 s)
+          timeout: 15000, // allow up to 15 s for the transaction to complete
+        },
+      );
 
-   
-       return created; 
-          } catch (err: any) {
+      return created;
+    } catch (err: any) {
       if (err instanceof PrismaClientKnownRequestError) {
         if (err.code === 'P2003') {
           throw new NotFoundException(
@@ -148,13 +167,14 @@ export class CommentService {
     }
   }
 
-   async getComments(
+  @TryCatch()
+  async getComments(
     targetId: number,
     targetType: TargetType,
     currentUserId?: string,
     parentCommentId?: number,
   ): Promise<CommentDto[]> {
-  const comments = await this.prisma.comment.findMany({
+    const comments = await this.prisma.comment.findMany({
       where: {
         target_id: targetId,
         target_type: targetType,
@@ -162,35 +182,38 @@ export class CommentService {
       },
       orderBy: { created_at: 'desc' },
       include: {
-        user: { select: { id: true, username: true, profile_picture_url: true } },
-      _count: { select: { replies: true } },
+        user: {
+          select: { id: true, username: true, profile_picture_url: true },
+        },
+        _count: { select: { replies: true } },
       },
     });
 
     //* gather IDs of comments **and** their included replies */
-  const ids: number[] = [];
-        comments.forEach((c: any) => {
-    ids.push(c.id);
-          c.replies?.forEach((r: any) => ids.push(r.id));
+    const ids: number[] = [];
+    comments.forEach((c: any) => {
+      ids.push(c.id);
+      c.replies?.forEach((r: any) => ids.push(r.id));
     });
-  const likedRows = currentUserId ? await this.prisma.commentLike.findMany({
-  where: { user_id: currentUserId, comment_id: { in: ids } },
-  select: { comment_id: true },
-}) : [];
+    const likedRows = currentUserId
+      ? await this.prisma.commentLike.findMany({
+          where: { user_id: currentUserId, comment_id: { in: ids } },
+          select: { comment_id: true },
+        })
+      : [];
     const likedSet = new Set(likedRows.map((l) => l.comment_id));
 
-     /* ❷ map every record to DTO, surfacing `reply_count` ---------- */
+    /* ❷ map every record to DTO, surfacing `reply_count` ---------- */
     return comments.map((commentPrisma): CommentDto => {
       const { _count: prismaCount, ...restOfCommentFields } = commentPrisma;
 
       return {
-        ...restOfCommentFields, 
+        ...restOfCommentFields,
         likedByCurrentUser: likedSet.has(commentPrisma.id),
-        reply_count: prismaCount.replies, 
+        reply_count: prismaCount.replies,
       };
     });
   }
-
 
   async update(
     commentId: number,

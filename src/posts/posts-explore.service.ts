@@ -12,6 +12,7 @@ import {
   mapPostToDto,
   PostWithRelations,
 } from './mapper/posts-explore.mapper';
+import { postsCollectionName } from 'src/embedding/embedding.utils';
 
 @Injectable()
 export class PostsExploreService {
@@ -20,8 +21,6 @@ export class PostsExploreService {
     private readonly embeddingService: EmbeddingService,
     private readonly qdrantClient: QdrantClient,
   ) {}
-
-  private readonly qdrantCollectionName = 'posts';
 
   private buildPostIncludes = (userId: string): Prisma.PostInclude => {
     return {
@@ -159,31 +158,33 @@ export class PostsExploreService {
 
     const queryEmbedding =
       await this.embeddingService.generateEmbeddingFromText(q);
-    const searchResponse = await this.qdrantClient.query(
-      this.qdrantCollectionName,
-      {
-        prefetch: [
-          {
-            query: queryEmbedding,
-            using: 'images',
-          },
-          {
-            query: queryEmbedding,
-            using: 'description',
-          },
-          {
-            query: queryEmbedding,
-            using: 'title',
-          },
-        ],
-        query: {
-          fusion: 'dbsf',
+    const searchResponse = await this.qdrantClient.query(postsCollectionName, {
+      prefetch: [
+        {
+          query: queryEmbedding,
+          using: 'images',
         },
-        offset: (page - 1) * page_size,
-        limit: page_size,
-        // with_payload: true,
+        {
+          query: queryEmbedding,
+          using: 'description',
+          limit: 1,
+        },
+        {
+          query: queryEmbedding,
+          using: 'title',
+          limit: 1,
+        },
+      ],
+      query: {
+        fusion: 'dbsf',
       },
-    );
+      // query: queryEmbedding,
+      // using: 'images',
+      offset: (page - 1) * page_size,
+      limit: page_size,
+      // with_payload: true,
+      score_threshold: 0.54,
+    });
 
     const pointIds: number[] = searchResponse.points
       .map((point) => Number(point.id))
@@ -226,30 +227,27 @@ export class PostsExploreService {
     const queryEmbedding =
       await this.embeddingService.generateEmbeddingFromText(relevantQueryText);
 
-    const searchResponse = await this.qdrantClient.query(
-      this.qdrantCollectionName,
-      {
-        prefetch: [
-          {
-            query: queryEmbedding,
-            using: 'images',
-          },
-          {
-            query: queryEmbedding,
-            using: 'description',
-          },
-          {
-            query: queryEmbedding,
-            using: 'title',
-          },
-        ],
-        query: {
-          fusion: 'dbsf',
+    const searchResponse = await this.qdrantClient.query(postsCollectionName, {
+      prefetch: [
+        {
+          query: queryEmbedding,
+          using: 'images',
         },
-        offset: (page - 1) * page_size,
-        limit: page_size,
+        {
+          query: queryEmbedding,
+          using: 'description',
+        },
+        {
+          query: queryEmbedding,
+          using: 'title',
+        },
+      ],
+      query: {
+        fusion: 'dbsf',
       },
-    );
+      offset: (page - 1) * page_size,
+      limit: page_size,
+    });
 
     const pointIds: number[] = searchResponse.points
       .map((point) => Number(point.id))
@@ -269,7 +267,10 @@ export class PostsExploreService {
   }
 
   @TryCatch()
-  async getAiTrendingPosts(page: number, page_size: number): Promise<PostListItemResponseDto[]> {
+  async getAiTrendingPosts(
+    page: number,
+    page_size: number,
+  ): Promise<PostListItemResponseDto[]> {
     const skip = (page - 1) * page_size;
 
     const customIncludes: Prisma.PostInclude = {
@@ -282,10 +283,9 @@ export class PostsExploreService {
       ...customIncludes,
     };
 
-
     const posts = await this.prisma.post.findMany({
       where: { ai_created: true },
-      orderBy: [{ view_count: 'desc'}, { share_count: 'desc' }, { id: 'asc' }],
+      orderBy: [{ view_count: 'desc' }, { share_count: 'desc' }, { id: 'asc' }],
       take: page_size,
       skip,
       // common includes with custom includes for art generation

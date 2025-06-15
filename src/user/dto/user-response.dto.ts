@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { UserStatus } from '@prisma/client';
 import { Role } from 'src/auth/enums/role.enum';
 
 export class UserResponseDto {
@@ -13,9 +14,9 @@ export class UserResponseDto {
     description: 'User display name',
     nullable: true,
   })
-  fullName?: string | null; // Maps from full_name
+  fullName?: string | null;
 
-  @ApiProperty({ example: 'johndoe', description: 'Username' }) // Assuming username is not nullable
+  @ApiProperty({ example: 'johndoe', description: 'Username' })
   username: string;
 
   @ApiProperty({
@@ -23,7 +24,7 @@ export class UserResponseDto {
     description: 'Avatar URL',
     nullable: true,
   })
-  profilePictureUrl?: string | null; // Maps from profile_picture_url
+  profilePictureUrl?: string | null;
 
   @ApiProperty({
     example: 'A short bio about the user.',
@@ -38,10 +39,7 @@ export class UserResponseDto {
     example: [Role.USER],
     description: 'User roles',
   })
-  roles: Role[]; // Assuming Role enum from your auth module
-
-  // @ApiProperty({ type: () => UserAccessDto, nullable: true, description: 'User access/subscription details' })
-  // userAccess?: UserAccessDto | null; // Map UserAccess to its DTO if applicable
+  roles: Role[];
 
   @ApiProperty({
     example: '2023-01-01T00:00:00.000Z',
@@ -64,12 +62,17 @@ export class UserResponseDto {
   birthday?: Date | null;
 
   @ApiProperty({ example: 100, description: 'Number of followers' })
-  followersCount: number; // Maps from followers_count
+  followersCount: number;
 
   @ApiProperty({ example: 50, description: 'Number of followings' })
-  followingsCount: number; // Maps from followings_count
+  followingsCount: number;
 
-  // Omit stripe_customer_id if it's sensitive and not for general user response
+  @ApiProperty({
+    enum: UserStatus,
+    example: UserStatus.ACTIVE,
+    description: "The user's account status.",
+  })
+  status: UserStatus;
 }
 
 export class DeleteUserByIdResponseDto {
