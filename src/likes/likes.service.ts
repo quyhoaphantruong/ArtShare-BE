@@ -8,6 +8,7 @@ import { RemoveLikeDto } from './dto/request/remove-like.dto';
 import { TryCatch } from 'src/common/try-catch.decorator';
 import { LikingUserResponseDto } from './dto/response/liking-user-response.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotificationUtils } from '../common/utils/notification.utils';
 
 @Injectable()
 export class LikesService {
@@ -40,15 +41,18 @@ export class LikesService {
             data: { like_count: { increment: 1 } },
           });
 
-          this.eventEmitter.emit('push-notification', {
-            from: userId,
-            to: postUpdated.user_id,
-            type: 'artwork_liked',
-            post: { id: postUpdated.id, title: postUpdated.title },
-            postId: postUpdated.id.toString(),
-            postTitle: postUpdated.title,
-            createdAt: new Date(),
-          });
+          // Only send notification if the user is not liking their own post
+          if (NotificationUtils.shouldSendNotification(userId, postUpdated.user_id)) {
+            this.eventEmitter.emit('push-notification', {
+              from: userId,
+              to: postUpdated.user_id,
+              type: 'artwork_liked',
+              post: { id: postUpdated.id, title: postUpdated.title },
+              postId: postUpdated.id.toString(),
+              postTitle: postUpdated.title,
+              createdAt: new Date(),
+            });
+          }
         } else {
           await tx.blog.update({
             where: { id: dto.target_id },

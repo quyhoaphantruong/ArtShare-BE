@@ -19,6 +19,7 @@ import { PostsManagementValidator } from './validator/posts-management.validator
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserFollowService } from 'src/user/user.follow.service';
 import { FollowerDto } from 'src/user/dto/follower.dto';
+import { NotificationUtils } from '../common/utils/notification.utils';
 
 @Injectable()
 export class PostsManagementService {
@@ -78,9 +79,10 @@ export class PostsManagementService {
 
     const followers: FollowerDto[] = await this.followService.getFollowersListByUserId(userId);
 
-    for (const follower of followers) {
-      if (follower.id === userId) continue;
+    // Filter out the post author from followers and send notifications
+    const notificationRecipients = NotificationUtils.filterNotificationRecipients(followers, userId);
 
+    for (const follower of notificationRecipients) {
       this.eventEmitter.emit('push-notification', {
         from: userId,
         to: follower.id,
