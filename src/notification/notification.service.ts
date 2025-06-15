@@ -2,6 +2,7 @@ import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { NotificationsGateway } from './notification.gateway';
+import { NotificationUtils } from '../common/utils/notification.utils';
 
 interface NotificationTemplate {
   template: string;
@@ -381,8 +382,8 @@ export class NotificationService {
       `Caught push-notification event (type: ${payload.type}), creating notification...`,
     );
 
-    // Prevent self-notifications as a safety net
-    if (payload.from && payload.to && payload.from === payload.to) {
+    // Prevent self-notifications using centralized utility
+    if (!NotificationUtils.shouldSendNotification(payload.from, payload.to)) {
       return;
     }
 

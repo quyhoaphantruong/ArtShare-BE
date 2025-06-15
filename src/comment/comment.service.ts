@@ -12,6 +12,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CommentDto } from './dto/get-comment.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotificationUtils } from '../common/utils/notification.utils';
 
 @Injectable()
 export class CommentService {
@@ -112,7 +113,7 @@ export class CommentService {
 
           // Only send notification if the user is not commenting on their own post
           const targetUserId = userIsReplied == null ? owner_post_id : userIsReplied.user_id;
-          if (userId !== targetUserId) {
+          if (targetUserId && NotificationUtils.shouldSendNotification(userId, targetUserId)) {
             this.eventEmitter.emit('push-notification', {
               from: userId,
               to: targetUserId,
