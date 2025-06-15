@@ -178,7 +178,7 @@ export class ReportService {
     });
 
     this.eventEmitter.emit('report.resolved', {
-      reporterId:  updatedReport.moderator_id,
+      reporterId: updatedReport.reporter_id,
       reportId: updatedReport.id,
       reason: updatedReport.reason,
       resolvedAt: updatedReport.resolved_at,

@@ -13,4 +13,5 @@ export class UserProfileMeDTO {
   roles: Role[];
   isFollowing: boolean;
   is_onboard: boolean;
+  created_at: Date;
 }
