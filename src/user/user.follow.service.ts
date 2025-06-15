@@ -16,12 +16,15 @@ import {
   UnfollowUserResponseDto,
 } from 'src/common/dto/api-response.dto';
 import { FollowerDto } from './dto/follower.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class UserFollowService {
   private readonly logger = new Logger(UserFollowService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService,
+              private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async followUser(
     followerId: string,
@@ -69,6 +72,14 @@ export class UserFollowService {
           data: { followers_count: { increment: 1 } },
         }),
       ]);
+
+      this.eventEmitter.emit('push-notification', {
+        from: followerId,
+        to: followingId,
+        type: 'user_followed',
+        createdAt: new Date(),
+      });
+      
       const responseData: FollowUnfollowDataDto = { followerId, followingId };
       return new FollowUserResponseDto(
         true,

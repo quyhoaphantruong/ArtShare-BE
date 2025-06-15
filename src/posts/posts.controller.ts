@@ -94,15 +94,16 @@ export class PostsController {
     return this.postsExploreService.searchPosts(query, user?.id ?? '');
   }
 
+  @Public()
   @Post('for-you')
   async getForYouPosts(
     @Body() body: { page: number; page_size: number; filter: string[] },
-    @CurrentUser() user: CurrentUserType,
+    @CurrentUser() user?: CurrentUserType,
   ): Promise<PostListItemResponseDto[]> {
     const { page = 1, page_size = 25, filter } = body;
 
     return this.postsExploreService.getForYouPosts(
-      user.id,
+      user?.id ?? '',
       page,
       page_size,
       filter,

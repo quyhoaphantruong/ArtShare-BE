@@ -12,6 +12,7 @@ import { FacebookAuthService } from './facebook/facebook.service';
 import { HttpModule } from '@nestjs/axios';
 import { EncryptionService } from 'src/encryption/encryption.service';
 import { PlatformModule } from 'src/platform/platform.module';
+import { WebSocketJwtAuthGuard } from './websocket-jwt-auth.guard';
 
 @Module({
   imports: [
@@ -39,9 +40,10 @@ import { PlatformModule } from 'src/platform/platform.module';
     RtStrategy,
     FacebookAuthService,
     EncryptionService,
+    WebSocketJwtAuthGuard,
   ],
   controllers: [AuthController, FacebookController],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, WebSocketJwtAuthGuard],
 })
 export class AuthModule {
   constructor() {}

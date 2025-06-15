@@ -20,5 +20,6 @@ import { UserReadService } from './user-read.service';
     AuthService,
     UserReadService,
   ],
+  exports: [UserFollowService],
 })
 export class UserModule {}

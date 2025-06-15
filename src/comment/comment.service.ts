@@ -11,11 +11,16 @@ import { Comment, TargetType } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CommentDto } from './dto/get-comment.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotificationUtils } from '../common/utils/notification.utils';
 import { TryCatch } from 'src/common/try-catch.decorator';
 
 @Injectable()
 export class CommentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async create(dto: CreateCommentDto, userId: string): Promise<Comment> {
     const { content, target_id, target_type, parent_comment_id } = dto;
@@ -40,6 +45,9 @@ export class CommentService {
       }
     }
 
+    let owner_post_id = null;
+    let post_title = null;
+
     if (target_type === TargetType.POST) {
       const post = await this.prisma.post.findUnique({
         where: { id: target_id },
@@ -47,6 +55,8 @@ export class CommentService {
       if (!post) {
         throw new NotFoundException(`Post ${target_id} not found.`);
       }
+      owner_post_id = post.user_id;
+      post_title = post.title;
     } else if (target_type === TargetType.BLOG) {
       const blog = await this.prisma.blog.findUnique({
         where: { id: target_id },
@@ -96,6 +106,33 @@ export class CommentService {
               where: { id: target_id },
               data: { comment_count: { increment: 1 } },
             });
+            let userIsReplied = null;
+            if (dto.parent_comment_id != null) {
+              userIsReplied = await this.prisma.comment.findFirst({
+                where: { parent_comment_id: dto.parent_comment_id },
+                select: { user_id: true },
+              });
+            }
+
+            // Only send notification if the user is not commenting on their own post
+            const targetUserId =
+              userIsReplied == null ? owner_post_id : userIsReplied.user_id;
+            if (
+              targetUserId &&
+              NotificationUtils.shouldSendNotification(userId, targetUserId)
+            ) {
+              this.eventEmitter.emit('push-notification', {
+                from: userId,
+                to: targetUserId,
+                type: 'artwork_commented',
+                post: { title: post_title ? post_title : 'post' },
+                comment: { text: dto.content },
+                postId: target_id.toString(),
+                commentId: newComment.id.toString(),
+                postTitle: post_title ? post_title : 'post',
+                createdAt: new Date(),
+              });
+            }
           } else {
             await tx.blog.update({
               where: { id: target_id },
