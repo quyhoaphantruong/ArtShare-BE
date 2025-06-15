@@ -1,17 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-metadata.dto';
-import { PrismaService } from 'src/prisma.service';
-import OpenAI from 'openai';
-import { z } from 'zod';
-import { zodTextFormat } from 'openai/helpers/zod';
-import { EmbeddingService } from 'src/embedding/embedding.service';
+import { ConfigService } from '@nestjs/config';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { plainToInstance } from 'class-transformer';
-import { PostCategoryResponseDto } from './dto/response/category.dto';
-import { UsageService } from 'src/usage/usage.service';
+import OpenAI from 'openai';
+import { zodTextFormat } from 'openai/helpers/zod';
 import { FeatureKey } from 'src/common/enum/subscription-feature-key.enum';
 import { TryCatch } from 'src/common/try-catch.decorator';
-import { ConfigService } from '@nestjs/config';
+import { EmbeddingService } from 'src/embedding/embedding.service';
+import { PrismaService } from 'src/prisma.service';
+import { UsageService } from 'src/usage/usage.service';
+import { z } from 'zod';
+import { PostCategoryResponseDto } from './dto/response/category.dto';
+import { GeneratePostMetadataResponseDto } from './dto/response/generate-post-metadata.dto';
 
 const PostMetadata = z.object({
   title: z.string(),
@@ -126,12 +126,25 @@ export class WorkflowAssistService {
   ): Promise<{ id: number; name: string }[]> {
     const batchInput = await Promise.all(
       imageFiles.map(async (file) => {
-        return {
-          query: await this.embeddingService.generateEmbeddingFromImageBlob(
+        const queryEmbedding =
+          await this.embeddingService.generateEmbeddingFromImageBlob(
             new Blob([file.buffer]),
-          ),
-          using: 'description',
-          score_threshold: 0.22,
+          );
+        return {
+          prefetch: [
+            {
+              query: queryEmbedding,
+              using: 'name',
+            },
+            {
+              query: queryEmbedding,
+              using: 'description',
+            },
+          ],
+          query: {
+            fusion: 'dbsf',
+          },
+          // score_threshold: 0.22,
           limit: 1,
           with_payload: true,
         };
